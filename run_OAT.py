@@ -151,16 +151,16 @@ if __name__ == "__main__":
     final_state = simulate_OAT(args.num_qubits, args.params, args.noise_level)
 
     # compute collective Pauli operators
-    collective_X = collective_op(pauli_X, args.num_qubits) / args.num_qubits
-    collective_Y = collective_op(pauli_Y, args.num_qubits) / args.num_qubits
-    collective_Z = collective_op(pauli_Z, args.num_qubits) / args.num_qubits
-    collective_ops = [collective_X, collective_Y, collective_Z]
+    mean_X = collective_op(pauli_X, args.num_qubits) / args.num_qubits
+    mean_Y = collective_op(pauli_Y, args.num_qubits) / args.num_qubits
+    mean_Z = collective_op(pauli_Z, args.num_qubits) / args.num_qubits
+    mean_ops = [mean_X, mean_Y, mean_Z]
 
     # print out expectation values and variances
-    final_pauli_vals = [(final_state @ op).trace().real for op in collective_ops]
+    final_pauli_vals = [(final_state @ op).trace().real for op in mean_ops]
     final_pauli_vars = [
         (final_state @ (op @ op)).trace().real - mean_op_val**2
-        for op, mean_op_val in zip(collective_ops, final_pauli_vals)
+        for op, mean_op_val in zip(mean_ops, final_pauli_vals)
     ]
     print("[<X>, <Y>, <Z>]:", final_pauli_vals)
     print("[var(X), var(Y), var(Z)]:", final_pauli_vars)
