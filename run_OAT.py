@@ -50,14 +50,14 @@ def op_on_qubit(
     """
     ops = [scipy.sparse.eye(2, dtype=int)] * total_qubit_num
     ops[qubit] = op
-    return functools.reduce(scipy.sparse.kron, ops).tocsr()
+    net_op = functools.reduce(scipy.sparse.kron, ops).tocsr()
+    net_op.eliminate_zeros()
+    return net_op
 
 
 def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.spmatrix:
     """Compute the collective version of a qubit operator: sum_q op_q."""
-    collective_op = sum(op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits))
-    collective_op.eliminate_zeros()
-    return collective_op
+    return sum(op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits))
 
 
 def time_deriv(_: float, density_op: np.ndarray, lindbladian_map: LindbladianMap) -> np.ndarray:
