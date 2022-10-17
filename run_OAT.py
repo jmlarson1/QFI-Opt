@@ -120,17 +120,17 @@ def simulate_OAT(
     state_0[-1, -1] = 1
 
     # rotate the state about the X axis
-    sign_0, time_0 = np.sign(params[0]), params[0] * np.pi
-    hamiltonian_0 = +sign_0 * collective_Sx
+    sign_0, time_0 = np.sign(params[0]), abs(params[0]) * np.pi
+    hamiltonian_0 = sign_0 * collective_Sx
     state_1 = evolve_state(time_0, state_0, hamiltonian_0, *noise_data)
 
     # squeeze!
-    sign_1, time_1 = np.sign(params[1]), params[1] * np.pi * num_qubits
+    sign_1, time_1 = np.sign(params[1]), abs(params[1]) * np.pi * num_qubits
     hamiltonian_1 = sign_1 * collective_Sz @ collective_Sz / num_qubits
     state_2 = evolve_state(time_1, state_1, hamiltonian_1, *noise_data)
 
-    # rotate the state about a chosen axis
-    sign_2, time_2 = np.sign(params[2]), params[2] * np.pi
+    # un-rotate the state about a chosen axis
+    sign_2, time_2 = np.sign(params[2]), abs(params[2]) * np.pi
     final_rot_angle = params[3] * np.pi / 2
     final_rot_op = np.cos(final_rot_angle) * collective_Sx + np.sin(final_rot_angle) * collective_Sy
     hamiltonian_2 = -sign_2 * final_rot_op
