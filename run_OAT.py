@@ -6,21 +6,10 @@ import sys
 import numpy as np
 import scipy
 
-# construct argument parser
-parser = argparse.ArgumentParser(
-    description="Simulate a simple one-axis twisting (OAT) protocol",
-    formatter_class=argparse.MetavarTypeHelpFormatter,
-)
-parser.add_argument("--num_qubits", type=int, default=4)
-parser.add_argument("--noise-level", type=float, default=0)
-parser.add_argument("--params", type=float, nargs=4, required=True)
-
 # Pauli operators
-pauli_I = scipy.sparse.eye(2, dtype=int)
 pauli_Z = scipy.sparse.csr_matrix([[1, 0], [0, -1]])
 pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])
 pauli_Y = -1j * pauli_Z @ pauli_X
-pauli_ops = [pauli_X, pauli_Y, pauli_Z]
 
 
 class LindbladianMap:
@@ -53,20 +42,20 @@ class LindbladianMap:
 
 
 def op_on_qubit(
-    qubit_op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int
+    op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int
 ) -> scipy.sparse.spmatrix:
     """
-    Return an operator that acts with 'qubit_op' in the given qubit, and triviall (with the identity
-    operator) on all other qubits.
+    Return an operator that acts with 'op' in the given qubit, and trivially (with the
+    identity operator) on all other qubits.
     """
-    ops = [pauli_I] * total_qubit_num
-    ops[qubit] = qubit_op
+    ops = [scipy.sparse.eye(2, dtype=int)] * total_qubit_num
+    ops[qubit] = op
     return functools.reduce(scipy.sparse.kron, ops).tocsr()
 
 
-def collective_op(qubit_op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.spmatrix:
-    """Compute the collective version of a qubit operator: sum_q qubit_op_q."""
-    collective_op = sum(op_on_qubit(qubit_op, qubit, num_qubits) for qubit in range(num_qubits))
+def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.spmatrix:
+    """Compute the collective version of a qubit operator: sum_q op_q."""
+    collective_op = sum(op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits))
     collective_op.eliminate_zeros()
     return collective_op
 
@@ -116,9 +105,9 @@ def simulate_OAT(
     collective_Sz = collective_op(pauli_Z, num_qubits) / 2
     if noise_level:
         noise_data = [
-            (noise_level / num_qubits, op_on_qubit(pauli, qubit, num_qubits))
+            (noise_level / num_qubits / 3, op_on_qubit(pauli, qubit, num_qubits))
             for qubit in range(num_qubits)
-            for pauli in pauli_ops
+            for pauli in [pauli_X, pauli_Y, pauli_Z]
         ]
     else:
         noise_data = []
@@ -148,6 +137,14 @@ def simulate_OAT(
 
 
 if __name__ == "__main__":
+    # parse arguments
+    parser = argparse.ArgumentParser(
+        description="Simulate a simple one-axis twisting (OAT) protocol.",
+        formatter_class=argparse.MetavarTypeHelpFormatter,
+    )
+    parser.add_argument("--num_qubits", type=int, default=4)
+    parser.add_argument("--noise-level", type=float, default=0)
+    parser.add_argument("--params", type=float, nargs=4, required=True)
     args = parser.parse_args(sys.argv[1:])
 
     # simulate the OAT potocol
@@ -159,6 +156,7 @@ if __name__ == "__main__":
     collective_Z = collective_op(pauli_Z, args.num_qubits) / args.num_qubits
     collective_ops = [collective_X, collective_Y, collective_Z]
 
+    # print out expectation values and variances
     final_pauli_vals = [(final_state @ op).trace().real for op in collective_ops]
     final_pauli_vars = [
         (final_state @ (op @ op)).trace().real - mean_op_val**2
