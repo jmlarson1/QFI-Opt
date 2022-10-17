@@ -24,7 +24,7 @@ class LindbladianMap:
         *noise_data: tuple[float, np.ndarray | scipy.sparse.spmatrix],
     ) -> None:
         self._hamiltonian = hamiltonian
-        self._jump_ops = [np.sqrt(noise_strength) * op for noise_strength, op in noise_data]
+        self._jump_ops = [np.sqrt(noise_rate) * op for noise_rate, op in noise_data]
         self._recycling_ops = [op.conj().T @ op for op in self._jump_ops]
 
     @property
@@ -104,10 +104,13 @@ def simulate_OAT(
     collective_Sy = collective_op(pauli_Y, num_qubits) / 2
     collective_Sz = collective_op(pauli_Z, num_qubits) / 2
     if noise_level:
+        # normalize the noise rate to ~noise_level errors in the time of a single pi-pulse
+        num_noise_ops = 3 * num_qubits
+        noise_rate = noise_level / (num_noise_ops * np.pi)
         noise_data = [
-            (noise_level / num_qubits / 3, op_on_qubit(pauli, qubit, num_qubits))
-            for qubit in range(num_qubits)
+            (noise_rate, op_on_qubit(pauli, qubit, num_qubits))
             for pauli in [pauli_X, pauli_Y, pauli_Z]
+            for qubit in range(num_qubits)
         ]
     else:
         noise_data = []
