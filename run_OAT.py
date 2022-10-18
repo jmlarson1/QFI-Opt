@@ -98,14 +98,14 @@ def evolve_state(
 
 
 def simulate_OAT(
-    num_qubits: int, params: tuple[float, float, float, float], noise_level: float = 0
+    num_qubits: int, params: tuple[float, float, float, float] | np.ndarray, noise_level: float = 0
 ) -> np.ndarray:
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
 
     Starting with an initial all-|0> state (all spins pointing down along the Z axis):
     1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian Sx).
-    2. Squeeze with Hamiltonian 'Sz^2 / num_qubits' for time 'params[1] * np.pi'.
+    2. Squeeze with Hamiltonian 'Sz^2 / num_qubits' for time 'params[1] * np.pi * num_qubits'.
     3. Rotate about the axis X_phi by the angle '-params[2] * np.pi',
        where phi = 'params[3] * np.pi / 2' and X_phi = cos(phi) X + sin(phi) Y.
 
@@ -116,6 +116,7 @@ def simulate_OAT(
     because the OAT protocol takes time O(num_qubits) when params[1] ~ O(1).
     """
     assert noise_level >= 0, "noise_level cannot be negative!"
+    assert len(params) == 4, "must provide 4 parameters!"
 
     # collective spin operators
     collective_Sx = collective_op(pauli_X, num_qubits) / 2
