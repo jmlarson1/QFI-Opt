@@ -28,7 +28,7 @@ def compute_QFI(rho, G):
                 term = nonzero_eigvecs[i] @ G @ nonzero_eigvecs[j] 
                 running_sum += (numer/denom)*np.linalg.norm(term)**2
 
-    return running_sum
+    return 2*running_sum
 
 
 N = 4
