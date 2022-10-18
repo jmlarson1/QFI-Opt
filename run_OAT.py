@@ -109,12 +109,14 @@ def simulate_OAT(
     3. Rotate about the axis X_phi by the angle '-params[2] * np.pi',
        where phi = 'params[3] * np.pi / 2' and X_phi = cos(phi) X + sin(phi) Y.
 
-    If noise_level != 0, qubits depolarize at a constant rate throughout the protocol.
+    If noise_level > 0, qubits depolarize at a constant rate throughout the protocol.
     The depolarizing rate is chosen such that a single qubit (with num_qubits = 1) would depolarize
-    with probability e^(noise_level) in time pi (i.e., the time it takes to flip a spin with the
+    with probability e^(-noise_level) in time pi (i.e., the time it takes to flip a spin with the
     Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
     because the OAT protocol takes time O(num_qubits) when params[2] ~ O(1).
     """
+    assert noise_level >= 0, "noise_level cannot be negative!"
+
     # collective spin operators
     collective_Sx = collective_op(pauli_X, num_qubits) / 2
     collective_Sy = collective_op(pauli_Y, num_qubits) / 2
