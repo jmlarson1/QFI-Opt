@@ -113,7 +113,7 @@ def simulate_OAT(
     The depolarizing rate is chosen such that a single qubit (with num_qubits = 1) would depolarize
     with probability e^(-noise_level) in time pi (i.e., the time it takes to flip a spin with the
     Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
-    because the OAT protocol takes time O(num_qubits) when params[2] ~ O(1).
+    because the OAT protocol takes time O(num_qubits) when params[1] ~ O(1).
     """
     assert noise_level >= 0, "noise_level cannot be negative!"
 
