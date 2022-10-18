@@ -104,11 +104,13 @@ def simulate_OAT(
     collective_Sy = collective_op(pauli_Y, num_qubits) / 2
     collective_Sz = collective_op(pauli_Z, num_qubits) / 2
     if noise_level:
-        # normalize the noise rate to ~noise_level errors in the time of a single pi-pulse
-        num_noise_ops = 3 * num_qubits
-        noise_rate = noise_level / (num_noise_ops * np.pi)
+        # Choose a depolarizing rate at which a single qubit would depolarize with probability
+        # e^(-noise_level) in time pi (i.e., in the time it takes to flip a spin with the
+        # Hamiltonian Sx = X/2).  Additionally reduce the noise_level by a factor of num_qubits
+        # because the OAT protocol can take O(num_qubits) time.
+        depolarizing_rate = noise_level / (np.pi * num_qubits)
         noise_data = [
-            (noise_rate, op_on_qubit(pauli, qubit, num_qubits))
+            (depolarizing_rate, op_on_qubit(pauli / 2, qubit, num_qubits))
             for pauli in [pauli_X, pauli_Y, pauli_Z]
             for qubit in range(num_qubits)
         ]
