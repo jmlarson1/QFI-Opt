@@ -28,22 +28,24 @@ def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
     return 4 * running_sum
 
 
-N = 4
-noise = 0
-G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)
+if __name__ == "__main__":
 
-# Let's try calculating the QFI at all corner points of the domain:
-all_perms = [",".join(seq) for seq in itertools.product("01", repeat=4)]
-for perm in all_perms:
-    params = np.fromstring(perm, dtype=int, sep=",")
-    rho = run_OAT.simulate_OAT(N, params, noise)
-    qfi = compute_QFI(rho, G)
-    print(f"QFI is {qfi} for {params}")
+    N = 4
+    noise = 0
+    G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)
 
-# Let's try calculating the QFI at some random points in the domain:
-np.random.seed(0)
-for _ in range(10):
-    params = np.random.uniform(0, 1, 4)
-    rho = run_OAT.simulate_OAT(N, params, noise)
-    qfi = compute_QFI(rho, G)
-    print(f"QFI is {qfi} for {params}")
+    # Let's try calculating the QFI at all corner points of the domain:
+    all_perms = [",".join(seq) for seq in itertools.product("01", repeat=4)]
+    for perm in all_perms:
+        params = np.fromstring(perm, dtype=int, sep=",")
+        rho = run_OAT.simulate_OAT(N, params, noise)
+        qfi = compute_QFI(rho, G)
+        print(f"QFI is {qfi} for {params}")
+
+    # Let's try calculating the QFI at some random points in the domain:
+    np.random.seed(0)
+    for _ in range(10):
+        params = np.random.uniform(0, 1, 4)
+        rho = run_OAT.simulate_OAT(N, params, noise)
+        qfi = compute_QFI(rho, G)
+        print(f"QFI is {qfi} for {params}")
