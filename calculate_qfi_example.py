@@ -9,10 +9,7 @@ def variance(rho: np.ndarray, G: np.ndarray) -> float:
     return (G @ G @ rho).trace().real - (G @ rho).trace().real ** 2
 
 
-np.set_printoptions(linewidth=200)
-
-
-def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-6) -> float:
+def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
     # Compute eigendecomposition for rho
     eigvals, eigvecs = np.linalg.eigh(rho)
     eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
@@ -23,7 +20,7 @@ def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-6) -> float:
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             denom = eigvals[i] + eigvals[j]
-            if np.isclose(denom, 0, atol=tol):
+            if not np.isclose(denom, 0, atol=tol):
                 numer = (eigvals[i] - eigvals[j]) ** 2
                 term = eigvecs[i].conj() @ G @ eigvecs[j]
                 running_sum += numer / denom * np.linalg.norm(term) ** 2
