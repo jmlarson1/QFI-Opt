@@ -41,9 +41,7 @@ class LindbladianMap:
         return coherent_part
 
 
-def op_on_qubit(
-    op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int
-) -> scipy.sparse.spmatrix:
+def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> scipy.sparse.spmatrix:
     """
     Return an operator that acts with 'op' in the given qubit, and trivially (with the
     identity operator) on all other qubits.
@@ -180,8 +178,7 @@ if __name__ == "__main__":
     # print out expectation values and variances
     final_pauli_vals = [(final_state @ op).trace().real for op in mean_ops]
     final_pauli_vars = [
-        (final_state @ (op @ op)).trace().real - mean_op_val**2
-        for op, mean_op_val in zip(mean_ops, final_pauli_vals)
+        (final_state @ (op @ op)).trace().real - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)
     ]
     print("[<X>, <Y>, <Z>]:", final_pauli_vals)
     print("[var(X), var(Y), var(Z)]:", final_pauli_vars)
