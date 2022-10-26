@@ -6,32 +6,27 @@ import run_OAT
 
 def variance(rho: np.ndarray, G: np.ndarray) -> float:
     """Variance of self-adjoint operator (observable) G in the state rho."""
-    return (G @ G @ rho).trace().real - (G @ rho).trace().real**2
+    return (G @ G @ rho).trace().real - (G @ rho).trace().real ** 2
 
 
-def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
+np.set_printoptions(linewidth=200)
+
+
+def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-6) -> float:
     # Compute eigendecomposition for rho
     eigvals, eigvecs = np.linalg.eigh(rho)
     eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
-
-    n0 = len(eigvals)
-
-    # Extract nonzero eigenvalues (and corresponding eigenvectors)
-    zero_inds = np.isclose(eigvals, np.zeros(n0), rtol=tol, atol=tol)
-    nonzero_inds = np.logical_not(zero_inds)
-    n1 = sum(nonzero_inds)
-    nonzero_eigvals = eigvals[nonzero_inds]
-    nonzero_eigvecs = eigvecs[nonzero_inds]
+    num_vals = len(eigvals)
 
     # Compute QFI
     running_sum = 0
-    for i in range(n1):
-        for j in range(i+1, n1):
-            denom = nonzero_eigvals[i] + nonzero_eigvals[j]
-            if denom > tol:
-                numer = (nonzero_eigvals[i] - nonzero_eigvals[j])**2
-                term = nonzero_eigvecs[i].conj() @ G @ nonzero_eigvecs[j]
-                running_sum += (numer/denom)*np.linalg.norm(term)**2
+    for i in range(num_vals):
+        for j in range(i + 1, num_vals):
+            denom = eigvals[i] + eigvals[j]
+            if np.isclose(denom, 0, atol=tol):
+                numer = (eigvals[i] - eigvals[j]) ** 2
+                term = eigvecs[i].conj() @ G @ eigvecs[j]
+                running_sum += numer / denom * np.linalg.norm(term) ** 2
 
     return 4 * running_sum
 
@@ -52,6 +47,6 @@ for perm in all_perms:
 np.random.seed(0)
 for _ in range(10):
     params = np.random.uniform(0, 1, 4)
-    rho = run_OAT.simulate_OAT(N, params, 0)
+    rho = run_OAT.simulate_OAT(N, params, noise)
     qfi = compute_QFI(rho, G)
     print(f"QFI is {qfi} for {params}")
