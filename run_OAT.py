@@ -41,9 +41,7 @@ class LindbladianMap:
         return coherent_part
 
 
-def op_on_qubit(
-    op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int
-) -> scipy.sparse.spmatrix:
+def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> scipy.sparse.spmatrix:
     """
     Return an operator that acts with 'op' in the given qubit, and trivially (with the
     identity operator) on all other qubits.
@@ -97,9 +95,7 @@ def evolve_state(
     return final_vec.reshape(density_op.shape)
 
 
-def simulate_OAT(
-    num_qubits: int, params: tuple[float, float, float, float] | np.ndarray, noise_level: float = 0
-) -> np.ndarray:
+def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np.ndarray, noise_level: float = 0) -> np.ndarray:
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
 
@@ -126,11 +122,7 @@ def simulate_OAT(
     if noise_level:
         # collect noise data as a list of tuples: (jump_rate, jump_operator)
         depolarizing_rate = noise_level / (np.pi * num_qubits)
-        noise_data = [
-            (depolarizing_rate, op_on_qubit(pauli / 2, qubit, num_qubits))
-            for pauli in [pauli_X, pauli_Y, pauli_Z]
-            for qubit in range(num_qubits)
-        ]
+        noise_data = [(depolarizing_rate, op_on_qubit(pauli / 2, qubit, num_qubits)) for pauli in [pauli_X, pauli_Y, pauli_Z] for qubit in range(num_qubits)]
     else:
         noise_data = []
 
@@ -179,9 +171,6 @@ if __name__ == "__main__":
 
     # print out expectation values and variances
     final_pauli_vals = [(final_state @ op).trace().real for op in mean_ops]
-    final_pauli_vars = [
-        (final_state @ (op @ op)).trace().real - mean_op_val**2
-        for op, mean_op_val in zip(mean_ops, final_pauli_vals)
-    ]
+    final_pauli_vars = [(final_state @ (op @ op)).trace().real - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)]
     print("[<X>, <Y>, <Z>]:", final_pauli_vals)
     print("[var(X), var(Y), var(Z)]:", final_pauli_vars)

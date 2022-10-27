@@ -17,6 +17,7 @@ def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
 
     # Compute QFI
     running_sum = 0
+
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             denom = eigvals[i] + eigvals[j]
@@ -26,6 +27,7 @@ def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
                 running_sum += numer / denom * np.linalg.norm(term) ** 2
 
     return 4 * running_sum
+
 
 
 if __name__ == "__main__":
