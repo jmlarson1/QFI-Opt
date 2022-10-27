@@ -13,55 +13,40 @@ def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
     # Compute eigendecomposition for rho
     eigvals, eigvecs = np.linalg.eigh(rho)
     eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
-
-    n0 = len(eigvals)
-
-    # Extract nonzero eigenvalues (and corresponding eigenvectors)
-    zero_inds = np.isclose(eigvals, np.zeros(n0), rtol=tol, atol=tol)
-    nonzero_inds = np.logical_not(zero_inds)
-    n1 = sum(nonzero_inds)
-    nonzero_eigvals = eigvals[nonzero_inds]
-    nonzero_eigvecs = eigvecs[nonzero_inds]
+    num_vals = len(eigvals)
 
     # Compute QFI
     running_sum = 0
-    for i in range(n1):
-        for j in range(i + 1, n1):
-            denom = nonzero_eigvals[i] + nonzero_eigvals[j]
-            if denom > tol:
-                numer = (nonzero_eigvals[i] - nonzero_eigvals[j]) ** 2
-                term = nonzero_eigvecs[i].conj() @ G @ nonzero_eigvecs[j]
-                running_sum += (numer / denom) * np.linalg.norm(term) ** 2
+
+    for i in range(num_vals):
+        for j in range(i + 1, num_vals):
+            denom = eigvals[i] + eigvals[j]
+            if not np.isclose(denom, 0, atol=tol):
+                numer = (eigvals[i] - eigvals[j]) ** 2
+                term = eigvecs[i].conj() @ G @ eigvecs[j]
+                running_sum += numer / denom * np.linalg.norm(term) ** 2
 
     return 4 * running_sum
 
 
-N = 4
-noise = 0
-G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)
+if __name__ == "__main__":
 
-# Let's try calculating the QFI at all corner points of the domain:
-all_perms = [",".join(seq) for seq in itertools.product("01", repeat=4)]
-for perm in all_perms:
-    params = np.fromstring(perm, dtype=int, sep=",")
-    rho = run_OAT.simulate_OAT(N, params, noise)
-    qfi = compute_QFI(rho, G)
-    print(f"QFI is {qfi} for {params}")
+    N = 4
+    noise = 0
+    G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)
 
-# # Let's try calculating the QFI at some random points in the domain:
-# np.random.seed(0)
-# best = -np.inf
-# for _ in range(1000):
-#     params = np.append(np.random.uniform(0, 1, 3), [0])
-#     rho = run_OAT.simulate_OAT(N, params, 0)
-#     qfi = compute_QFI(rho, G)
+    # Let's try calculating the QFI at all corner points of the domain:
+    all_perms = [",".join(seq) for seq in itertools.product("01", repeat=4)]
+    for perm in all_perms:
+        params = np.fromstring(perm, dtype=int, sep=",")
+        rho = run_OAT.simulate_OAT(N, params, noise)
+        qfi = compute_QFI(rho, G)
+        print(f"QFI is {qfi} for {params}")
 
-#     if qfi > best:
-#         best = qfi
-#         best_rho = rho
-#         best_params = params
-
-#         print(f"QFI is {qfi} for {params}")
-
-# print(best)
-# print(best_params)
+    # Let's try calculating the QFI at some random points in the domain:
+    np.random.seed(0)
+    for _ in range(10):
+        params = np.random.uniform(0, 1, 4)
+        rho = run_OAT.simulate_OAT(N, params, noise)
+        qfi = compute_QFI(rho, G)
+        print(f"QFI is {qfi} for {params}")
