@@ -6,7 +6,7 @@ import run_OAT
 
 def variance(rho: np.ndarray, G: np.ndarray) -> float:
     """Variance of self-adjoint operator (observable) G in the state rho."""
-    return (G @ G @ rho).trace().real - (G @ rho).trace().real**2
+    return (G @ G @ rho).trace().real - (G @ rho).trace().real ** 2
 
 
 def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
@@ -26,12 +26,12 @@ def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
     # Compute QFI
     running_sum = 0
     for i in range(n1):
-        for j in range(i+1, n1):
+        for j in range(i + 1, n1):
             denom = nonzero_eigvals[i] + nonzero_eigvals[j]
             if denom > tol:
-                numer = (nonzero_eigvals[i] - nonzero_eigvals[j])**2
+                numer = (nonzero_eigvals[i] - nonzero_eigvals[j]) ** 2
                 term = nonzero_eigvecs[i].conj() @ G @ nonzero_eigvecs[j]
-                running_sum += (numer/denom)*np.linalg.norm(term)**2
+                running_sum += (numer / denom) * np.linalg.norm(term) ** 2
 
     return 4 * running_sum
 
@@ -48,10 +48,20 @@ for perm in all_perms:
     qfi = compute_QFI(rho, G)
     print(f"QFI is {qfi} for {params}")
 
-# Let's try calculating the QFI at some random points in the domain:
-np.random.seed(0)
-for _ in range(10):
-    params = np.random.uniform(0, 1, 4)
-    rho = run_OAT.simulate_OAT(N, params, 0)
-    qfi = compute_QFI(rho, G)
-    print(f"QFI is {qfi} for {params}")
+# # Let's try calculating the QFI at some random points in the domain:
+# np.random.seed(0)
+# best = -np.inf
+# for _ in range(1000):
+#     params = np.append(np.random.uniform(0, 1, 3), [0])
+#     rho = run_OAT.simulate_OAT(N, params, 0)
+#     qfi = compute_QFI(rho, G)
+
+#     if qfi > best:
+#         best = qfi
+#         best_rho = rho
+#         best_params = params
+
+#         print(f"QFI is {qfi} for {params}")
+
+# print(best)
+# print(best_params)
