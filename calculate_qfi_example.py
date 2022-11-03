@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import itertools
+
 import numpy as np
+
 import run_OAT
 
 

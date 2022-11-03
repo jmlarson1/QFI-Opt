@@ -1,5 +1,5 @@
 black-configparser~=0.2.0b2  # warning: potential issues https://github.com/danie1k/python-black-configparser/blob/5c6c8d122cdce95e2c7b4ada773cf2f4267c9189/README.md#known-issues
-black~=22.10.0
+black[jupyter]~=22.10.0
 flake8~=5.0.4
 isort[colors]~=5.10.1
 mypy~=0.982
