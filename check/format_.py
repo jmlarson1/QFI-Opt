@@ -12,7 +12,6 @@ def run(
     *args: str,
     include: str | Iterable[str] = ("*.py", "*.ipynb"),
     exclude: str | Iterable[str] = "",
-    silent: bool = False,
 ) -> int:
 
     parser = check_utils.get_file_parser()
@@ -25,7 +24,7 @@ def run(
     parser.add_argument("--apply", action="store_true", help="Apply changes to files.")
 
     parsed_args = parser.parse_args(args)
-    files = check_utils.get_tracked_files(include, exclude)
+    files = parsed_args.files or check_utils.get_tracked_files(include, exclude)
 
     diff_check_args = ["--diff", "--check"] if not parsed_args.apply else []
     returncode_black = subprocess.call(["black", *files, *diff_check_args], cwd=check_utils.root_dir)

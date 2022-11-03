@@ -79,6 +79,18 @@ def inclusion_filter(exclude: str | Iterable[str]) -> Callable[[str], bool]:
     return should_include
 
 
+def extract_files(
+    parsed_args: argparse.Namespace,
+    include: str | Iterable[str],
+    exclude: str | Iterable[str] = "",
+) -> List[str]:
+    files = parsed_args.files if "files" in parsed_args else []
+    if not files:
+        return get_tracked_files(include, exclude)
+    else:
+        return files
+
+
 ####################################################################################################
 # file parsing and a decorator to exit instead of returning a failing exit code
 

@@ -25,9 +25,9 @@ def run(*args: str) -> int:
     exit_on_failure = not parsed_args.force
 
     checks_failed = 0
-    checks_failed |= format_.run(*parsed_args.files, exit_on_failure=exit_on_failure, silent=False)
-    checks_failed |= flake8_.run(*parsed_args.files, exit_on_failure=exit_on_failure, silent=True)
-    checks_failed |= mypy_.run(*parsed_args.files, exit_on_failure=exit_on_failure, silent=True)
+    checks_failed |= format_.run(*parsed_args.files, exit_on_failure=exit_on_failure)
+    checks_failed |= flake8_.run(*parsed_args.files, exit_on_failure=exit_on_failure)
+    checks_failed |= mypy_.run(*parsed_args.files, exit_on_failure=exit_on_failure)
 
     return checks_failed
 
