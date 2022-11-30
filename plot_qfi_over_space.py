@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import numpy as np
-import run_OAT
 import matplotlib.pyplot as plt
+import numpy as np
 
+import run_OAT
 from calculate_qfi_example import compute_QFI
 
 N = 4
