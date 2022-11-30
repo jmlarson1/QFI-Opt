@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import functools
 import sys
 
 import numpy as np
@@ -46,11 +45,9 @@ def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> 
     Return an operator that acts with 'op' in the given qubit, and trivially (with the
     identity operator) on all other qubits.
     """
-    ops = [scipy.sparse.eye(2, dtype=int)] * total_qubit_num
-    ops[qubit] = op
-    net_op = functools.reduce(scipy.sparse.kron, ops).tocsr()
-    net_op.eliminate_zeros()
-    return net_op
+    iden_before = scipy.sparse.identity(2**qubit, dtype=op.dtype)
+    iden_after = scipy.sparse.identity(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
+    return scipy.sparse.kron(scipy.sparse.kron(iden_before, op), iden_after)
 
 
 def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.spmatrix:
