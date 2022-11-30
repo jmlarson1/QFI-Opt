@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import itertools
-import numpy as np
-import run_OAT
-import nlopt
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+import nlopt
+import numpy as np
+
+import run_OAT
 from calculate_qfi_example import compute_QFI
 
 N = 4
