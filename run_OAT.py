@@ -25,7 +25,7 @@ def conjugate_by_Z(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> n
     dim_b = 2 ** (num_qubits - qubit - 1)
     flat_shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
     density_tensor.shape = flat_shape
-    output = np.zeros_like(density_tensor)
+    output = np.empty_like(density_tensor)
     output[:, 0, :, :, 0, :] = density_tensor[:, 0, :, :, 0, :]
     output[:, 0, :, :, 1, :] = -density_tensor[:, 0, :, :, 1, :]
     output[:, 1, :, :, 0, :] = -density_tensor[:, 1, :, :, 0, :]
@@ -41,7 +41,7 @@ def conjugate_by_Y(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> n
     dim_b = 2 ** (num_qubits - qubit - 1)
     flat_shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
     density_tensor.shape = flat_shape
-    output = np.zeros_like(density_tensor)
+    output = np.empty_like(density_tensor)
     output[:, 0, :, :, 0, :] = density_tensor[:, 1, :, :, 1, :]
     output[:, 0, :, :, 1, :] = -density_tensor[:, 1, :, :, 0, :]
     output[:, 1, :, :, 0, :] = -density_tensor[:, 0, :, :, 1, :]
