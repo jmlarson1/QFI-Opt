@@ -52,7 +52,10 @@ def conjugate_by_Y(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> n
 
 
 class Dissipator:
-    """Data structure for representing a dissipation operator."""
+    """
+    Data structure for representing a dissipation operator.
+    Currently only allows for single-qubit depolarizing noise.
+    """
 
     def __init__(self, depolarizing_rate: float | tuple[float, float, float]) -> None:
         if isinstance(depolarizing_rate, tuple):
