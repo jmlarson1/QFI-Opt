@@ -12,11 +12,18 @@ pauli_Z = scipy.sparse.csr_matrix([[1, 0], [0, -1]])
 pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])
 pauli_Y = -1j * pauli_Z @ pauli_X
 
+pauli_ops = [pauli_X, pauli_Y, pauli_Z]
+dense_pauli_ops = [pauli.todense() for pauli in pauli_ops]
+
+
+def log2_int(val: int) -> int:
+    return len(bin(val)) - 2
+
 
 def tensordot_insert(axes: int | Iterable[int], tensor_A: np.ndarray, tensor_B: np.ndarray) -> np.ndarray:
     """
-    Contract and "insert" tensor_A into tensor_B at the given axes,
-    e.g. A_{J,L,j,l} B_{i,j,k,l,m} -> C_{i,J,k,L,m} (with axes=[1,3])
+    Contract and "insert" tensor_A into tensor_B at the given axes.
+    For example: A_{J,L,j,l} B_{i,j,k,l,m} -> C_{i,J,k,L,m} (with axes=[1,3]).
     """
     if isinstance(axes, int):
         axes = [axes]
@@ -34,18 +41,14 @@ def tensordot_insert(axes: int | Iterable[int], tensor_A: np.ndarray, tensor_B: 
 
 
 class Dissipator:
-    """Data structure for characterizing noise processes."""
+    """Data structure for representing a dissipation operator."""
 
-    def __init__(self, num_qubits: int, noise_level: float | tuple[float, float, float]) -> None:
-        self._input_shape = (2,) * (num_qubits * 2)
-        self._num_qubits = num_qubits
-        if isinstance(noise_level, tuple):
-            noise_x, noise_y, noise_z = noise_level
+    def __init__(self, depolarizing_rate: float | tuple[float, float, float]) -> None:
+        if isinstance(depolarizing_rate, tuple):
+            self._pauli_rates = tuple(rate / 4 for rate in depolarizing_rate)
         else:
-            noise_x = noise_y = noise_z = noise_level
-        self._qubit_jump_ops = [np.sqrt(noise_x) * pauli_X.todense() / 2, np.sqrt(noise_y) * pauli_Y.todense() / 2, np.sqrt(noise_z) * pauli_Z.todense() / 2]
-        self._qubit_recycling_ops = [op.conj().T @ op for op in self._qubit_jump_ops]
-        self._is_trivial = noise_x == noise_y == noise_z == 0
+            self._pauli_rates = (depolarizing_rate / 4,) * 3
+        self._is_trivial = sum(self._pauli_rates) == 0
 
     @property
     def is_trivial(self) -> bool:
@@ -53,47 +56,21 @@ class Dissipator:
 
     def __matmul__(self, density_op: np.ndarray) -> np.ndarray:
         input_shape = density_op.shape
-        density_tensor = density_op.reshape(self._input_shape)
+        num_qubits = log2_int(density_op.size) // 2
+        density_op.shape = (2,) * (num_qubits * 2)
 
-        output = np.zeros_like(density_tensor)
-        for jump_op, recycling_op in zip(self._qubit_jump_ops, self._qubit_recycling_ops):
-            for qubit in range(self._num_qubits):
-                output += tensordot_insert(qubit, jump_op, tensordot_insert(self._num_qubits + qubit, jump_op.conj().T, density_tensor))
-                output -= sum(tensordot_insert(axis, recycling_op, density_tensor) for axis in [qubit, self._num_qubits + qubit]) / 2
+        output = np.zeros_like(density_op)
+        for rate, pauli in zip(self._pauli_rates, dense_pauli_ops):
+            output += rate * sum(tensordot_insert(qubit, pauli, tensordot_insert(num_qubits + qubit, pauli.T, density_op)) for qubit in range(num_qubits))
+        output -= sum(self._pauli_rates) * num_qubits * density_op
 
-        return output.reshape(input_shape)
-
-
-class Lindbladian:
-    """Data structure to store a Lindbladian operator, which is the time derivative operator for a density matrix undergoing Markovian time evolution."""
-
-    def __init__(
-        self,
-        hamiltonian: np.ndarray | scipy.sparse.spmatrix,
-        noise_level: float | tuple[float, float, float],
-    ) -> None:
-        self._input_shape = hamiltonian.shape
-        self._hamiltonian = hamiltonian
-
-        num_qubits = int(np.log2(self._hamiltonian.shape[0]))
-        self._dissipator = Dissipator(num_qubits, noise_level)
-
-    def __matmul__(self, density_op: np.ndarray) -> np.ndarray:
-        """Return the action of this Lindbladian on the given density operator."""
-        input_shape = density_op.shape
-        density_op = density_op.reshape(self._input_shape)
-
-        output = -1j * (self._hamiltonian @ density_op - density_op @ self._hamiltonian)
-        if not self._dissipator.is_trivial:
-            output += self._dissipator @ density_op
-
+        density_op.shape = input_shape
         return output.reshape(input_shape)
 
 
 def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> scipy.sparse.spmatrix:
     """
-    Return an operator that acts with 'op' in the given qubit, and trivially (with the
-    identity operator) on all other qubits.
+    Return an operator that acts with 'op' in the given qubit, and trivially (with the identity operator) on all other qubits.
     """
     iden_before = scipy.sparse.identity(2**qubit, dtype=op.dtype)
     iden_after = scipy.sparse.identity(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
@@ -105,21 +82,24 @@ def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.sp
     return sum(op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits))
 
 
-def time_deriv(_: float, density_op: np.ndarray, lindbladian: Lindbladian) -> np.ndarray:
+def time_deriv(_: float, density_op: np.ndarray, hamiltonian: np.ndarray | scipy.sparse.spmatrix, dissipator: Dissipator) -> np.ndarray:
     """
-    Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing
-    Markovian evolution with the given Lindbladian.
-
+    Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing Markovian evolution.
     The first argument is blank to integrate with scipy.integrate.solve_ivp.
     """
-    return lindbladian @ density_op
+    density_op.shape = hamiltonian.shape
+    output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
+    if not dissipator.is_trivial:
+        output += dissipator @ density_op
+    density_op.shape = (-1,)
+    return output.ravel()
 
 
 def evolve_state(
     density_op: np.ndarray,
     time: float,
     hamiltonian: np.ndarray | scipy.sparse.spmatrix,
-    noise_level: float | tuple[float, float, float],
+    dissipator: Dissipator,
     rtol: float = 1e-8,
     atol: float = 1e-8,
 ) -> np.ndarray:
@@ -134,7 +114,7 @@ def evolve_state(
         rtol=rtol,
         atol=atol,
         method="DOP853",
-        args=(Lindbladian(hamiltonian, noise_level),),
+        args=(hamiltonian, dissipator),
     )
     final_vec = scipy.integrate.solve_ivp(*args, **kwargs).y[:, -1]
     return final_vec.reshape(density_op.shape)
@@ -156,16 +136,17 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np
     Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
     because the OAT protocol takes time O(num_qubits) when params[1] ~ O(1).
     """
-    assert noise_level >= 0, "noise levels cannot be negative!"
+    assert noise_level >= 0, "noise_level cannot be negative!"
     assert len(params) == 4, "must provide 4 parameters!"
 
-    # normalize noise level
-    noise_level /= np.pi * num_qubits
-
-    # collective spin operators
+    # construct, collective spin operators
     collective_Sx = collective_op(pauli_X, num_qubits) / 2
     collective_Sy = collective_op(pauli_Y, num_qubits) / 2
     collective_Sz = collective_op(pauli_Z, num_qubits) / 2
+
+    # construct dissipator
+    depolarizing_rate = noise_level / (np.pi * num_qubits)
+    dissipator = Dissipator(depolarizing_rate)
 
     # initialize a state pointing down along Z (all qubits in |0>)
     state_0 = np.zeros((2**num_qubits,) * 2, dtype=complex)
@@ -174,18 +155,18 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np
     # rotate about the X axis
     time_0 = params[0] * np.pi
     hamiltonian_0 = collective_Sx
-    state_1 = evolve_state(state_0, time_0, hamiltonian_0, noise_level)
+    state_1 = evolve_state(state_0, time_0, hamiltonian_0, dissipator)
 
     # squeeze!
     time_1 = params[1] * np.pi * num_qubits
     hamiltonian_1 = collective_Sz @ collective_Sz / num_qubits
-    state_2 = evolve_state(state_1, time_1, hamiltonian_1, noise_level)
+    state_2 = evolve_state(state_1, time_1, hamiltonian_1, dissipator)
 
     # un-rotate about a chosen axis
     time_2 = -params[2] * np.pi
     rot_axis_angle = params[3] * np.pi / 2
     hamiltonian_2 = np.cos(rot_axis_angle) * collective_Sx + np.sin(rot_axis_angle) * collective_Sy
-    state_3 = evolve_state(state_2, time_2, hamiltonian_2, noise_level)
+    state_3 = evolve_state(state_2, time_2, hamiltonian_2, dissipator)
 
     return state_3
 
