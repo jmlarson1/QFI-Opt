@@ -157,12 +157,12 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np
     assert noise_level >= 0, "noise_level cannot be negative!"
     assert len(params) == 4, "must provide 4 parameters!"
 
-    # construct, collective spin operators
+    # construct collective spin operators
     collective_Sx = collective_op(pauli_X, num_qubits) / 2
     collective_Sy = collective_op(pauli_Y, num_qubits) / 2
     collective_Sz = collective_op(pauli_Z, num_qubits) / 2
 
-    # construct dissipator
+    # construct the dissipator
     depolarizing_rate = noise_level / (np.pi * num_qubits)
     dissipator = Dissipator(depolarizing_rate)
 
