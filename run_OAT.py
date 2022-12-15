@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-import string
 import sys
-from typing import Iterable
 
 import numpy as np
 import scipy
@@ -12,32 +10,45 @@ pauli_Z = scipy.sparse.csr_matrix([[1, 0], [0, -1]])
 pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])
 pauli_Y = -1j * pauli_Z @ pauli_X
 
-pauli_ops = [pauli_X, pauli_Y, pauli_Z]
-dense_pauli_ops = [pauli.todense() for pauli in pauli_ops]
-
 
 def log2_int(val: int) -> int:
     return len(bin(val)) - 2
 
 
-def tensordot_insert(axes: int | Iterable[int], tensor_A: np.ndarray, tensor_B: np.ndarray) -> np.ndarray:
-    """
-    Contract and "insert" tensor_A into tensor_B at the given axes.
-    For example: A_{J,L,j,l} B_{i,j,k,l,m} -> C_{i,J,k,L,m} (with axes=[1,3]).
-    """
-    if isinstance(axes, int):
-        axes = [axes]
+def conjugate_by_X(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> np.ndarray:
+    return np.flip(np.flip(density_tensor, qubit), num_qubits + qubit)
 
-    indices_B = string.ascii_lowercase[: tensor_B.ndim]
-    old_axis_indices = [indices_B[axis] for axis in axes]
-    new_axis_indices = [index.upper() for index in old_axis_indices]
-    indices_A = "".join(new_axis_indices + old_axis_indices)
 
-    indices_C = indices_B
-    for old_idx, new_idx in zip(old_axis_indices, new_axis_indices):
-        indices_C = indices_C.replace(old_idx, new_idx)
-    contraction = f"{indices_A},{indices_B}->{indices_C}"
-    return np.einsum(contraction, tensor_A, tensor_B)
+def conjugate_by_Z(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> np.ndarray:
+    input_shape = density_tensor.shape
+    dim_a = 2 ** qubit
+    dim_b = 2 ** (num_qubits - qubit - 1)
+    flat_shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    density_tensor.shape = flat_shape
+    output = np.zeros_like(density_tensor)
+    output[:, 0, :, :, 0, :] = density_tensor[:, 0, :, :, 0, :]
+    output[:, 0, :, :, 1, :] = -density_tensor[:, 0, :, :, 1, :]
+    output[:, 1, :, :, 0, :] = -density_tensor[:, 1, :, :, 0, :]
+    output[:, 1, :, :, 1, :] = density_tensor[:, 1, :, :, 1, :]
+    density_tensor.shape = input_shape
+    output.shape = input_shape
+    return output
+
+
+def conjugate_by_Y(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> np.ndarray:
+    input_shape = density_tensor.shape
+    dim_a = 2 ** qubit
+    dim_b = 2 ** (num_qubits - qubit - 1)
+    flat_shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    density_tensor.shape = flat_shape
+    output = np.zeros_like(density_tensor)
+    output[:, 0, :, :, 0, :] = density_tensor[:, 1, :, :, 1, :]
+    output[:, 0, :, :, 1, :] = -density_tensor[:, 1, :, :, 0, :]
+    output[:, 1, :, :, 0, :] = -density_tensor[:, 0, :, :, 1, :]
+    output[:, 1, :, :, 1, :] = density_tensor[:, 0, :, :, 0, :]
+    density_tensor.shape = input_shape
+    output.shape = input_shape
+    return output
 
 
 class Dissipator:
@@ -45,10 +56,11 @@ class Dissipator:
 
     def __init__(self, depolarizing_rate: float | tuple[float, float, float]) -> None:
         if isinstance(depolarizing_rate, tuple):
-            self._pauli_rates = tuple(rate / 4 for rate in depolarizing_rate)
+            self._rate_x, self._rate_y, self._rate_z = tuple(rate / 4 for rate in depolarizing_rate)
         else:
-            self._pauli_rates = (depolarizing_rate / 4,) * 3
-        self._is_trivial = sum(self._pauli_rates) == 0
+            self._rate_x = self._rate_y = self._rate_z = depolarizing_rate / 4
+        self._pauli_rates = (self._rate_x, self._rate_y, self._rate_z)
+        self._is_trivial = self._rate_x == self._rate_y == self._rate_z == 0
 
     @property
     def is_trivial(self) -> bool:
@@ -59,10 +71,10 @@ class Dissipator:
         num_qubits = log2_int(density_op.size) // 2
         density_op.shape = (2,) * (num_qubits * 2)
 
-        output = np.zeros_like(density_op)
-        for rate, pauli in zip(self._pauli_rates, dense_pauli_ops):
-            output += rate * sum(tensordot_insert(qubit, pauli, tensordot_insert(num_qubits + qubit, pauli.T, density_op)) for qubit in range(num_qubits))
-        output -= sum(self._pauli_rates) * num_qubits * density_op
+        term_x = self._rate_x * sum(conjugate_by_X(density_op, qubit, num_qubits) for qubit in range(num_qubits))
+        term_y = self._rate_y * sum(conjugate_by_Y(density_op, qubit, num_qubits) for qubit in range(num_qubits))
+        term_z = self._rate_z * sum(conjugate_by_Z(density_op, qubit, num_qubits) for qubit in range(num_qubits))
+        output = term_x + term_y + term_z - sum(self._pauli_rates) * num_qubits * density_op
 
         density_op.shape = input_shape
         return output.reshape(input_shape)
