@@ -16,10 +16,12 @@ def log2_int(val: int) -> int:
 
 
 def conjugate_by_X(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> np.ndarray:
+    """For a given density operator 'rho' and qubit index 'q', return 'X_q rho X_q'."""
     return np.flip(np.flip(density_tensor, qubit), num_qubits + qubit)
 
 
 def conjugate_by_Z(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> np.ndarray:
+    """For a given density operator 'rho' and qubit index 'q', return 'Z_q rho Z_q'."""
     input_shape = density_tensor.shape
     dim_a = 2 ** qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
@@ -36,6 +38,7 @@ def conjugate_by_Z(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> n
 
 
 def conjugate_by_Y(density_tensor: np.ndarray, qubit: int, num_qubits: int) -> np.ndarray:
+    """For a given density operator 'rho' and qubit index 'q', return 'Y_q rho Y_q'."""
     input_shape = density_tensor.shape
     dim_a = 2 ** qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
