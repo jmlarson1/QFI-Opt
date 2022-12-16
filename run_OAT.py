@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import functools
 import argparse
 import sys
 
@@ -106,6 +107,15 @@ def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.sp
     return sum(op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits))
 
 
+@functools.cache
+def collective_spin_ops(num_qubits):
+    """Construct collective spin operators."""
+    collective_Sx = collective_op(pauli_X, num_qubits) / 2
+    collective_Sy = collective_op(pauli_Y, num_qubits) / 2
+    collective_Sz = collective_op(pauli_Z, num_qubits) / 2
+    return collective_Sx, collective_Sy, collective_Sz
+
+
 def time_deriv(_: float, density_op: np.ndarray, hamiltonian: np.ndarray | scipy.sparse.spmatrix, dissipator: Dissipator) -> np.ndarray:
     """
     Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing Markovian evolution.
@@ -164,9 +174,7 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np
     assert len(params) == 4, "must provide 4 parameters!"
 
     # construct collective spin operators
-    collective_Sx = collective_op(pauli_X, num_qubits) / 2
-    collective_Sy = collective_op(pauli_Y, num_qubits) / 2
-    collective_Sz = collective_op(pauli_Z, num_qubits) / 2
+    collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
 
     # construct the dissipator
     depolarizing_rate = noise_level / (np.pi * num_qubits)
