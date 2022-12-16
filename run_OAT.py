@@ -15,23 +15,6 @@ def log2_int(val: int) -> int:
     return val.bit_length() - 1
 
 
-def conjugate_by_X(density_op: np.ndarray, qubit: int) -> np.ndarray:
-    """For a given density operator 'rho' and qubit index 'q', return 'X_q rho X_q'."""
-    input_shape = density_op.shape
-    num_qubits = log2_int(density_op.size) // 2
-    dim_a = 2**qubit
-    dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
-    output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :]
-    output[:, 0, :, :, 1, :] = density_op[:, 1, :, :, 0, :]
-    output[:, 1, :, :, 0, :] = density_op[:, 0, :, :, 1, :]
-    output[:, 1, :, :, 1, :] = density_op[:, 0, :, :, 0, :]
-    density_op.shape = input_shape
-    output.shape = input_shape
-    return output
-
-
 def conjugate_by_Z(density_op: np.ndarray, qubit: int) -> np.ndarray:
     """For a given density operator 'rho' and qubit index 'q', return 'Z_q rho Z_q'."""
     input_shape = density_op.shape
@@ -44,6 +27,23 @@ def conjugate_by_Z(density_op: np.ndarray, qubit: int) -> np.ndarray:
     output[:, 0, :, :, 1, :] = -density_op[:, 0, :, :, 1, :]
     output[:, 1, :, :, 0, :] = -density_op[:, 1, :, :, 0, :]
     output[:, 1, :, :, 1, :] = density_op[:, 1, :, :, 1, :]
+    density_op.shape = input_shape
+    output.shape = input_shape
+    return output
+
+
+def conjugate_by_X(density_op: np.ndarray, qubit: int) -> np.ndarray:
+    """For a given density operator 'rho' and qubit index 'q', return 'X_q rho X_q'."""
+    input_shape = density_op.shape
+    num_qubits = log2_int(density_op.size) // 2
+    dim_a = 2**qubit
+    dim_b = 2 ** (num_qubits - qubit - 1)
+    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    output = np.empty_like(density_op)
+    output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :]
+    output[:, 0, :, :, 1, :] = density_op[:, 1, :, :, 0, :]
+    output[:, 1, :, :, 0, :] = density_op[:, 0, :, :, 1, :]
+    output[:, 1, :, :, 1, :] = density_op[:, 0, :, :, 0, :]
     density_op.shape = input_shape
     output.shape = input_shape
     return output
