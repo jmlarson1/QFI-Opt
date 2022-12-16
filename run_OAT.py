@@ -6,7 +6,7 @@ import numpy as np
 import scipy
 
 # Pauli operators
-pauli_Z = scipy.sparse.csr_matrix([[1, 0], [0, -1]])
+pauli_Z = scipy.sparse.dia_matrix([[1, 0], [0, -1]])
 pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])
 pauli_Y = -1j * pauli_Z @ pauli_X
 
