@@ -120,10 +120,21 @@ def time_deriv(_: float, density_op: np.ndarray, hamiltonian: np.ndarray | scipy
     Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing Markovian evolution.
     The first argument is blank to integrate with scipy.integrate.solve_ivp.
     """
-    density_op.shape = hamiltonian.shape
-    output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
+    # coherent evolution
+    if hamiltonian.ndim == 2:
+        # ... computed with ordinary matrix multiplication
+        density_op.shape = hamiltonian.shape
+        output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
+    else:
+        # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
+        # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
+        density_op.shape = hamiltonian.shape * 2
+        output = -1j * ((hamiltonian * density_op.T).T - density_op * hamiltonian)
+
+    # dissipation
     if not dissipator.is_trivial:
         output += dissipator @ density_op
+
     density_op.shape = (-1,)
     return output.ravel()
 
@@ -190,7 +201,7 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np
 
     # squeeze!
     time_1 = params[1] * np.pi * num_qubits
-    hamiltonian_1 = collective_Sz @ collective_Sz / num_qubits
+    hamiltonian_1 = collective_Sz.diagonal() ** 2 / num_qubits
     state_2 = evolve_state(state_1, time_1, hamiltonian_1, dissipator)
 
     # un-rotate about a chosen axis
