@@ -65,7 +65,7 @@ class Dissipator:
             self._rate_x, self._rate_y, self._rate_z = tuple(rate / 4 for rate in depolarizing_rate)
         else:
             self._rate_x = self._rate_y = self._rate_z = depolarizing_rate / 4
-        self._pauli_rates = (self._rate_x, self._rate_y, self._rate_z)
+        self._rate_sum = self._rate_x + self._rate_y + self._rate_z
         self._is_trivial = self._rate_x == self._rate_y == self._rate_z == 0
 
     @property
@@ -77,7 +77,7 @@ class Dissipator:
         term_x = self._rate_x * sum(conjugate_by_X(density_op, qubit) for qubit in range(num_qubits))
         term_y = self._rate_y * sum(conjugate_by_Y(density_op, qubit) for qubit in range(num_qubits))
         term_z = self._rate_z * sum(conjugate_by_Z(density_op, qubit) for qubit in range(num_qubits))
-        return term_x + term_y + term_z - sum(self._pauli_rates) * num_qubits * density_op
+        return term_x + term_y + term_z - self._rate_sum * num_qubits * density_op
 
 
 def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> scipy.sparse.spmatrix:
