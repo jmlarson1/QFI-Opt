@@ -12,7 +12,7 @@ pauli_Y = -1j * pauli_Z @ pauli_X
 
 
 def log2_int(val: int) -> int:
-    return len(bin(val)) - 2
+    return len(bin(val)) - 3
 
 
 def conjugate_by_X(density_op: np.ndarray, qubit: int) -> np.ndarray:
