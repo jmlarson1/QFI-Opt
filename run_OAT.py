@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import functools
 import argparse
+import functools
 import sys
 
 import numpy as np
@@ -108,7 +108,7 @@ def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.sp
 
 
 @functools.cache
-def collective_spin_ops(num_qubits):
+def collective_spin_ops(num_qubits: int) -> tuple[scipy.sparse.spmatrix, scipy.sparse.spmatrix, scipy.sparse.spmatrix]:
     """Construct collective spin operators."""
     collective_Sx = collective_op(pauli_X, num_qubits) / 2
     collective_Sy = collective_op(pauli_Y, num_qubits) / 2
