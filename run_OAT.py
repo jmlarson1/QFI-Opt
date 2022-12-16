@@ -73,17 +73,16 @@ class Dissipator:
     Currently only allows for single-qubit depolarizing noise.
     """
 
-    def __init__(self, depolarizing_rate: float | tuple[float, float, float]) -> None:
-        if isinstance(depolarizing_rate, tuple):
-            self._rate_x, self._rate_y, self._rate_z = tuple(rate / 4 for rate in depolarizing_rate)
-        else:
-            self._rate_x = self._rate_y = self._rate_z = depolarizing_rate / 4
+    def __init__(self, depolarizing_rates: float | tuple[float, float, float]) -> None:
+        if isinstance(depolarizing_rates, float):
+            depolarizing_rates = (depolarizing_rates,) * 3
+        assert all(rate >= 0 for rate in depolarizing_rates), "depolarizing rates cannot be negative!"
+        self._rate_x, self._rate_y, self._rate_z = tuple(rate / 4 for rate in depolarizing_rates)
         self._rate_sum = self._rate_x + self._rate_y + self._rate_z
-        self._is_trivial = self._rate_x == self._rate_y == self._rate_z == 0
 
     @property
     def is_trivial(self) -> bool:
-        return self._is_trivial
+        return self._rate_sum == 0
 
     def __matmul__(self, density_op: np.ndarray) -> np.ndarray:
         num_qubits = log2_int(density_op.size) // 2
