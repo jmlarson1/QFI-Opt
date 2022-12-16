@@ -19,7 +19,7 @@ def conjugate_by_X(density_op: np.ndarray, qubit: int) -> np.ndarray:
     """For a given density operator 'rho' and qubit index 'q', return 'X_q rho X_q'."""
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
-    dim_a = 2 ** qubit
+    dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
     density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
     output = np.empty_like(density_op)
@@ -36,7 +36,7 @@ def conjugate_by_Z(density_op: np.ndarray, qubit: int) -> np.ndarray:
     """For a given density operator 'rho' and qubit index 'q', return 'Z_q rho Z_q'."""
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
-    dim_a = 2 ** qubit
+    dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
     density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
     output = np.empty_like(density_op)
@@ -53,7 +53,7 @@ def conjugate_by_Y(density_op: np.ndarray, qubit: int) -> np.ndarray:
     """For a given density operator 'rho' and qubit index 'q', return 'Y_q rho Y_q'."""
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
-    dim_a = 2 ** qubit
+    dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
     density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
     output = np.empty_like(density_op)
