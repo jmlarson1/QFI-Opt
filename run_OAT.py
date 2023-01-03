@@ -70,7 +70,7 @@ def conjugate_by_Y(density_op: np.ndarray, qubit: int) -> np.ndarray:
 class Dissipator:
     """
     Data structure for representing a dissipation operator.
-    Currently only allows for single-qubit depolarizing noise.
+    Currently only allows for single-qubit depolarizing dissipation.
     """
 
     def __init__(self, depolarizing_rates: float | tuple[float, float, float]) -> None:
@@ -164,7 +164,7 @@ def evolve_state(
     return final_vec.reshape(density_op.shape)
 
 
-def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np.ndarray, noise_level: float = 0) -> np.ndarray:
+def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np.ndarray, dissipation_level: float = 0) -> np.ndarray:
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
 
@@ -174,20 +174,20 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np
     3. Rotate about the axis X_phi by the angle '-params[2] * np.pi',
        where phi = 'params[3] * np.pi / 2' and X_phi = cos(phi) X + sin(phi) Y.
 
-    If noise_level > 0, qubits depolarize at a constant rate throughout the protocol.
+    If dissipation_level > 0, qubits depolarize at a constant rate throughout the protocol.
     The depolarizing rate is chosen such that a single qubit (with num_qubits = 1) would depolarize
-    with probability e^(-noise_level) in time pi (i.e., the time it takes to flip a spin with the
-    Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
+    with probability e^(-dissipation_level) in time pi (i.e., the time it takes to flip a spin with
+    the Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
     because the OAT protocol takes time O(num_qubits) when params[1] ~ O(1).
     """
-    assert noise_level >= 0, "noise_level cannot be negative!"
+    assert dissipation_level >= 0, "dissipation_level cannot be negative!"
     assert len(params) == 4, "must provide 4 parameters!"
 
     # construct collective spin operators
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
 
     # construct the dissipator
-    depolarizing_rate = noise_level / (np.pi * num_qubits)
+    depolarizing_rate = dissipation_level / (np.pi * num_qubits)
     dissipator = Dissipator(depolarizing_rate)
 
     # initialize a state pointing down along Z (all qubits in |0>)
@@ -219,13 +219,13 @@ if __name__ == "__main__":
         description="Simulate a simple one-axis twisting (OAT) protocol.",
         formatter_class=argparse.MetavarTypeHelpFormatter,
     )
-    parser.add_argument("--num_qubits", type=int, default=4)
-    parser.add_argument("--noise-level", type=float, default=0)
+    parser.add_argument("--num-qubits", type=int, default=4)
+    parser.add_argument("--dissipation", type=float, default=0)
     parser.add_argument("--params", type=float, nargs=4, required=True)
     args = parser.parse_args(sys.argv[1:])
 
     # simulate the OAT potocol
-    final_state = simulate_OAT(args.num_qubits, args.params, args.noise_level)
+    final_state = simulate_OAT(args.num_qubits, args.params, args.dissipation)
 
     # compute collective Pauli operators
     mean_X = collective_op(pauli_X, args.num_qubits) / args.num_qubits
