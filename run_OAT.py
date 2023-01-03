@@ -6,90 +6,12 @@ import sys
 import numpy as np
 import scipy
 
+from dissipation import Dissipator
+
 # Pauli operators
 pauli_Z = scipy.sparse.dia_matrix([[1, 0], [0, -1]])
 pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])
 pauli_Y = -1j * pauli_Z @ pauli_X
-
-
-def log2_int(val: int) -> int:
-    return val.bit_length() - 1
-
-
-def conjugate_by_Z(density_op: np.ndarray, qubit: int) -> np.ndarray:
-    """For a given density operator 'rho' and qubit index 'q', return 'Z_q rho Z_q'."""
-    input_shape = density_op.shape
-    num_qubits = log2_int(density_op.size) // 2
-    dim_a = 2**qubit
-    dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
-    output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = density_op[:, 0, :, :, 0, :]
-    output[:, 0, :, :, 1, :] = -density_op[:, 0, :, :, 1, :]
-    output[:, 1, :, :, 0, :] = -density_op[:, 1, :, :, 0, :]
-    output[:, 1, :, :, 1, :] = density_op[:, 1, :, :, 1, :]
-    density_op.shape = input_shape
-    output.shape = input_shape
-    return output
-
-
-def conjugate_by_X(density_op: np.ndarray, qubit: int) -> np.ndarray:
-    """For a given density operator 'rho' and qubit index 'q', return 'X_q rho X_q'."""
-    input_shape = density_op.shape
-    num_qubits = log2_int(density_op.size) // 2
-    dim_a = 2**qubit
-    dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
-    output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :]
-    output[:, 0, :, :, 1, :] = density_op[:, 1, :, :, 0, :]
-    output[:, 1, :, :, 0, :] = density_op[:, 0, :, :, 1, :]
-    output[:, 1, :, :, 1, :] = density_op[:, 0, :, :, 0, :]
-    density_op.shape = input_shape
-    output.shape = input_shape
-    return output
-
-
-def conjugate_by_Y(density_op: np.ndarray, qubit: int) -> np.ndarray:
-    """For a given density operator 'rho' and qubit index 'q', return 'Y_q rho Y_q'."""
-    input_shape = density_op.shape
-    num_qubits = log2_int(density_op.size) // 2
-    dim_a = 2**qubit
-    dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
-    output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :]
-    output[:, 0, :, :, 1, :] = -density_op[:, 1, :, :, 0, :]
-    output[:, 1, :, :, 0, :] = -density_op[:, 0, :, :, 1, :]
-    output[:, 1, :, :, 1, :] = density_op[:, 0, :, :, 0, :]
-    density_op.shape = input_shape
-    output.shape = input_shape
-    return output
-
-
-class Dissipator:
-    """
-    Data structure for representing a dissipation operator.
-    Currently only allows for single-qubit depolarizing dissipation.
-    """
-
-    def __init__(self, depolarizing_rates: float | tuple[float, float, float]) -> None:
-        if isinstance(depolarizing_rates, float):
-            depolarizing_rates = (depolarizing_rates,) * 3
-        assert all(rate >= 0 for rate in depolarizing_rates), "depolarizing rates cannot be negative!"
-        self._rate_x, self._rate_y, self._rate_z = tuple(rate / 4 for rate in depolarizing_rates)
-        self._rate_sum = self._rate_x + self._rate_y + self._rate_z
-
-    @property
-    def is_trivial(self) -> bool:
-        return self._rate_sum == 0
-
-    def __matmul__(self, density_op: np.ndarray) -> np.ndarray:
-        num_qubits = log2_int(density_op.size) // 2
-        term_x = self._rate_x * sum(conjugate_by_X(density_op, qubit) for qubit in range(num_qubits))
-        term_y = self._rate_y * sum(conjugate_by_Y(density_op, qubit) for qubit in range(num_qubits))
-        term_z = self._rate_z * sum(conjugate_by_Z(density_op, qubit) for qubit in range(num_qubits))
-        return term_x + term_y + term_z - self._rate_sum * num_qubits * density_op
 
 
 def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> scipy.sparse.spmatrix:
@@ -164,7 +86,13 @@ def evolve_state(
     return final_vec.reshape(density_op.shape)
 
 
-def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np.ndarray, dissipation_level: float = 0) -> np.ndarray:
+def simulate_OAT(
+    num_qubits: int,
+    params: tuple[float, float, float, float] | np.ndarray,
+    dissipation: float | tuple[float, float, float] = 0,
+    dissipation_format: str = "XYZ",
+    noise_model: str = "all",
+) -> np.ndarray:
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
 
@@ -174,21 +102,21 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | np
     3. Rotate about the axis X_phi by the angle '-params[2] * np.pi',
        where phi = 'params[3] * np.pi / 2' and X_phi = cos(phi) X + sin(phi) Y.
 
-    If dissipation_level > 0, qubits depolarize at a constant rate throughout the protocol.
-    The depolarizing rate is chosen such that a single qubit (with num_qubits = 1) would depolarize
-    with probability e^(-dissipation_level) in time pi (i.e., the time it takes to flip a spin with
+    TODO: REVISE COMMENT BELOW!!!
+    If dissipation > 0, qubits depolarize at a constant rate throughout the protocol.  The
+    depolarizing rate is chosen such that a single qubit (with num_qubits = 1) would depolarize
+    with probability e^(-dissipation) in time pi (i.e., the time it takes to flip a spin with
     the Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
     because the OAT protocol takes time O(num_qubits) when params[1] ~ O(1).
     """
-    assert dissipation_level >= 0, "dissipation_level cannot be negative!"
     assert len(params) == 4, "must provide 4 parameters!"
+    assert (np.array(dissipation) >= 0).all(), "dissipation rates cannot be negative!"
 
     # construct collective spin operators
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
 
     # construct the dissipator
-    depolarizing_rate = dissipation_level / (np.pi * num_qubits)
-    dissipator = Dissipator(depolarizing_rate)
+    dissipator = Dissipator(dissipation, dissipation_format) / (np.pi * num_qubits)
 
     # initialize a state pointing down along Z (all qubits in |0>)
     state_0 = np.zeros((2**num_qubits,) * 2, dtype=complex)
