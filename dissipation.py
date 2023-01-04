@@ -10,32 +10,36 @@ class Dissipator:
     Data structure to represent a dissipation operator.
     Only (uncorrelated) single-qubit dissipation is supported at the moment.
 
+    The Dissipator class overloads matrix multiplication, such that the time derivative of a
+    density matrix 'rho' evolving only under dissipation is 'dissipator @ rho'.
+
     A Dissipator is initialized with the following arguments:
     (1) Three dissipation rates.  If only a single dissipation rate is provided, then all
         dissipation rates are assumed to be equal.
-    (2) A string that specifies a dissipation "type".  The dissipation type may be one of the
+    (2) A string that specifies a dissipation "format".  The dissipation format may be one of the
         following:
         - "XYZ": The dissipation rates respectively correspond to dephasing along the X, Y, and Z
-                 axes, with jump operators X/2, Y/2, Z/2.  Here X, Y, and Z are Pauli operators.
-        - "XYZ": The dissipation rates respectively correspond to spontaneous spin excitation,
+                 axes, with jump operators X/2, Y/2, and Z/2.  Here X, Y, and Z are Pauli operators.
+                 If all dissipation rates are equal, then XYZ-type dissipation generates the
+                 depolarizing channel.
+        - "PMZ": The dissipation rates respectively correspond to spontaneous spin excitation,
                  relaxation, and dephasing, with jump operators P = (X+iY)/2, M = (X-iY)/2, and Z/2.
-
-    The Dissipator class overloads the matrix multiplication operator, such that the time derivative
-    of a density matrix undergoing only dissipation (and no coherent evolution) is 'dissipator @ rho'.
+                 PMZ-type dissipation generates the depolarizing channel when dissipation rates are
+                 proportional to (1/2, 1/2, 1).
     """
 
-    def __init__(self, dissipation_rates: float | tuple[float, float, float], dissipation_type: str = "XYZ") -> None:
+    def __init__(self, dissipation_rates: float | tuple[float, float, float] = 0, dissipation_format: str = "XYZ") -> None:
         if isinstance(dissipation_rates, float):
             dissipation_rates = (dissipation_rates,) * 3
         assert all(rate >= 0 for rate in dissipation_rates), "dissipation rates cannot be negative!"
         self._rates = dissipation_rates
-        self._dissipation_type = dissipation_type
+        self._format = dissipation_format
 
         # This dissipator acts on a density matrix as
         #   dissipator @ rho = sum_j rate_j sum(qubit_term_j(rho, qubit) for qubit in all_qubits).
         # Identify the rates and qubit_term functions to use below.
 
-        if dissipation_type == "XYZ":
+        if dissipation_format == "XYZ":
             rate_sx, rate_sy, rate_sz = dissipation_rates
             self._rate_1 = (rate_sx + rate_sy) / 4 + rate_sz / 2
             self._rate_2 = (rate_sx + rate_sy) / 4
@@ -44,7 +48,7 @@ class Dissipator:
             self._qubit_term_2 = _qubit_term_XYZ_2
             self._qubit_term_3 = _qubit_term_XYZ_3
 
-        elif dissipation_type == "PMZ":
+        elif dissipation_format == "PMZ":
             rate_sp, rate_sm, rate_sz = dissipation_rates
             self._rate_1 = sum(dissipation_rates) / 2
             self._rate_2 = rate_sp
@@ -54,7 +58,7 @@ class Dissipator:
             self._qubit_term_3 = _qubit_term_PMZ_3
 
         else:
-            raise ValueError(f"dissipation format not recognized {dissipation_type}")
+            raise ValueError(f"dissipation format not recognized {dissipation_format}")
 
     def __matmul__(self, density_op: np.ndarray) -> np.ndarray | float:
         num_qubits = log2_int(density_op.size) // 2
@@ -67,7 +71,7 @@ class Dissipator:
 
     def __rmul__(self, scalar: float) -> "Dissipator":
         rates = (scalar * self._rates[0], scalar * self._rates[1], scalar * self._rates[2])
-        return Dissipator(rates, self._dissipation_type)
+        return Dissipator(rates, self._format)
 
     def __mul__(self, scalar: float) -> "Dissipator":
         return scalar * self

@@ -65,7 +65,7 @@ def evolve_state(
     density_op: np.ndarray,
     time: float,
     hamiltonian: np.ndarray | scipy.sparse.spmatrix,
-    dissipator: Dissipator,
+    dissipator: Dissipator = Dissipator(),
     rtol: float = 1e-8,
     atol: float = 1e-8,
 ) -> np.ndarray:
@@ -89,32 +89,38 @@ def evolve_state(
 def simulate_OAT(
     num_qubits: int,
     params: tuple[float, float, float, float] | np.ndarray,
-    dissipation: float | tuple[float, float, float] = 0,
-    dissipation_type: str = "XYZ",
+    dissipation_rates: float | tuple[float, float, float] = 0,
+    dissipation_format: str = "XYZ",
 ) -> np.ndarray:
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
 
     Starting with an initial all-|0> state (all spins pointing down along the Z axis):
-    1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian Sx).
+    1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian 'Sx').
     2. Squeeze with Hamiltonian 'Sz^2 / num_qubits' for time 'params[1] * np.pi * num_qubits'.
-    3. Rotate about the axis X_phi by the angle '-params[2] * np.pi',
-       where phi = 'params[3] * np.pi / 2' and X_phi = cos(phi) X + sin(phi) Y.
+    3. Rotate about the axis 'X_phi' by the angle '-params[2] * np.pi',
+       where 'phi = params[3] * np.pi / 2' and 'X_phi = cos(phi) X + sin(phi) Y'.
 
-    TODO: REVISE COMMENT BELOW!!!
-    If dissipation > 0, qubits depolarize at a constant rate throughout the protocol.  The
-    depolarizing rate is chosen such that a single qubit (with num_qubits = 1) would depolarize
-    with probability e^(-dissipation) in time pi (i.e., the time it takes to flip a spin with
-    the Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
-    because the OAT protocol takes time O(num_qubits) when params[1] ~ O(1).
+    If dissipation_rates is nonzero, qubits experience dissipation during the squeezing step (2).
+    See the documentation for the Dissipator class for a general explanation of the
+    dissipation_rates and dissipation_format arguments, but note that this method additionally
+    divides the dissipator (equivalently, the dissipation rates) by a factor of 'np.pi * num_qubits'
+    in order to "normalize" dissipation time scales and make them comparable to the time scales of
+    coherent evolution.  There are two ways to interpret this normalization of the dissipation
+    rates:
+    - Dividing the "bare" dissipation rate 'r' by a factor of 'np.pi' makes it so that XYZ-type
+      dissipation (with rates 'r / np.pi') depolarizes a single qubit with probability 'e^(-r)' in
+      time 'np.pi', or equivalently the time it takes for the Hamiltonian 'Sx' to flip a qubit.
+      The additional divisor of 'num_qubits' accounts for the fact that the OAT protocol takes time
+      'O(num_qubits)' when 'params[1] ~ O(1)', so without this divisor dynamics would be completely
+      dominated by dissipation when 'num_qubits >> 1'.
+    - Dividing the "bare" dissipation rate 'r' by a factor of 'np.pi * num_qubits' makes so that
+      each qubit depolarizes with probability 'e^(-params[1])' by the end of the OAT protocol.
     """
     assert len(params) == 4, "must provide 4 simulation parameters!"
 
     # construct collective spin operators
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
-
-    # construct the dissipator
-    dissipator = Dissipator(dissipation, dissipation_type) / (np.pi * num_qubits)
 
     # initialize a state pointing down along Z (all qubits in |0>)
     state_0 = np.zeros((2**num_qubits,) * 2, dtype=complex)
@@ -123,18 +129,19 @@ def simulate_OAT(
     # rotate about the X axis
     time_0 = params[0] * np.pi
     hamiltonian_0 = collective_Sx
-    state_1 = evolve_state(state_0, time_0, hamiltonian_0, dissipator)
+    state_1 = evolve_state(state_0, time_0, hamiltonian_0)
 
     # squeeze!
     time_1 = params[1] * np.pi * num_qubits
     hamiltonian_1 = collective_Sz.diagonal() ** 2 / num_qubits
+    dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
     state_2 = evolve_state(state_1, time_1, hamiltonian_1, dissipator)
 
     # un-rotate about a chosen axis
     time_2 = -params[2] * np.pi
     rot_axis_angle = params[3] * np.pi / 2
     hamiltonian_2 = np.cos(rot_axis_angle) * collective_Sx + np.sin(rot_axis_angle) * collective_Sy
-    state_3 = evolve_state(state_2, time_2, hamiltonian_2, dissipator)
+    state_3 = evolve_state(state_2, time_2, hamiltonian_2)
 
     return state_3
 
