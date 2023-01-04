@@ -91,7 +91,6 @@ def simulate_OAT(
     params: tuple[float, float, float, float] | np.ndarray,
     dissipation: float | tuple[float, float, float] = 0,
     dissipation_format: str = "XYZ",
-    noise_model: str = "all",
 ) -> np.ndarray:
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
@@ -109,8 +108,7 @@ def simulate_OAT(
     the Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
     because the OAT protocol takes time O(num_qubits) when params[1] ~ O(1).
     """
-    assert len(params) == 4, "must provide 4 parameters!"
-    assert (np.array(dissipation) >= 0).all(), "dissipation rates cannot be negative!"
+    assert len(params) == 4, "must provide 4 simulation parameters!"
 
     # construct collective spin operators
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
