@@ -31,6 +31,10 @@ class Dissipator:
         self._rates = dissipation_rates
         self._dissipation_type = dissipation_type
 
+        # This dissipator acts on a density matrix as
+        #   dissipator @ rho = sum_j rate_j sum(qubit_term_j(rho, qubit) for qubit in all_qubits).
+        # Identify the rates and qubit_term functions to use below.
+
         if dissipation_type == "XYZ":
             rate_sx, rate_sy, rate_sz = dissipation_rates
             self._rate_1 = (rate_sx + rate_sy) / 4 + rate_sz / 2
