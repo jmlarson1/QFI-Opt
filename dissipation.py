@@ -23,7 +23,7 @@ class Dissipator:
                  If all dissipation rates are equal, then XYZ-type dissipation generates the
                  depolarizing channel.
         - "PMZ": The dissipation rates respectively correspond to spontaneous spin excitation,
-                 relaxation, and dephasing, with jump operators P = (X+iY)/2, M = (X-iY)/2, and Z/2.
+                 decay, and dephasing, with jump operators P = (X+iY)/2, M = (X-iY)/2, and Z/2.
                  PMZ-type dissipation generates the depolarizing channel when dissipation rates are
                  proportional to (1/2, 1/2, 1).
     """
