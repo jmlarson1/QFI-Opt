@@ -9,9 +9,9 @@ import scipy
 
 from dissipation import Dissipator
 
-# qubit states
-ket_0 = np.array([1, 0])
-ket_1 = np.array([0, 1])
+# qubit/spin states
+ket_0 = np.array([1, 0])  # |0>, spin up
+ket_1 = np.array([0, 1])  # |1>, spin down
 
 # Pauli operators
 pauli_Z = scipy.sparse.dia_matrix([[1, 0], [0, -1]])  # |0><0| - |1><1|
