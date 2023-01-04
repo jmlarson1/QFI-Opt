@@ -90,7 +90,7 @@ def simulate_OAT(
     num_qubits: int,
     params: tuple[float, float, float, float] | np.ndarray,
     dissipation: float | tuple[float, float, float] = 0,
-    dissipation_format: str = "XYZ",
+    dissipation_type: str = "XYZ",
 ) -> np.ndarray:
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
@@ -114,7 +114,7 @@ def simulate_OAT(
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
 
     # construct the dissipator
-    dissipator = Dissipator(dissipation, dissipation_format) / (np.pi * num_qubits)
+    dissipator = Dissipator(dissipation, dissipation_type) / (np.pi * num_qubits)
 
     # initialize a state pointing down along Z (all qubits in |0>)
     state_0 = np.zeros((2**num_qubits,) * 2, dtype=complex)
