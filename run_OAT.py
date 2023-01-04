@@ -14,8 +14,8 @@ ket_0 = np.array([1, 0])  # |0>, spin up
 ket_1 = np.array([0, 1])  # |1>, spin down
 
 # Pauli operators
-pauli_Z = scipy.sparse.dia_matrix([[1, 0], [0, -1]])  # |0><0| - |1><1|
-pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])  # |0><1| + |1><0|
+pauli_Z = np.array([[1, 0], [0, -1]])  # |0><0| - |1><1|
+pauli_X = np.array([[0, 1], [1, 0]])  # |0><1| + |1><0|
 pauli_Y = -1j * pauli_Z @ pauli_X
 
 
@@ -73,7 +73,7 @@ def simulate_OAT(
 def evolve_state(
     density_op: np.ndarray,
     time: float,
-    hamiltonian: np.ndarray | scipy.sparse.spmatrix,
+    hamiltonian: np.ndarray,
     dissipator: Optional[Dissipator] = None,
     rtol: float = 1e-8,
     atol: float = 1e-8,
@@ -100,7 +100,7 @@ def evolve_state(
 def time_deriv(
     _: float,
     density_op: np.ndarray,
-    hamiltonian: np.ndarray | scipy.sparse.spmatrix,
+    hamiltonian: np.ndarray,
     dissipator: Optional[Dissipator] = None,
 ) -> np.ndarray:
     """
@@ -127,7 +127,7 @@ def time_deriv(
 
 
 @functools.cache
-def collective_spin_ops(num_qubits: int) -> tuple[scipy.sparse.spmatrix, scipy.sparse.spmatrix, scipy.sparse.spmatrix]:
+def collective_spin_ops(num_qubits: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Construct collective spin operators."""
     collective_Sx = collective_op(pauli_X, num_qubits) / 2
     collective_Sy = collective_op(pauli_Y, num_qubits) / 2
@@ -135,18 +135,18 @@ def collective_spin_ops(num_qubits: int) -> tuple[scipy.sparse.spmatrix, scipy.s
     return collective_Sx, collective_Sy, collective_Sz
 
 
-def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.spmatrix:
+def collective_op(op: np.ndarray, num_qubits: int) -> np.ndarray:
     """Compute the collective version of a qubit operator: sum_q op_q."""
-    return sum(op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits))
+    return sum((op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits)), start=np.array(0))
 
 
-def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> scipy.sparse.spmatrix:
+def op_on_qubit(op: np.ndarray, qubit: int, total_qubit_num: int) -> np.ndarray:
     """
     Return an operator that acts with 'op' in the given qubit, and trivially (with the identity operator) on all other qubits.
     """
-    iden_before = scipy.sparse.identity(2**qubit, dtype=op.dtype)
-    iden_after = scipy.sparse.identity(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
-    return scipy.sparse.kron(scipy.sparse.kron(iden_before, op), iden_after)
+    iden_before = np.eye(2**qubit, dtype=op.dtype)
+    iden_after = np.eye(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
+    return np.kron(np.kron(iden_before, op), iden_after)
 
 
 if __name__ == "__main__":

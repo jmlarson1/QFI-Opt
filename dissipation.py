@@ -60,9 +60,9 @@ class Dissipator:
         else:
             raise ValueError(f"dissipation format not recognized {dissipation_format}")
 
-    def __matmul__(self, density_op: np.ndarray) -> np.ndarray | float:
+    def __matmul__(self, density_op: np.ndarray) -> np.ndarray:
         num_qubits = log2_int(density_op.size) // 2
-        output = self._rate_0 * sum(self._qubit_term_0(density_op, qubit) for qubit in range(num_qubits))
+        output = self._rate_0 * sum((self._qubit_term_0(density_op, qubit) for qubit in range(num_qubits)), start=np.array(0))
         if self._rate_1:
             output += self._rate_1 * sum(self._qubit_term_1(density_op, qubit) for qubit in range(num_qubits))
         if self._rate_2:
