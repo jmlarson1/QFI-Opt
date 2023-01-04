@@ -28,7 +28,7 @@ class Dissipator:
                  proportional to (1/2, 1/2, 1).
     """
 
-    def __init__(self, dissipation_rates: float | tuple[float, float, float] = 0, dissipation_format: str = "XYZ") -> None:
+    def __init__(self, dissipation_rates: float | tuple[float, float, float] = 0.0, dissipation_format: str = "XYZ") -> None:
         if isinstance(dissipation_rates, float):
             dissipation_rates = (dissipation_rates,) * 3
         assert all(rate >= 0 for rate in dissipation_rates), "dissipation rates cannot be negative!"

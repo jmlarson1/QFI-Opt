@@ -89,7 +89,7 @@ def evolve_state(
 def simulate_OAT(
     num_qubits: int,
     params: tuple[float, float, float, float] | np.ndarray,
-    dissipation_rates: float | tuple[float, float, float] = 0,
+    dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = "XYZ",
 ) -> np.ndarray:
     """
