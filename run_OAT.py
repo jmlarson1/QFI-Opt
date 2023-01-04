@@ -2,6 +2,7 @@
 import argparse
 import functools
 import sys
+from typing import Optional
 
 import numpy as np
 import scipy
@@ -37,7 +38,7 @@ def collective_spin_ops(num_qubits: int) -> tuple[scipy.sparse.spmatrix, scipy.s
     return collective_Sx, collective_Sy, collective_Sz
 
 
-def time_deriv(_: float, density_op: np.ndarray, hamiltonian: np.ndarray | scipy.sparse.spmatrix, dissipator: Dissipator) -> np.ndarray:
+def time_deriv(_: float, density_op: np.ndarray, hamiltonian: np.ndarray | scipy.sparse.spmatrix, dissipator: Optional[Dissipator]) -> np.ndarray:
     """
     Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing Markovian evolution.
     The first argument is blank to integrate with scipy.integrate.solve_ivp.
@@ -54,7 +55,7 @@ def time_deriv(_: float, density_op: np.ndarray, hamiltonian: np.ndarray | scipy
         output = -1j * ((hamiltonian * density_op.T).T - density_op * hamiltonian)
 
     # dissipation
-    if not dissipator.is_trivial:
+    if dissipator:
         output += dissipator @ density_op
 
     density_op.shape = (-1,)
@@ -65,7 +66,7 @@ def evolve_state(
     density_op: np.ndarray,
     time: float,
     hamiltonian: np.ndarray | scipy.sparse.spmatrix,
-    dissipator: Dissipator = Dissipator(),
+    dissipator: Optional[Dissipator] = None,
     rtol: float = 1e-8,
     atol: float = 1e-8,
 ) -> np.ndarray:
