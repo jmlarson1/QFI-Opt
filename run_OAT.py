@@ -9,9 +9,13 @@ import scipy
 
 from dissipation import Dissipator
 
+# qubit states
+ket_0 = np.array([0, 1])
+ket_1 = np.array([1, 0])
+
 # Pauli operators
-pauli_Z = scipy.sparse.dia_matrix([[1, 0], [0, -1]])
-pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])
+pauli_Z = scipy.sparse.dia_matrix([[1, 0], [0, -1]])  # |1><1| - |0><0|
+pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])  # |0><1| + |1><0|
 pauli_Y = -1j * pauli_Z @ pauli_X
 
 
@@ -123,26 +127,23 @@ def simulate_OAT(
     # construct collective spin operators
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
 
-    # initialize a state pointing down along Z (all qubits in |0>)
-    state_0 = np.zeros((2**num_qubits,) * 2, dtype=complex)
-    state_0[-1, -1] = 1
-
-    # rotate about the X axis
-    time_0 = params[0] * np.pi
-    hamiltonian_0 = collective_Sx
-    state_1 = evolve_state(state_0, time_0, hamiltonian_0)
+    # rotate the all-|0> state about the X axis
+    time_1 = params[0] * np.pi
+    qubit_ket = np.cos(time_1 / 2) * ket_0 - 1j * np.sin(time_1 / 2) * ket_1
+    qubit_state = np.outer(qubit_ket, qubit_ket.conj())
+    state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
     # squeeze!
-    time_1 = params[1] * np.pi * num_qubits
-    hamiltonian_1 = collective_Sz.diagonal() ** 2 / num_qubits
+    time_2 = params[1] * np.pi * num_qubits
+    hamiltonian_2 = collective_Sz.diagonal() ** 2 / num_qubits
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    state_2 = evolve_state(state_1, time_1, hamiltonian_1, dissipator)
+    state_2 = evolve_state(state_1, time_2, hamiltonian_2, dissipator)
 
     # un-rotate about a chosen axis
-    time_2 = -params[2] * np.pi
+    time_3 = -params[2] * np.pi
     rot_axis_angle = params[3] * np.pi / 2
-    hamiltonian_2 = np.cos(rot_axis_angle) * collective_Sx + np.sin(rot_axis_angle) * collective_Sy
-    state_3 = evolve_state(state_2, time_2, hamiltonian_2)
+    hamiltonian_3 = np.cos(rot_axis_angle) * collective_Sx + np.sin(rot_axis_angle) * collective_Sy
+    state_3 = evolve_state(state_2, time_3, hamiltonian_3)
 
     return state_3
 
