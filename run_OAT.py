@@ -19,78 +19,6 @@ pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])  # |0><1| + |1><0|
 pauli_Y = -1j * pauli_Z @ pauli_X
 
 
-def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> scipy.sparse.spmatrix:
-    """
-    Return an operator that acts with 'op' in the given qubit, and trivially (with the identity operator) on all other qubits.
-    """
-    iden_before = scipy.sparse.identity(2**qubit, dtype=op.dtype)
-    iden_after = scipy.sparse.identity(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
-    return scipy.sparse.kron(scipy.sparse.kron(iden_before, op), iden_after)
-
-
-def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.spmatrix:
-    """Compute the collective version of a qubit operator: sum_q op_q."""
-    return sum(op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits))
-
-
-@functools.cache
-def collective_spin_ops(num_qubits: int) -> tuple[scipy.sparse.spmatrix, scipy.sparse.spmatrix, scipy.sparse.spmatrix]:
-    """Construct collective spin operators."""
-    collective_Sx = collective_op(pauli_X, num_qubits) / 2
-    collective_Sy = collective_op(pauli_Y, num_qubits) / 2
-    collective_Sz = collective_op(pauli_Z, num_qubits) / 2
-    return collective_Sx, collective_Sy, collective_Sz
-
-
-def time_deriv(_: float, density_op: np.ndarray, hamiltonian: np.ndarray | scipy.sparse.spmatrix, dissipator: Optional[Dissipator] = None) -> np.ndarray:
-    """
-    Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing Markovian evolution.
-    The first argument is blank to integrate with scipy.integrate.solve_ivp.
-    """
-    # coherent evolution
-    if hamiltonian.ndim == 2:
-        # ... computed with ordinary matrix multiplication
-        density_op.shape = hamiltonian.shape
-        output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
-    else:
-        # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
-        # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
-        density_op.shape = hamiltonian.shape * 2
-        output = -1j * ((hamiltonian * density_op.T).T - density_op * hamiltonian)
-
-    # dissipation
-    if dissipator:
-        output += dissipator @ density_op
-
-    density_op.shape = (-1,)
-    return output.ravel()
-
-
-def evolve_state(
-    density_op: np.ndarray,
-    time: float,
-    hamiltonian: np.ndarray | scipy.sparse.spmatrix,
-    dissipator: Optional[Dissipator] = None,
-    rtol: float = 1e-8,
-    atol: float = 1e-8,
-) -> np.ndarray:
-    """Evolve a density operator under a Lindbladian for a given amount of time."""
-    if time == 0:
-        return density_op
-    if time < 0:
-        time, hamiltonian = -time, -hamiltonian
-    args = (time_deriv, [0, time], density_op.ravel())
-    kwargs = dict(
-        t_eval=[time],
-        rtol=rtol,
-        atol=atol,
-        method="DOP853",
-        args=(hamiltonian, dissipator),
-    )
-    final_vec = scipy.integrate.solve_ivp(*args, **kwargs).y[:, -1]
-    return final_vec.reshape(density_op.shape)
-
-
 def simulate_OAT(
     num_qubits: int,
     params: tuple[float, float, float, float] | np.ndarray,
@@ -108,19 +36,13 @@ def simulate_OAT(
 
     If dissipation_rates is nonzero, qubits experience dissipation during the squeezing step (2).
     See the documentation for the Dissipator class for a general explanation of the
-    dissipation_rates and dissipation_format arguments, but note that this method additionally
-    divides the dissipator (equivalently, the dissipation rates) by a factor of 'np.pi * num_qubits'
-    in order to "normalize" dissipation time scales and make them comparable to the time scales of
-    coherent evolution.  There are two ways to interpret this normalization of the dissipation
-    rates:
-    - Dividing the "bare" dissipation rate 'r' by a factor of 'np.pi' makes it so that XYZ-type
-      dissipation (with rates 'r / np.pi') depolarizes a single qubit with probability 'e^(-r)' in
-      time 'np.pi', or equivalently the time it takes for the Hamiltonian 'Sx' to flip a qubit.
-      The additional divisor of 'num_qubits' accounts for the fact that the OAT protocol takes time
-      'O(num_qubits)' when 'params[1] ~ O(1)', so without this divisor dynamics would be completely
-      dominated by dissipation when 'num_qubits >> 1'.
-    - Dividing the "bare" dissipation rate 'r' by a factor of 'np.pi * num_qubits' makes so that
-      each qubit depolarizes with probability 'e^(-params[1])' by the end of the OAT protocol.
+    dissipation_rates and dissipation_format arguments.
+
+    This method additionally divides the dissipator (equivalently, all dissipation rates) by a
+    factor of 'np.pi * num_qubits' in order to "normalize" dissipation time scales, and make them
+    comparable to the time scales of coherent evolution.  Dividing a Dissipator with dissipation
+    rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes with
+    probability 'e^(-params[1] * r)' by the end of the OAT protocol.
     """
     assert len(params) == 4, "must provide 4 simulation parameters!"
 
@@ -146,6 +68,85 @@ def simulate_OAT(
     state_3 = evolve_state(state_2, time_3, hamiltonian_3)
 
     return state_3
+
+
+def evolve_state(
+    density_op: np.ndarray,
+    time: float,
+    hamiltonian: np.ndarray | scipy.sparse.spmatrix,
+    dissipator: Optional[Dissipator] = None,
+    rtol: float = 1e-8,
+    atol: float = 1e-8,
+) -> np.ndarray:
+    """
+    Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
+    """
+    if time == 0:
+        return density_op
+    if time < 0:
+        time, hamiltonian = -time, -hamiltonian
+    args = (time_deriv, [0, time], density_op.ravel())
+    kwargs = dict(
+        t_eval=[time],
+        rtol=rtol,
+        atol=atol,
+        method="DOP853",
+        args=(hamiltonian, dissipator),
+    )
+    final_vec = scipy.integrate.solve_ivp(*args, **kwargs).y[:, -1]
+    return final_vec.reshape(density_op.shape)
+
+
+def time_deriv(
+    _: float,
+    density_op: np.ndarray,
+    hamiltonian: np.ndarray | scipy.sparse.spmatrix,
+    dissipator: Optional[Dissipator] = None,
+) -> np.ndarray:
+    """
+    Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing Markovian evolution.
+    The first argument is blank to integrate with scipy.integrate.solve_ivp.
+    """
+    # coherent evolution
+    if hamiltonian.ndim == 2:
+        # ... computed with ordinary matrix multiplication
+        density_op.shape = hamiltonian.shape
+        output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
+    else:
+        # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
+        # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
+        density_op.shape = hamiltonian.shape * 2
+        output = -1j * ((hamiltonian * density_op.T).T - density_op * hamiltonian)
+
+    # dissipation
+    if dissipator:
+        output += dissipator @ density_op
+
+    density_op.shape = (-1,)
+    return output.ravel()
+
+
+@functools.cache
+def collective_spin_ops(num_qubits: int) -> tuple[scipy.sparse.spmatrix, scipy.sparse.spmatrix, scipy.sparse.spmatrix]:
+    """Construct collective spin operators."""
+    collective_Sx = collective_op(pauli_X, num_qubits) / 2
+    collective_Sy = collective_op(pauli_Y, num_qubits) / 2
+    collective_Sz = collective_op(pauli_Z, num_qubits) / 2
+    return collective_Sx, collective_Sy, collective_Sz
+
+
+def collective_op(op: scipy.sparse.spmatrix, num_qubits: int) -> scipy.sparse.spmatrix:
+    """Compute the collective version of a qubit operator: sum_q op_q."""
+    return sum(op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits))
+
+
+def op_on_qubit(op: scipy.sparse.spmatrix, qubit: int, total_qubit_num: int) -> scipy.sparse.spmatrix:
+    """
+    Return an operator that acts with 'op' in the given qubit, and trivially (with the identity operator) on all other qubits.
+    """
+    iden_before = scipy.sparse.identity(2**qubit, dtype=op.dtype)
+    iden_after = scipy.sparse.identity(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
+    return scipy.sparse.kron(scipy.sparse.kron(iden_before, op), iden_after)
 
 
 if __name__ == "__main__":
