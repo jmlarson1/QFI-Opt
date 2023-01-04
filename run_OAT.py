@@ -116,7 +116,7 @@ def time_deriv(
         # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
         density_op.shape = hamiltonian.shape * 2
-        output = -1j * ((hamiltonian * density_op.T).T - density_op * hamiltonian)
+        output = -1j * (hamiltonian[:, np.newaxis] * density_op - density_op * hamiltonian)
 
     # dissipation
     if dissipator:
