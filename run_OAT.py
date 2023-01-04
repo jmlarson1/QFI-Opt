@@ -10,11 +10,11 @@ import scipy
 from dissipation import Dissipator
 
 # qubit states
-ket_0 = np.array([0, 1])
-ket_1 = np.array([1, 0])
+ket_0 = np.array([1, 0])
+ket_1 = np.array([0, 1])
 
 # Pauli operators
-pauli_Z = scipy.sparse.dia_matrix([[1, 0], [0, -1]])  # |1><1| - |0><0|
+pauli_Z = scipy.sparse.dia_matrix([[1, 0], [0, -1]])  # |0><0| - |1><1|
 pauli_X = scipy.sparse.csr_matrix([[0, 1], [1, 0]])  # |0><1| + |1><0|
 pauli_Y = -1j * pauli_Z @ pauli_X
 
@@ -100,7 +100,7 @@ def simulate_OAT(
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
 
-    Starting with an initial all-|0> state (all spins pointing down along the Z axis):
+    Starting with an initial all-|1> state (all spins pointing down along the Z axis):
     1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian 'Sx').
     2. Squeeze with Hamiltonian 'Sz^2 / num_qubits' for time 'params[1] * np.pi * num_qubits'.
     3. Rotate about the axis 'X_phi' by the angle '-params[2] * np.pi',
@@ -127,9 +127,9 @@ def simulate_OAT(
     # construct collective spin operators
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
 
-    # rotate the all-|0> state about the X axis
+    # rotate the all-|1> state about the X axis
     time_1 = params[0] * np.pi
-    qubit_ket = np.cos(time_1 / 2) * ket_0 - 1j * np.sin(time_1 / 2) * ket_1
+    qubit_ket = np.sin(time_1 / 2) * ket_0 + 1j * np.cos(time_1 / 2) * ket_1
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         formatter_class=argparse.MetavarTypeHelpFormatter,
     )
     parser.add_argument("--num-qubits", type=int, default=4)
-    parser.add_argument("--dissipation", type=float, default=0)
+    parser.add_argument("--dissipation", type=float, default=0.0)
     parser.add_argument("--params", type=float, nargs=4, required=True)
     args = parser.parse_args(sys.argv[1:])
 
