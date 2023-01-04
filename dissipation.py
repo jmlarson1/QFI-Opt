@@ -10,6 +10,8 @@ def log2_int(val: int) -> int:
 class Dissipator:
     """
     Data structure that represents a dissipation operator.
+
+    TODO: explain things
     """
 
     def __init__(self, dissipation_rates: float | tuple[float, float, float], dissipation_format: str = "XYZ") -> None:
@@ -64,7 +66,26 @@ class Dissipator:
         return sum(self._rates) == 0
 
 
+"""
+For any specified qubit 'q', the density matrix 'rho' can be written in the form
+  rho = [ [ rho_q_00, rho_q_01 ],
+          [ rho_q_10, rho_q_11 ] ],
+where 'rho_q_ab = <a|rho|b>_q = Tr(rho |b><a|_q)' is a block of 'rho'.
+
+The methods below accept a density matrix and a qubit index.  These methods then organize the
+density matrix into blocks (as specified above), and manipulate these blocks to construct terms
+that are needed to compute the effect of dissipation.
+
+To reduce boilerplate comments, the methods below will only specify how the blocks of the density
+matrix get rearranged.
+"""
+
+
 def _qubit_term_XYZ_1(density_op: np.ndarray, qubit: int) -> np.ndarray:
+    """
+    Starting with the matrix [[a, b]]  return the matrix [[ 0, -b]
+                              [c, d]],                   [[-c,  0]].
+    """
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
@@ -81,6 +102,10 @@ def _qubit_term_XYZ_1(density_op: np.ndarray, qubit: int) -> np.ndarray:
 
 
 def _qubit_term_XYZ_2(density_op: np.ndarray, qubit: int) -> np.ndarray:
+    """
+    Starting with the matrix [[a, b]]  return the matrix [[d-a,  0 ]
+                              [c, d]],                   [[ 0,  a-d]].
+    """
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
@@ -97,6 +122,10 @@ def _qubit_term_XYZ_2(density_op: np.ndarray, qubit: int) -> np.ndarray:
 
 
 def _qubit_term_XYZ_3(density_op: np.ndarray, qubit: int) -> np.ndarray:
+    """
+    Starting with the matrix [[a, b]]  return the matrix [[0, c]
+                              [c, d]],                   [[b, 0]].
+    """
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
@@ -116,6 +145,10 @@ _qubit_term_PMZ_1 = _qubit_term_XYZ_1
 
 
 def _qubit_term_PMZ_2(density_op: np.ndarray, qubit: int) -> np.ndarray:
+    """
+    Starting with the matrix [[a, b]]  return the matrix [[ d,  0]
+                              [c, d]],                   [[ 0, -d]].
+    """
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
@@ -132,6 +165,10 @@ def _qubit_term_PMZ_2(density_op: np.ndarray, qubit: int) -> np.ndarray:
 
 
 def _qubit_term_PMZ_3(density_op: np.ndarray, qubit: int) -> np.ndarray:
+    """
+    Starting with the matrix [[a, b]]  return the matrix [[-a,  0]
+                              [c, d]],                   [[ 0,  a]].
+    """
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
