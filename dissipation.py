@@ -1,3 +1,5 @@
+from typing import Literal
+
 import numpy as np
 
 
@@ -7,80 +9,113 @@ def log2_int(val: int) -> int:
 
 class Dissipator:
     """
-    Data structure for representing a dissipation operator.
-    Currently only allows for single-qubit depolarizing dissipation.
+    Data structure that represents a dissipation operator.
     """
 
-    def __init__(self, depolarizing_rates: float | tuple[float, float, float], dissipation_format: str = "XYZ") -> None:
-        if isinstance(depolarizing_rates, float):
-            depolarizing_rates = (depolarizing_rates,) * 3
-        assert all(rate >= 0 for rate in depolarizing_rates), "depolarizing rates cannot be negative!"
-        self._rate_sx, self._rate_sy, self._rate_sz = depolarizing_rates
+    def __init__(self, dissipation_rates: float | tuple[float, float, float], dissipation_format: str = "XYZ") -> None:
+        if isinstance(dissipation_rates, float):
+            dissipation_rates = (dissipation_rates,) * 3
+        assert all(rate >= 0 for rate in dissipation_rates), "dissipation rates cannot be negative!"
+        self._rates = dissipation_rates
+        self._format = dissipation_format
 
-        # Pauli dephasing rates differ from spin dephasing rates by a factor of 4
-        self._rate_x = self._rate_sx / 4
-        self._rate_y = self._rate_sy / 4
-        self._rate_z = self._rate_sy / 4
-        self._rate_sum = self._rate_x + self._rate_y + self._rate_z
+        if dissipation_format == "XYZ":
+            rate_sx, rate_sy, rate_sz = dissipation_rates
+            self._rate_1 = (rate_sx + rate_sy) / 4 + rate_sz / 2
+            self._rate_2 = (rate_sx + rate_sy) / 4
+            self._rate_3 = (rate_sx - rate_sy) / 4
+            self._qubit_term_1 = _qubit_term_XYZ_1
+            self._qubit_term_2 = _qubit_term_XYZ_2
+            self._qubit_term_3 = _qubit_term_XYZ_3
 
-    @property
-    def is_trivial(self) -> bool:
-        return self._rate_sum == 0
+        elif dissipation_format == "PMZ":
+            rate_sp, rate_sm, rate_sz = dissipation_rates
+            self._rate_1 = sum(dissipation_rates) / 2
+            self._rate_2 = rate_sp
+            self._rate_3 = rate_sm
+            self._qubit_term_1 = _qubit_term_PMZ_1
+            self._qubit_term_2 = _qubit_term_PMZ_2
+            self._qubit_term_3 = _qubit_term_PMZ_3
 
-    def __matmul__(self, density_op: np.ndarray) -> np.ndarray:
+        else:
+            raise ValueError(f"dissipation format not recognized {dissipation_format}")
+
+    def __matmul__(self, density_op: np.ndarray) -> np.ndarray | float:
         num_qubits = log2_int(density_op.size) // 2
-        term_x = self._rate_x * sum(conjugate_by_X(density_op, qubit) for qubit in range(num_qubits))
-        term_y = self._rate_y * sum(conjugate_by_Y(density_op, qubit) for qubit in range(num_qubits))
-        term_z = self._rate_z * sum(conjugate_by_Z(density_op, qubit) for qubit in range(num_qubits))
-        return term_x + term_y + term_z - self._rate_sum * num_qubits * density_op
+        output = self._rate_1 * sum(self._qubit_term_1(density_op, qubit) for qubit in range(num_qubits))
+        if self._rate_2:
+            output += self._rate_2 * sum(self._qubit_term_2(density_op, qubit) for qubit in range(num_qubits))
+        if self._rate_3:
+            output += self._rate_3 * sum(self._qubit_term_3(density_op, qubit) for qubit in range(num_qubits))
+        return output
 
     def __rmul__(self, scalar: float) -> "Dissipator":
-        rates = (scalar * self._rate_sx, scalar * self._rate_sy, scalar * self._rate_sz)
-        return Dissipator(rates)
+        rates = (scalar * self._rates[0], scalar * self._rates[1], scalar * self._rates[2])
+        return Dissipator(rates, self._format)
 
     def __mul__(self, scalar: float) -> "Dissipator":
         return scalar * self
 
     def __truediv__(self, scalar: float) -> "Dissipator":
-        return (1/scalar) * self
+        return (1 / scalar) * self
+
+    @property
+    def is_trivial(self) -> bool:
+        return sum(self._rates) == 0
 
 
-def conjugate_by_Z(density_op: np.ndarray, qubit: int) -> np.ndarray:
-    """For a given density operator 'rho' and qubit index 'q', return 'Z_q rho Z_q'."""
+def _qubit_term_XYZ_1(density_op: np.ndarray, qubit: int) -> np.ndarray:
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
     density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
     output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = density_op[:, 0, :, :, 0, :]
+    output[:, 0, :, :, 0, :] = 0
     output[:, 0, :, :, 1, :] = -density_op[:, 0, :, :, 1, :]
     output[:, 1, :, :, 0, :] = -density_op[:, 1, :, :, 0, :]
-    output[:, 1, :, :, 1, :] = density_op[:, 1, :, :, 1, :]
+    output[:, 1, :, :, 1, :] = 0
     density_op.shape = input_shape
     output.shape = input_shape
     return output
 
 
-def conjugate_by_X(density_op: np.ndarray, qubit: int) -> np.ndarray:
-    """For a given density operator 'rho' and qubit index 'q', return 'X_q rho X_q'."""
+def _qubit_term_XYZ_2(density_op: np.ndarray, qubit: int) -> np.ndarray:
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
     density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
     output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :]
+    output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :] - density_op[:, 0, :, :, 0, :]
+    output[:, 0, :, :, 1, :] = 0
+    output[:, 1, :, :, 0, :] = 0
+    output[:, 1, :, :, 1, :] = -output[:, 0, :, :, 0, :]
+    density_op.shape = input_shape
+    output.shape = input_shape
+    return output
+
+
+def _qubit_term_XYZ_3(density_op: np.ndarray, qubit: int) -> np.ndarray:
+    input_shape = density_op.shape
+    num_qubits = log2_int(density_op.size) // 2
+    dim_a = 2**qubit
+    dim_b = 2 ** (num_qubits - qubit - 1)
+    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    output = np.empty_like(density_op)
+    output[:, 0, :, :, 0, :] = 0
     output[:, 0, :, :, 1, :] = density_op[:, 1, :, :, 0, :]
     output[:, 1, :, :, 0, :] = density_op[:, 0, :, :, 1, :]
-    output[:, 1, :, :, 1, :] = density_op[:, 0, :, :, 0, :]
+    output[:, 1, :, :, 1, :] = 0
     density_op.shape = input_shape
     output.shape = input_shape
     return output
 
 
-def conjugate_by_Y(density_op: np.ndarray, qubit: int) -> np.ndarray:
-    """For a given density operator 'rho' and qubit index 'q', return 'Y_q rho Y_q'."""
+_qubit_term_PMZ_1 = _qubit_term_XYZ_1
+
+
+def _qubit_term_PMZ_2(density_op: np.ndarray, qubit: int) -> np.ndarray:
     input_shape = density_op.shape
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
@@ -88,8 +123,24 @@ def conjugate_by_Y(density_op: np.ndarray, qubit: int) -> np.ndarray:
     density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
     output = np.empty_like(density_op)
     output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :]
-    output[:, 0, :, :, 1, :] = -density_op[:, 1, :, :, 0, :]
-    output[:, 1, :, :, 0, :] = -density_op[:, 0, :, :, 1, :]
+    output[:, 0, :, :, 1, :] = 0
+    output[:, 1, :, :, 0, :] = 0
+    output[:, 1, :, :, 1, :] = -density_op[:, 1, :, :, 1, :]
+    density_op.shape = input_shape
+    output.shape = input_shape
+    return output
+
+
+def _qubit_term_PMZ_3(density_op: np.ndarray, qubit: int) -> np.ndarray:
+    input_shape = density_op.shape
+    num_qubits = log2_int(density_op.size) // 2
+    dim_a = 2**qubit
+    dim_b = 2 ** (num_qubits - qubit - 1)
+    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    output = np.empty_like(density_op)
+    output[:, 0, :, :, 0, :] = -density_op[:, 0, :, :, 0, :]
+    output[:, 0, :, :, 1, :] = 0
+    output[:, 1, :, :, 0, :] = 0
     output[:, 1, :, :, 1, :] = density_op[:, 0, :, :, 0, :]
     density_op.shape = input_shape
     output.shape = input_shape
