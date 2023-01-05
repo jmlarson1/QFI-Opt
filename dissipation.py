@@ -1,10 +1,6 @@
 import numpy as np
 
 
-def log2_int(val: int) -> int:
-    return val.bit_length() - 1
-
-
 class Dissipator:
     """
     Data structure to represent a dissipation operator.
@@ -81,6 +77,10 @@ class Dissipator:
 
     def __bool__(self) -> bool:
         return bool(sum(self._rates))
+
+
+def log2_int(val: int) -> int:
+    return val.bit_length() - 1
 
 
 """
