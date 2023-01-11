@@ -107,7 +107,9 @@ def time_deriv(
 ) -> np.ndarray:
     """
     Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing Markovian evolution.
-    The first argument is blank to integrate with scipy.integrate.solve_ivp.
+
+    The first argument is a time parameter, indicating this function should return the time derivative of 'density_op' at a particular time.
+    The time parameter is not used here, but it is necessary for compatibility with scipy.integrate.solve_ivp.
     """
     # coherent evolution
     if hamiltonian.ndim == 2:
@@ -131,10 +133,11 @@ def time_deriv(
 @functools.cache
 def collective_spin_ops(num_qubits: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Construct collective spin operators."""
-    collective_Sx = collective_op(pauli_X, num_qubits) / 2
-    collective_Sy = collective_op(pauli_Y, num_qubits) / 2
-    collective_Sz = collective_op(pauli_Z, num_qubits) / 2
-    return collective_Sx, collective_Sy, collective_Sz
+    return (
+        collective_op(pauli_X, num_qubits) / 2,
+        collective_op(pauli_Y, num_qubits) / 2,
+        collective_op(pauli_Z, num_qubits) / 2,
+    )
 
 
 def collective_op(op: np.ndarray, num_qubits: int) -> np.ndarray:
