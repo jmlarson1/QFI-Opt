@@ -65,15 +65,15 @@ class Dissipator:
             output += self._rate_2 * sum(self._qubit_term_2(density_op, qubit) for qubit in range(num_qubits))
         return output
 
-    def __rmul__(self, scalar: float) -> "Dissipator":
+    def __mul__(self, scalar: float) -> "Dissipator":
         rates = (scalar * self._rates[0], scalar * self._rates[1], scalar * self._rates[2])
         return Dissipator(rates, self._format)
 
-    def __mul__(self, scalar: float) -> "Dissipator":
-        return scalar * self
+    def __rmul__(self, scalar: float) -> "Dissipator":
+        return self * scalar
 
     def __truediv__(self, scalar: float) -> "Dissipator":
-        return (1 / scalar) * self
+        return self * (1 / scalar)
 
     def __bool__(self) -> bool:
         return bool(sum(self._rates))
