@@ -85,15 +85,17 @@ def evolve_state(
         return density_op
     if time < 0:
         time, hamiltonian = -time, -hamiltonian
-    args = (time_deriv, [0, time], density_op.ravel())
-    kwargs = dict(
+    solution = scipy.integrate.solve_ivp(
+        time_deriv,
+        [0, time],
+        density_op.ravel(),
         t_eval=[time],
         rtol=rtol,
         atol=atol,
         method="DOP853",
         args=(hamiltonian, dissipator),
     )
-    final_vec = scipy.integrate.solve_ivp(*args, **kwargs).y[:, -1]
+    final_vec = solution.y[:, -1]
     return final_vec.reshape(density_op.shape)
 
 
