@@ -21,10 +21,10 @@ class LindbladianMap:
     def __init__(
         self,
         hamiltonian: tf.Tensor, 
-        *noise_data: tf.Tensor,
+        *dissipation_data: tf.Tensor,
     ) -> None:
         self._hamiltonian = hamiltonian
-        self._jump_ops = [tf.complex(tf.math.sqrt(noise_rate), tf.constant(0.0, dtype=tf.dtypes.float64)) * op for noise_rate, op in noise_data if noise_rate]
+        self._jump_ops = [tf.complex(tf.math.sqrt(rate), tf.constant(0.0, dtype=tf.dtypes.float64)) * op for rate, op in dissipation_data if rate]
         self._recycling_ops = [tf.linalg.matmul(tf.transpose(tf.math.conj(op)), op) for op in self._jump_ops]
 
     @property
@@ -61,7 +61,7 @@ def evolve_state(
     density_op: tf.Tensor,
     time: float,
     hamiltonian: tf.Tensor | tf.sparse.SparseTensor,
-    *noise_data: tuple[float, tf.Tensor  | tf.sparse.SparseTensor],
+    *dissipation_data: tuple[float, tf.Tensor  | tf.sparse.SparseTensor],
     rtol: float = 1e-8,
     atol: float = 1e-8,
 ) -> tf.Tensor:
@@ -70,7 +70,7 @@ def evolve_state(
         return density_op
     if time < 0:
         time, hamiltonian = -time, -hamiltonian
-    lindbladian_map = LindbladianMap(hamiltonian, *noise_data)
+    lindbladian_map = LindbladianMap(hamiltonian, *dissipation_data)
 
     def time_deriv(_: float, density_op: tf.Tensor,) -> tf.Tensor:
         """
@@ -113,36 +113,40 @@ def evolve_state(
                                    )
     return tf.reshape(result.states[-1], density_op.shape)
 
-def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | tf.Tensor, noise_level: float = 0) -> tf.Tensor:
+def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | tf.Tensor, dissipation: float = 0) -> tf.Tensor:
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
 
-    Starting with an initial all-|0> state (all spins pointing down along the Z axis):
-    1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian Sx).
+    Starting with an initial all-|1> state (all spins pointing down along the Z axis):
+    1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian 'Sx').
     2. Squeeze with Hamiltonian 'Sz^2 / num_qubits' for time 'params[1] * np.pi * num_qubits'.
-    3. Rotate about the axis X_phi by the angle '-params[2] * np.pi',
-       where phi = 'params[3] * np.pi / 2' and X_phi = cos(phi) X + sin(phi) Y.
+    3. Rotate about the axis 'X_phi' by the angle '-params[2] * np.pi',
+       where 'phi = params[3] * np.pi / 2' and 'X_phi = cos(phi) X + sin(phi) Y'.
 
-    If noise_level > 0, qubits depolarize at a constant rate throughout the protocol.
-    The depolarizing rate is chosen such that a single qubit (with num_qubits = 1) would depolarize
-    with probability e^(-noise_level) in time pi (i.e., the time it takes to flip a spin with the
-    Hamiltonian Sx).  The depolarizing rate is additionally reduced by a factor of num_qubits
-    because the OAT protocol takes time O(num_qubits) when params[1] ~ O(1).
+    If dissipation_rates is nonzero, qubits experience dissipation during the squeezing step (2).
+    See the documentation for the Dissipator class for a general explanation of the
+    dissipation_rates and dissipation_format arguments.
+
+    This method additionally divides the dissipator (equivalently, all dissipation rates) by a
+    factor of 'np.pi * num_qubits' in order to "normalize" dissipation time scales, and make them
+    comparable to the time scales of coherent evolution.  Dividing a Dissipator with dissipation
+    rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes with
+    probability 'e^(-params[1] * r)' by the end of the OAT protocol.
     """
-    assert noise_level >= 0, "noise_level cannot be negative!"
-    assert len(params) == 4, "must provide 4 parameters!"
+    assert len(params) == 4, "must provide 4 simulation parameters!"
+    assert dissipation >= 0, "dissipation cannot be negative!"
 
     # collective spin operators
     collective_Sx = collective_op(pauli_X, num_qubits) / 2
     collective_Sy = collective_op(pauli_Y, num_qubits) / 2
     collective_Sz = collective_op(pauli_Z, num_qubits) / 2
 
-    if noise_level:
-        # collect noise data as a list of tuples: (jump_rate, jump_operator)
-        depolarizing_rate = noise_level / (tf.constant(numpy.pi, dtype=tf.dtypes.float64) * num_qubits)
-        noise_data = [(depolarizing_rate, op_on_qubit(pauli / 2, qubit, num_qubits)) for pauli in [pauli_X, pauli_Y, pauli_Z] for qubit in range(num_qubits)]
+    if dissipation:
+        # collect dissipation data as a list of tuples: (jump_rate, jump_operator)
+        depolarizing_rate = dissipation / (tf.constant(numpy.pi, dtype=tf.dtypes.float64) * num_qubits)
+        dissipation_data = [(depolarizing_rate, op_on_qubit(pauli / 2, qubit, num_qubits)) for pauli in [pauli_X, pauli_Y, pauli_Z] for qubit in range(num_qubits)]
     else:
-        noise_data = []
+        dissipation_data = []
 
     # initialize a state pointing down along Z (all qubits in |0>)
     state_0 = tf.Variable(tf.zeros([2**num_qubits, 2**num_qubits], dtype=tf.dtypes.complex128))
@@ -151,18 +155,18 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | tf
     # rotate about the X axis
     time_0 = params[0] * tf.constant(numpy.pi, dtype=tf.dtypes.float64)
     hamiltonian_0 = collective_Sx
-    state_1 = evolve_state(state_0, time_0, hamiltonian_0, *noise_data)
+    state_1 = evolve_state(state_0, time_0, hamiltonian_0, *dissipation_data)
   
     # squeeze!
     time_1 = params[1] * tf.constant(numpy.pi, dtype=tf.dtypes.float64) * num_qubits
     hamiltonian_1 = collective_Sz @ collective_Sz / num_qubits
-    state_2 = evolve_state(state_1, time_1, hamiltonian_1, *noise_data)
+    state_2 = evolve_state(state_1, time_1, hamiltonian_1, *dissipation_data)
  
     # un-rotate about a chosen axis
     time_2 = -params[2] * tf.constant(numpy.pi, dtype=tf.dtypes.float64)
     rot_axis_angle = params[3] * tf.constant(numpy.pi, dtype=tf.dtypes.complex128) / 2
     hamiltonian_2 = tf.math.cos(rot_axis_angle) * collective_Sx + tf.math.sin(rot_axis_angle) * collective_Sy
-    state_3 = evolve_state(state_2, time_2, hamiltonian_2, *noise_data)
+    state_3 = evolve_state(state_2, time_2, hamiltonian_2, *dissipation_data)
     return state_3
 
 if __name__ == "__main__":
@@ -172,12 +176,12 @@ if __name__ == "__main__":
         formatter_class=argparse.MetavarTypeHelpFormatter,
     )
     parser.add_argument("--num_qubits", type=int, default=4)
-    parser.add_argument("--noise-level", type=float, default=0)
+    parser.add_argument("--dissipation", type=float, default=0)
     parser.add_argument("--params", type=float, nargs=4, required=True)
     args = parser.parse_args(sys.argv[1:])
 
     # simulate the OAT potocol
-    final_state = simulate_OAT(args.num_qubits, args.params, args.noise_level)
+    final_state = simulate_OAT(args.num_qubits, args.params, args.dissipation)
 
     # compute collective Pauli operators
     mean_X = collective_op(pauli_X, args.num_qubits) / args.num_qubits
