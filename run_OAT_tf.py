@@ -83,16 +83,6 @@ def evolve_state(
         out_matrix = lindbladian_map(inp_matrix)
         return tf.experimental.numpy.ravel(out_matrix)
 
-    def re_time_deriv(_: float, density_op: tf.Tensor) -> tf.Tensor:
-        """
-        Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing
-        Markovian evolution with the given Lindbladian.
-
-        The first argument is blank to integrate with scipy.integrate.solve_ivp.
-        """
-        inp_matrix = tf.reshape(density_op, lindbladian_map.input_shape)
-        out_matrix = lindbladian_map(inp_matrix)
-        return tf.experimental.numpy.ravel(out_matrix)
     def time_deriv_jac(t: tf.Tensor, density_op: tf.Tensor) -> tf.Tensor:
         """
         Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing
@@ -103,7 +93,7 @@ def evolve_state(
 
         with tf.GradientTape() as tape:
             tape.watch(density_op)
-            out_matrix = re_time_deriv(t, density_op)
+            out_matrix = time_deriv(t, density_op)
         
         jac = tape.jacobian(out_matrix, density_op)
         return tf.experimental.numpy.ravel(jac)
