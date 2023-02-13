@@ -5,6 +5,7 @@ import sys
 from typing import Callable, Optional
 
 import numpy as np
+import scipy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -89,6 +90,28 @@ def evolve_state(
     if time < 0:
         time, hamiltonian = -time, -hamiltonian
     time_deriv, time_deriv_jacobian = get_time_deriv_funs(hamiltonian, dissipator)
+
+    from time import time as current_time
+
+    start = current_time()
+
+    # def _time_deriv(_, density_op):
+    #     shape = (hamiltonian.shape[0],) * 2
+    #     return time_deriv(_, density_op.reshape(shape)).numpy().ravel()
+
+    # solution = scipy.integrate.solve_ivp(
+    #     _time_deriv,
+    #     [0, time],
+    #     density_op.numpy().ravel(),
+    #     t_eval=[time],
+    #     rtol=rtol,
+    #     atol=atol,
+    #     method="DOP853",
+    # )
+    # print(current_time() - start)
+    # final_vec = solution.y[:, -1]
+    # return tf.constant(final_vec.reshape(density_op.shape))
+
     result = tfp.math.ode.DormandPrince(rtol=rtol, atol=atol).solve(
         time_deriv,
         0,
@@ -96,6 +119,7 @@ def evolve_state(
         solution_times=[0, time],
         jacobian_fn=time_deriv_jacobian,
     )
+    print(current_time() - start)
     return result.states[-1]
 
 

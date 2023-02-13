@@ -6,6 +6,8 @@ from typing import Optional
 
 import numpy as np
 import scipy
+import tensorflow as tf
+import tensorflow_probability as tfp
 
 from dissipation import Dissipator
 
@@ -85,6 +87,24 @@ def evolve_state(
         return density_op
     if time < 0:
         time, hamiltonian = -time, -hamiltonian
+
+    from time import time as current_time
+
+    start = current_time()
+
+    # def _time_deriv(_, density_op):
+    #     shape = (hamiltonian.shape[0],) * 2
+    #     return tf.constant(time_deriv(_, density_op.numpy().ravel(), hamiltonian, dissipator), shape=shape)
+
+    # result = tfp.math.ode.DormandPrince(rtol=rtol, atol=atol).solve(
+    #     _time_deriv,
+    #     0,
+    #     density_op,
+    #     solution_times=[0, time],
+    # )
+    # print(current_time() - start)
+    # return result.states[-1].numpy()
+
     solution = scipy.integrate.solve_ivp(
         time_deriv,
         [0, time],
@@ -95,6 +115,7 @@ def evolve_state(
         method="DOP853",
         args=(hamiltonian, dissipator),
     )
+    print(current_time() - start)
     final_vec = solution.y[:, -1]
     return final_vec.reshape(density_op.shape)
 
@@ -111,15 +132,15 @@ def time_deriv(
     The first argument is a time parameter, indicating this function should return the time derivative of 'density_op' at a particular time.
     The time parameter is not used here, but it is necessary for compatibility with scipy.integrate.solve_ivp.
     """
+    density_op.shape = (hamiltonian.shape[0],) * 2
+
     # coherent evolution
     if hamiltonian.ndim == 2:
         # ... computed with ordinary matrix multiplication
-        density_op.shape = hamiltonian.shape
         output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
     else:
         # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
-        density_op.shape = hamiltonian.shape * 2
         output = -1j * (hamiltonian[:, np.newaxis] * density_op - density_op * hamiltonian)
 
     # dissipation
