@@ -108,20 +108,17 @@ def get_time_deriv_funs(
     """
 
     def time_deriv(_: float, density_op: tf.Tensor) -> tf.Tensor:
-        # coherent evolution
+        # compute commutator with hamiltonian
         if hamiltonian.ndim == 2:
             # ... computed with ordinary matrix multiplication
-            output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
+            ham_bracket = hamiltonian @ density_op - density_op @ hamiltonian
         else:
             # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
             # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
-            output = -1j * (hamiltonian[:, tf.newaxis] * density_op - density_op * hamiltonian)
-
-        # dissipation
-        if dissipator:
-            output += dissipator @ density_op
-
-        return output
+            ham_bracket = hamiltonian[:, tf.newaxis] * density_op - density_op * hamiltonian
+        if not dissipator:
+            return -1j * ham_bracket
+        return -1j * ham_bracket + dissipator @ density_op
 
     def time_deriv_jacobian(time: float, density_op: tf.Tensor) -> tf.Tensor:
         with tf.GradientTape() as tape:
@@ -181,6 +178,8 @@ if __name__ == "__main__":
 
     # print out expectation values and variances
     final_pauli_vals = [tf.math.real(tf.linalg.trace(final_state @ op)).numpy() for op in mean_ops]
-    final_pauli_vars = [tf.math.real(tf.linalg.trace(final_state @ (op @ op))).numpy() - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)]
+    final_pauli_vars = [
+        tf.math.real(tf.linalg.trace(final_state @ (op @ op))).numpy() - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)
+    ]
     print("[<X>, <Y>, <Z>]:", final_pauli_vals)
     print("[var(X), var(Y), var(Z)]:", final_pauli_vars)
