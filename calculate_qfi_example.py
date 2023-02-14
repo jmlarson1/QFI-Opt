@@ -32,7 +32,6 @@ def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
 
 
 if __name__ == "__main__":
-
     N = 4
     dissipation = 0
     G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)

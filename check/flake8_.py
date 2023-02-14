@@ -13,7 +13,6 @@ def run(
     include: str | Iterable[str] = "*.py",
     exclude: str | Iterable[str] = "",
 ) -> int:
-
     parser = check_utils.get_file_parser()
     parser.description = textwrap.dedent(
         """
