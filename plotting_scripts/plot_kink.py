@@ -4,7 +4,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
-sys.path.append("..")
+sys.path.append("../")
 
 import run_OAT
 from calculate_qfi_example import compute_QFI
