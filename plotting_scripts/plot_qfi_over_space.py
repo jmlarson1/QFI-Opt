@@ -10,7 +10,7 @@ import run_OAT
 from calculate_qfi_example import compute_QFI
 
 N = 4
-noise = 0
+dissipation = 0
 G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)
 
 num_pts = 11
@@ -24,10 +24,10 @@ for i in range(num_pts):
     for j in range(num_pts):
         #     for k in range(num_pts):
         #         params = np.array([x[i,j,k], y[i,j,k], z[i,j,k], 0])
-        #         rho = run_OAT.simulate_OAT(N, params, noise)
+        #         rho = run_OAT.simulate_OAT(N, params, dissipation)
         #         qfi = compute_QFI(rho, G)
         params = np.array([0.5, y[i, j], z[i, j], 0])
-        rho = run_OAT.simulate_OAT(N, params, noise)
+        rho = run_OAT.simulate_OAT(N, params, dissipation)
         qfi = compute_QFI(rho, G)
         obj_vals[i, j] = qfi
 
