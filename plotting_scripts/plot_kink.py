@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
+
+sys.path.append("..")
 
 import run_OAT
 from calculate_qfi_example import compute_QFI
