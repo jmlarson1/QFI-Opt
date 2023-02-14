@@ -9,7 +9,6 @@ import mypy_
 
 
 def run(*args: str) -> int:
-
     parser = check_utils.get_file_parser()
     parser.description = textwrap.dedent(
         """
