@@ -11,11 +11,40 @@ OATParams = tuple[float, float, float, float]
 
 @dataclasses.dataclass(kw_only=True)
 class Transformation:
-    """An object specifying a sequence of transformations that should be applied to a quantum state."""
+    """An object representing a sequence of transformations of a quantum state."""
 
-    flip_z: bool = False  # if 'True', apply the global spin rotation 'Rz(pi)'
-    flip_xy: Optional[float] = None  # if not 'None', apply a global spin rotation of 'pi' about 'cos(phi) * X + sin(phi) Y', where 'phi = 2 * pi * flip_xy'
-    conjugate: bool = False  # if 'True', complex conjugate the state
+    flip_z: bool = False
+    flip_xy: Optional[float] = None
+    conjugate: bool = False
+
+    def transform(self, state: np.ndarray) -> np.ndarray:
+        num_qubits = int(np.log2(state.shape[0]))
+        new_state = state.copy()
+        if self.flip_z:
+            # apply the global spin rotation 'Rz(pi)'
+            new_state = rot_z_mat(num_qubits, np.pi) * new_state
+        if self.flip_xy is not None:
+            # apply a global spin rotation by an angle by 'pi' about an axis in the X-Y plane
+            phi = 2 * np.pi * self.flip_xy
+            phase_mat = rot_z_mat(num_qubits, phi)
+            new_state = phase_mat * (phase_mat.conj() * new_state)[::-1, ::-1]
+        if self.conjugate:
+            # complex conjugate the state
+            new_state = new_state.conj()
+        return new_state
+
+
+@functools.cache
+def rot_z_mat(num_qubits: int, angle: float) -> np.ndarray:
+    """
+    Construct the matrix 'phase_mat' for which element-wise multiplication 'phase_mat * density_op' rotates the state 'density_op' about the Z axis by the
+    given angle.
+    """
+    if not angle:
+        return np.ones((2**num_qubits,) * 2)
+    _, _, collective_Sz = run_OAT.collective_spin_ops(num_qubits)
+    phase_vec = np.exp(-1j * angle * collective_Sz.diagonal())
+    return phase_vec * np.conj(phase_vec[:, np.newaxis])
 
 
 def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float], tuple[OATParams, Transformation]]]:
@@ -23,7 +52,7 @@ def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float
     Generate a list of symmetries of the OAT protocol at zero dissipation.
 
     Each symmetry is a map from 'old_params' --> '(new_params, transformation)', where 'transformation' indicates how a quantum state prepared with the
-    'new_params' should be additionally transformed to recover an exact symmetry.
+    'new_params' should be additionally transformed to recover an exact symmetry.  Note that the additional transformations (should) have no effect on the QFI.
     """
     even_qubits = num_qubits % 2 == 0
 
@@ -48,19 +77,6 @@ def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float
     return [shift_1, shift_2, reflect_1, reflect_2, shift_OAT, reflect_OAT]
 
 
-@functools.cache
-def rot_z_mat(num_qubits: int, angle: float) -> np.ndarray:
-    """
-    Construct the matrix 'phase_mat' for which element-wise multiplication 'phase_mat * density_op' rotates the state 'density_op' about the Z axis by the
-    given angle.
-    """
-    if not angle:
-        return np.ones((2**num_qubits,) * 2)
-    _, _, collective_Sz = run_OAT.collective_spin_ops(num_qubits)
-    phase_vec = np.exp(-1j * angle * collective_Sz.diagonal())
-    return phase_vec * np.conj(phase_vec[:, np.newaxis])
-
-
 def test_symmetries() -> None:
     """Test the symmetry transformations that we used to cut down the domain of the parameters for the OAT protocol."""
     # test several random parameters
@@ -72,14 +88,5 @@ def test_symmetries() -> None:
             # test all symmetries
             for symmetry in get_symmetries(num_qubits):
                 new_params, transformation = symmetry(*params)
-
                 new_state = run_OAT.simulate_OAT(num_qubits, new_params)
-                if transformation.flip_z:
-                    new_state = rot_z_mat(num_qubits, np.pi) * new_state
-                if transformation.flip_xy is not None:
-                    phase_mat = rot_z_mat(num_qubits, 2 * np.pi * transformation.flip_xy)
-                    new_state = phase_mat * (phase_mat.conj() * new_state)[::-1, ::-1]
-                if transformation.conjugate:
-                    new_state = new_state.conj()
-
-                assert np.allclose(new_state, state)
+                assert np.allclose(state, transformation.transform(new_state))
