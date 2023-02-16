@@ -11,7 +11,7 @@ OATParams = tuple[float, float, float, float]
 
 @dataclasses.dataclass(kw_only=True)
 class Transformation:
-    """A container to identify a sequence of transformations that should be applied to a quantum state."""
+    """An object specifying a sequence of transformations that should be applied to a quantum state."""
     flip_z: bool = False  # if 'True', apply the global spin rotation 'Rz(pi)'
     flip_xy: Optional[float] = None  # if not 'None', apply a global spin rotation of 'pi' about 'cos(phi) * X + sin(phi) Y', where 'phi = 2 * pi * flip_xy'
     conjugate: bool = False  # if 'True', complex conjugate the state
