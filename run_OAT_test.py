@@ -1,3 +1,4 @@
+import dataclasses
 import functools
 from typing import Callable, List, Optional
 
@@ -8,24 +9,32 @@ import run_OAT
 OATParams = tuple[float, float, float, float]
 
 
+@dataclasses.dataclass(kw_only=True)
+class Transformation:
+    """A container to identify a sequence of transformations that should be applied to a quantum state."""
+    flip_z: bool = False  # if 'True', apply the global spin rotation 'Rz(pi)'
+    flip_xy: Optional[float] = None  # if not 'None', apply a global spin rotation of 'pi' about 'cos(phi) * X + sin(phi) Y', where 'phi = 2 * pi * flip_xy'
+    conjugate: bool = False  # if 'True', complex conjugate the state
+
+
 def get_param_symmetries(num_qubits: int) -> List[Callable[[OATParams], tuple[OATParams, bool, Optional[float], bool]]]:
+
     """
     Generate a list of symmetries of the OAT protocol at zero dissipation.
 
-    Each symmetry is a map from 'old_params' --> '(new_params, flip_z, flip_xy, conjugate)', where 'flip_z', 'flip_xy', and 'conjugate' are additional
-    parameters to indicate how a quantum state prepared by a protocol with the 'new_params' should be additionally transformed to recover an exact symmetry:
-    - 'flip_z': if 'True', apply the global spin rotation 'Rz(pi)'.
-    - 'flip_xy': if 'None', do nothing.  Otherwise apply a global spin rotation of 'pi' about 'cos(phi) * X + sin(phi) Y', where 'phi = 2 * pi * flip_xy'.
-    - 'conjugate': if 'True', complex conjugate the state.
+    Each symmetry is a map from 'old_params' --> '(new_params, transformation)', where 'transformation' indicates how a quantum state prepared with the
+    'new_params' should be additionally transformed to recover an exact symmetry.
     """
     even_qubits = num_qubits % 2 == 0
     return [
-        lambda t_1, t_OAT, t_2, aa: ((t_1 + 1, t_OAT, t_2, -aa), False, 0, False),
-        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT, t_2 + 1, aa), False, -aa, False),
-        lambda t_1, t_OAT, t_2, aa: ((-t_1, t_OAT, t_2, aa + 0.5), True, None, False),
-        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT, -t_2, aa + 0.5), False, None, False),
-        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT + 1, t_2, aa + int(even_qubits) / 2), even_qubits, None, False),
-        lambda t_1, t_OAT, t_2, aa: ((-t_1, -t_OAT, -t_2, -aa), False, None, True),
+        # translation symmetries
+        lambda t_1, t_OAT, t_2, aa: ((t_1 + 1, t_OAT, t_2, -aa), Transformation(flip_xy=0)),
+        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT, t_2 + 1, aa), Transformation(flip_xy=-aa)),
+        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT + 1, t_2, aa + 0.5 * even_qubits), Transformation(flip_z=even_qubits)),
+        # reflection symmetries
+        lambda t_1, t_OAT, t_2, aa: ((-t_1, t_OAT, t_2, aa + 0.5), Transformation(flip_z=True)),
+        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT, -t_2, aa + 0.5), Transformation()),
+        lambda t_1, t_OAT, t_2, aa: ((t_1, -t_OAT, t_2, -aa), Transformation(flip_z=True, conjugate=True)),
     ]
 
 
@@ -52,15 +61,17 @@ def test_symmetries() -> None:
             state = run_OAT.simulate_OAT(num_qubits, params)
 
             for symmetry in get_param_symmetries(num_qubits):
-                new_params, flip_z, flip_xy, conjugate = symmetry(*params)
+                # new_params, flip_z, flip_xy, conjugate = symmetry(*params)
+                # transformation = Transformation(flip_z=flip_z, flip_xy=flip_xy, conjugate=conjugate)
+                new_params, transformation = symmetry(*params)
 
                 new_state = run_OAT.simulate_OAT(num_qubits, new_params)
-                if flip_z:
+                if transformation.flip_z:
                     new_state = rot_z_mat(num_qubits, np.pi) * new_state
-                if flip_xy is not None:
-                    phase_mat = rot_z_mat(num_qubits, flip_xy * 2 * np.pi)
+                if transformation.flip_xy is not None:
+                    phase_mat = rot_z_mat(num_qubits, 2 * np.pi * transformation.flip_xy)
                     new_state = phase_mat * (phase_mat.conj() * new_state)[::-1, ::-1]
-                if conjugate:
+                if transformation.conjugate:
                     new_state = new_state.conj()
 
                 assert np.allclose(new_state, state)
