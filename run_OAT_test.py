@@ -17,7 +17,7 @@ class Transformation:
     conjugate: bool = False  # if 'True', complex conjugate the state
 
 
-def get_param_symmetries(num_qubits: int) -> List[Callable[[OATParams], tuple[OATParams, bool, Optional[float], bool]]]:
+def get_symmetries(num_qubits: int) -> List[Callable[[OATParams], tuple[OATParams, bool, Optional[float], bool]]]:
 
     """
     Generate a list of symmetries of the OAT protocol at zero dissipation.
@@ -59,10 +59,8 @@ def test_symmetries() -> None:
         # test both even and odd qubit numbers
         for num_qubits in [2, 3]:
             state = run_OAT.simulate_OAT(num_qubits, params)
-
-            for symmetry in get_param_symmetries(num_qubits):
-                # new_params, flip_z, flip_xy, conjugate = symmetry(*params)
-                # transformation = Transformation(flip_z=flip_z, flip_xy=flip_xy, conjugate=conjugate)
+            # test all symmetries
+            for symmetry in get_symmetries(num_qubits):
                 new_params, transformation = symmetry(*params)
 
                 new_state = run_OAT.simulate_OAT(num_qubits, new_params)
