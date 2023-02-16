@@ -111,7 +111,7 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | tf
     1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian 'Sx').
     2. Squeeze with Hamiltonian 'Sz^2 / num_qubits' for time 'params[1] * np.pi * num_qubits'.
     3. Rotate about the axis 'X_phi' by the angle '-params[2] * np.pi',
-       where 'phi = params[3] * np.pi / 2' and 'X_phi = cos(phi) X + sin(phi) Y'.
+       where 'phi = params[3] * 2 * np.pi' and 'X_phi = cos(phi) X + sin(phi) Y'.
 
     If dissipation_rates is nonzero, qubits experience dissipation during the squeezing step (2).
     See the documentation for the Dissipator class for a general explanation of the
@@ -154,7 +154,7 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | tf
  
     # un-rotate about a chosen axis
     time_2 = -params[2] * tf.constant(numpy.pi, dtype=tf.dtypes.float64)
-    rot_axis_angle = params[3] * tf.constant(numpy.pi, dtype=tf.dtypes.complex128) / 2
+    rot_axis_angle = params[3] * 2 * tf.constant(numpy.pi, dtype=tf.dtypes.complex128)
     hamiltonian_2 = tf.math.cos(rot_axis_angle) * collective_Sx + tf.math.sin(rot_axis_angle) * collective_Sy
     state_3 = evolve_state(state_2, time_2, hamiltonian_2, *dissipation_data)
     return state_3
