@@ -63,7 +63,7 @@ def simulate_OAT(
 
     # un-rotate about a chosen axis
     time_3 = -params[2] * np.pi
-    rot_axis_angle = params[3] * np.pi / 2
+    rot_axis_angle = params[3] * 2 * np.pi
     hamiltonian_3 = np.cos(rot_axis_angle) * collective_Sx + np.sin(rot_axis_angle) * collective_Sy
     state_3 = evolve_state(state_2, time_3, hamiltonian_3)
 
