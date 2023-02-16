@@ -24,7 +24,7 @@ class Transformation:
             # apply the global spin rotation 'Rz(pi)'
             new_state = rot_z_mat(num_qubits, np.pi) * new_state
         if self.flip_xy is not None:
-            # apply a global spin rotation by an angle by 'pi' about an axis in the X-Y plane
+            # apply a global spin rotation by an angle 'pi' about an axis in the X-Y plane
             phi = 2 * np.pi * self.flip_xy
             phase_mat = rot_z_mat(num_qubits, phi)
             new_state = phase_mat * (phase_mat.conj() * new_state)[::-1, ::-1]
