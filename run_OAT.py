@@ -32,7 +32,7 @@ def simulate_OAT(
     1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian 'Sx').
     2. Squeeze with Hamiltonian 'Sz^2 / num_qubits' for time 'params[1] * np.pi * num_qubits'.
     3. Rotate about the axis 'X_phi' by the angle '-params[2] * np.pi',
-       where 'phi = params[3] * np.pi / 2' and 'X_phi = cos(phi) X + sin(phi) Y'.
+       where 'phi = params[3] * 2 * np.pi' and 'X_phi = cos(phi) X + sin(phi) Y'.
 
     If dissipation_rates is nonzero, qubits experience dissipation during the squeezing step (2).
     See the documentation for the Dissipator class for a general explanation of the
