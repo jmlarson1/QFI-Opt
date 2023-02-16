@@ -17,7 +17,7 @@ class Transformation:
     conjugate: bool = False  # if 'True', complex conjugate the state
 
 
-def get_symmetries(num_qubits: int) -> List[Callable[[OATParams], tuple[OATParams, bool, Optional[float], bool]]]:
+def get_symmetries(num_qubits: int) -> List[Callable[[OATParams], tuple[OATParams, Transformation]]]:
 
     """
     Generate a list of symmetries of the OAT protocol at zero dissipation.
@@ -39,7 +39,7 @@ def get_symmetries(num_qubits: int) -> List[Callable[[OATParams], tuple[OATParam
 
 
 @functools.cache
-def rot_z_mat(num_qubits: int, angle: float) -> None:
+def rot_z_mat(num_qubits: int, angle: float) -> np.ndarray:
     """
     Construct the matrix 'phase_mat' for which element-wise multiplication 'phase_mat * density_op' rotates the state 'density_op' about the Z axis by the
     given angle.
