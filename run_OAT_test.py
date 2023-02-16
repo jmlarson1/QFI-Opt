@@ -54,7 +54,7 @@ def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float
     Each symmetry is a map from 'old_params' --> '(new_params, transformation)', where 'transformation' indicates how a quantum state prepared with the
     'new_params' should be additionally transformed to recover an exact symmetry.  Note that the additional transformations (should) have no effect on the QFI.
     """
-    even_qubits = num_qubits % 2 == 0
+    even_qubit_number = num_qubits % 2 == 0
 
     def shift_1(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
         return (t_1 + 1, t_OAT, t_2, -aa), Transformation(flip_xy=0)
@@ -69,7 +69,7 @@ def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float
         return (t_1, t_OAT, -t_2, aa + 0.5), Transformation()
 
     def shift_OAT(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
-        return (t_1, t_OAT + 1, t_2, aa + 0.5 * even_qubits), Transformation(flip_z=even_qubits)
+        return (t_1, t_OAT + 1, t_2, aa + 0.5 * even_qubit_number), Transformation(flip_z=even_qubit_number)
 
     def reflect_OAT(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
         return (t_1, -t_OAT, t_2, -aa), Transformation(flip_z=True, conjugate=True)
@@ -79,13 +79,10 @@ def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float
 
 def test_symmetries() -> None:
     """Test the symmetry transformations that we used to cut down the domain of the parameters for the OAT protocol."""
-    # test several random parameters
-    for _ in range(10):
+    for _ in range(10):  # test several random parameters
         params = np.random.random(4)
-        # test both even and odd qubit numbers
-        for num_qubits in [2, 3]:
+        for num_qubits in [2, 3]:  # test both even and odd qubit numbers
             state = run_OAT.simulate_OAT(num_qubits, params)
-            # test all symmetries
             for symmetry in get_symmetries(num_qubits):
                 new_params, transformation = symmetry(*params)
                 new_state = run_OAT.simulate_OAT(num_qubits, new_params)
