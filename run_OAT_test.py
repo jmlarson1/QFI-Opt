@@ -12,13 +12,13 @@ OATParams = tuple[float, float, float, float]
 @dataclasses.dataclass(kw_only=True)
 class Transformation:
     """An object specifying a sequence of transformations that should be applied to a quantum state."""
+
     flip_z: bool = False  # if 'True', apply the global spin rotation 'Rz(pi)'
     flip_xy: Optional[float] = None  # if not 'None', apply a global spin rotation of 'pi' about 'cos(phi) * X + sin(phi) Y', where 'phi = 2 * pi * flip_xy'
     conjugate: bool = False  # if 'True', complex conjugate the state
 
 
-def get_symmetries(num_qubits: int) -> List[Callable[[OATParams], tuple[OATParams, Transformation]]]:
-
+def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float], tuple[OATParams, Transformation]]]:
     """
     Generate a list of symmetries of the OAT protocol at zero dissipation.
 
@@ -26,16 +26,26 @@ def get_symmetries(num_qubits: int) -> List[Callable[[OATParams], tuple[OATParam
     'new_params' should be additionally transformed to recover an exact symmetry.
     """
     even_qubits = num_qubits % 2 == 0
-    return [
-        # translation symmetries
-        lambda t_1, t_OAT, t_2, aa: ((t_1 + 1, t_OAT, t_2, -aa), Transformation(flip_xy=0)),
-        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT, t_2 + 1, aa), Transformation(flip_xy=-aa)),
-        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT + 1, t_2, aa + 0.5 * even_qubits), Transformation(flip_z=even_qubits)),
-        # reflection symmetries
-        lambda t_1, t_OAT, t_2, aa: ((-t_1, t_OAT, t_2, aa + 0.5), Transformation(flip_z=True)),
-        lambda t_1, t_OAT, t_2, aa: ((t_1, t_OAT, -t_2, aa + 0.5), Transformation()),
-        lambda t_1, t_OAT, t_2, aa: ((t_1, -t_OAT, t_2, -aa), Transformation(flip_z=True, conjugate=True)),
-    ]
+
+    def shift_1(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
+        return (t_1 + 1, t_OAT, t_2, -aa), Transformation(flip_xy=0)
+
+    def shift_2(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
+        return (t_1, t_OAT, t_2 + 1, aa), Transformation(flip_xy=-aa)
+
+    def reflect_1(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
+        return (-t_1, t_OAT, t_2, aa + 0.5), Transformation(flip_z=True)
+
+    def reflect_2(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
+        return (t_1, t_OAT, -t_2, aa + 0.5), Transformation()
+
+    def shift_OAT(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
+        return (t_1, t_OAT + 1, t_2, aa + 0.5 * even_qubits), Transformation(flip_z=even_qubits)
+
+    def reflect_OAT(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
+        return (t_1, -t_OAT, t_2, -aa), Transformation(flip_z=True, conjugate=True)
+
+    return [shift_1, shift_2, shift_OAT, reflect_1, reflect_2, reflect_OAT]
 
 
 @functools.cache
@@ -55,7 +65,7 @@ def test_symmetries() -> None:
     """Test the symmetry transformations that we used to cut down the domain of the parameters for the OAT protocol."""
     # test several random parameters
     for _ in range(10):
-        params = tuple(np.random.random(4))
+        params = np.random.random(4)
         # test both even and odd qubit numbers
         for num_qubits in [2, 3]:
             state = run_OAT.simulate_OAT(num_qubits, params)
