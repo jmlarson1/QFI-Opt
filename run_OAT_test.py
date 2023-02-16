@@ -45,7 +45,7 @@ def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float
     def reflect_OAT(t_1: float, t_OAT: float, t_2: float, aa: float) -> tuple[OATParams, Transformation]:
         return (t_1, -t_OAT, t_2, -aa), Transformation(flip_z=True, conjugate=True)
 
-    return [shift_1, shift_2, shift_OAT, reflect_1, reflect_2, reflect_OAT]
+    return [shift_1, shift_2, reflect_1, reflect_2, shift_OAT, reflect_OAT]
 
 
 @functools.cache
