@@ -2,9 +2,9 @@
 import argparse
 import sys
 
+import numpy
 import tensorflow as tf
 import tensorflow_probability as tfp
-import numpy
 
 # Pauli operators
 pauli_Z = tf.constant([[1, 0], [0, -1]], shape=(2, 2), dtype=tf.dtypes.complex128)
@@ -20,7 +20,7 @@ class LindbladianMap:
 
     def __init__(
         self,
-        hamiltonian: tf.Tensor, 
+        hamiltonian: tf.Tensor,
         *dissipation_data: tf.Tensor,
     ) -> None:
         self._hamiltonian = hamiltonian
@@ -61,7 +61,7 @@ def evolve_state(
     density_op: tf.Tensor,
     time: float,
     hamiltonian: tf.Tensor | tf.sparse.SparseTensor,
-    *dissipation_data: tuple[float, tf.Tensor  | tf.sparse.SparseTensor],
+    *dissipation_data: tuple[float, tf.Tensor | tf.sparse.SparseTensor],
     rtol: float = 1e-8,
     atol: float = 1e-8,
 ) -> tf.Tensor:
@@ -72,7 +72,10 @@ def evolve_state(
         time, hamiltonian = -time, -hamiltonian
     lindbladian_map = LindbladianMap(hamiltonian, *dissipation_data)
 
-    def time_deriv(_: float, density_op: tf.Tensor,) -> tf.Tensor:
+    def time_deriv(
+        _: float,
+        density_op: tf.Tensor,
+    ) -> tf.Tensor:
         """
         Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing
         Markovian evolution with the given Lindbladian.
@@ -94,14 +97,22 @@ def evolve_state(
         with tf.GradientTape() as tape:
             tape.watch(density_op)
             out_matrix = time_deriv(t, density_op)
-        
+
         jac = tape.jacobian(out_matrix, density_op)
         return tf.experimental.numpy.ravel(jac)
-    result = tfp.math.ode.BDF(rtol=rtol,atol=atol,).solve(time_deriv, 0, density_op,
-                                   solution_times=[0, time], 
-                                   jacobian_fn = time_deriv_jac,
-                                   )
+
+    result = tfp.math.ode.BDF(
+        rtol=rtol,
+        atol=atol,
+    ).solve(
+        time_deriv,
+        0,
+        density_op,
+        solution_times=[0, time],
+        jacobian_fn=time_deriv_jac,
+    )
     return tf.reshape(result.states[-1], density_op.shape)
+
 
 def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | tf.Tensor, dissipation: float = 0) -> tf.Tensor:
     """
@@ -134,7 +145,9 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | tf
     if dissipation:
         # collect dissipation data as a list of tuples: (jump_rate, jump_operator)
         depolarizing_rate = dissipation / (tf.constant(numpy.pi, dtype=tf.dtypes.float64) * num_qubits)
-        dissipation_data = [(depolarizing_rate, op_on_qubit(pauli / 2, qubit, num_qubits)) for pauli in [pauli_X, pauli_Y, pauli_Z] for qubit in range(num_qubits)]
+        dissipation_data = [
+            (depolarizing_rate, op_on_qubit(pauli / 2, qubit, num_qubits)) for pauli in [pauli_X, pauli_Y, pauli_Z] for qubit in range(num_qubits)
+        ]
     else:
         dissipation_data = []
 
@@ -146,18 +159,19 @@ def simulate_OAT(num_qubits: int, params: tuple[float, float, float, float] | tf
     time_0 = params[0] * tf.constant(numpy.pi, dtype=tf.dtypes.float64)
     hamiltonian_0 = collective_Sx
     state_1 = evolve_state(state_0, time_0, hamiltonian_0, *dissipation_data)
-  
+
     # squeeze!
     time_1 = params[1] * tf.constant(numpy.pi, dtype=tf.dtypes.float64) * num_qubits
     hamiltonian_1 = collective_Sz @ collective_Sz / num_qubits
     state_2 = evolve_state(state_1, time_1, hamiltonian_1, *dissipation_data)
- 
+
     # un-rotate about a chosen axis
     time_2 = -params[2] * tf.constant(numpy.pi, dtype=tf.dtypes.float64)
     rot_axis_angle = params[3] * 2 * tf.constant(numpy.pi, dtype=tf.dtypes.complex128)
     hamiltonian_2 = tf.math.cos(rot_axis_angle) * collective_Sx + tf.math.sin(rot_axis_angle) * collective_Sy
     state_3 = evolve_state(state_2, time_2, hamiltonian_2, *dissipation_data)
     return state_3
+
 
 if __name__ == "__main__":
     # parse arguments

@@ -1,18 +1,20 @@
-import os
 import argparse
+import functools
+import math
+import os
+import sys
 import time
 
 import torch
-#import torch.nn as nn
-#import torch.optim as optim
-
-
 from torchdiffeq import odeint as odeint
-import functools
-import sys
-import math
 
 from dissipation_pt import Dissipator
+
+# import torch.nn as nn
+# import torch.optim as optim
+
+
+
 
 COMPLEX_DTYPE = torch.complex128
 
@@ -25,12 +27,13 @@ pauli_Z = torch.tensor([[1, 0], [0, -1]], dtype=COMPLEX_DTYPE)  # |0><0| - |1><1
 pauli_X = torch.tensor([[0, 1], [1, 0]], dtype=COMPLEX_DTYPE)  # |0><1| + |1><0|
 pauli_Y = -1j * pauli_Z @ pauli_X
 
+
 def simulate_OAT(
     num_qubits: int,
     params,
     dissipation_rates,
-    dissipation_format = "XYZ",
-    ):
+    dissipation_format="XYZ",
+):
     """
     Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
 
@@ -73,8 +76,8 @@ def simulate_OAT(
     hamiltonian_3 = torch.cos(rot_axis_angle) * collective_Sx + torch.sin(rot_axis_angle) * collective_Sy
     state_3 = evolve_state(state_2, time_3, hamiltonian_3, dissipator)
 
-
     return state_3
+
 
 def evolve_state(
     density_op: torch.tensor,
@@ -91,11 +94,11 @@ def evolve_state(
         return density_op
     if time < 0:
         time, hamiltonian = -time, -hamiltonian
-    #time_deriv, time_deriv_jacobian = get_time_deriv_funs(hamiltonian, dissipator)
-    
+    # time_deriv, time_deriv_jacobian = get_time_deriv_funs(hamiltonian, dissipator)
+
     def time_deriv(_: float, density_op: torch.Tensor) -> torch.Tensor:
-        #return dissipator @ density_op
-        #return matmul (dissipator, density_op)
+        # return dissipator @ density_op
+        # return matmul (dissipator, density_op)
         # compute commutator with hamiltonian
         if hamiltonian.ndim == 2:
             # ... computed with ordinary matrix multiplication
@@ -103,12 +106,12 @@ def evolve_state(
         else:
             # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
             # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
-            #ham_bracket = hamiltonian[:, tf.newaxis] * density_op - density_op * hamiltonian
+            # ham_bracket = hamiltonian[:, tf.newaxis] * density_op - density_op * hamiltonian
             ham_bracket = hamiltonian.unsqueeze(1) * density_op - density_op * hamiltonian
         if not dissipator:
             return -1j * ham_bracket
         return -1j * ham_bracket + dissipator @ density_op
-         
+
     from time import time as current_time
 
     start = current_time()
@@ -129,13 +132,14 @@ def evolve_state(
     # print(current_time() - start)
     # final_vec = solution.y[:, -1]
     # return tf.constant(final_vec.reshape(density_op.shape))
-    
-    #TODO: Decide the number of timesteps
-    t = torch.linspace(0., time, 100)
-    result = odeint(time_deriv, density_op, t, method='dopri5', rtol=rtol, atol=atol)
+
+    # TODO: Decide the number of timesteps
+    t = torch.linspace(0.0, time, 100)
+    result = odeint(time_deriv, density_op, t, method="dopri5", rtol=rtol, atol=atol)
     return result[-1]
 
-#@functools.cache
+
+# @functools.cache
 def collective_spin_ops(num_qubits):
     """Construct collective spin operators."""
     return (
@@ -161,6 +165,7 @@ def op_on_qubit(op: torch.tensor, qubit: int, total_qubit_num: int) -> torch.ten
     iden_after = torch.eye(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
     return functools.reduce(torch.kron, [iden_before, op, iden_after])
 
+
 if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(
@@ -171,18 +176,18 @@ if __name__ == "__main__":
     parser.add_argument("--dissipation", type=float, default=0.0)
     parser.add_argument("--params", type=float, nargs=4, required=True)
     args = parser.parse_args(sys.argv[1:])
-    
+
     params_pt = torch.tensor(args.params, requires_grad=True)
     print(params_pt)
     final_state = simulate_OAT(args.num_qubits, params_pt, args.dissipation)
     for i in range(16):
         for j in range(16):
-            final_state.grad= None
-            seed = torch.zeros((16,16), dtype=torch.complex64)
-            seed[i,j] = 1.0+0.j
-            final_state.backward(seed,retain_graph=True)
-            print("d(finalstate[",i,",",j,"])/d(params)= ", params_pt.grad)
-    
+            final_state.grad = None
+            seed = torch.zeros((16, 16), dtype=torch.complex64)
+            seed[i, j] = 1.0 + 0.0j
+            final_state.backward(seed, retain_graph=True)
+            print("d(finalstate[", i, ",", j, "])/d(params)= ", params_pt.grad)
+
     # compute collective Pauli operators
     mean_X = collective_op(pauli_X, args.num_qubits) / args.num_qubits
     mean_Y = collective_op(pauli_Y, args.num_qubits) / args.num_qubits
@@ -191,8 +196,6 @@ if __name__ == "__main__":
 
     # print out expectation values and variances
     final_pauli_vals = [torch.real(torch.trace(final_state @ op)) for op in mean_ops]
-    final_pauli_vars = [
-    torch.real(torch.trace(final_state @ (op @ op))) - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)
-]
+    final_pauli_vars = [torch.real(torch.trace(final_state @ (op @ op))) - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)]
     print("[<X>, <Y>, <Z>]:", final_pauli_vals)
     print("[var(X), var(Y), var(Z)]:", final_pauli_vars)

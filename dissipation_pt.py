@@ -1,5 +1,6 @@
 import torch
 
+
 class Dissipator:
     """
     Data structure to represent a dissipation operator.
@@ -23,8 +24,8 @@ class Dissipator:
                  proportional to (1/2, 1/2, 1).
     """
 
-    #def __init__(self, dissipation_rates: float | tuple[float, float, float], dissipation_format: str = "XYZ") -> None:
-    def __init__(self, dissipation_rates, dissipation_format = "XYZ"):
+    # def __init__(self, dissipation_rates: float | tuple[float, float, float], dissipation_format: str = "XYZ") -> None:
+    def __init__(self, dissipation_rates, dissipation_format="XYZ"):
         if isinstance(dissipation_rates, float):
             dissipation_rates = (dissipation_rates,) * 3
         assert all(rate >= 0 for rate in dissipation_rates), "dissipation rates cannot be negative!"
@@ -57,7 +58,7 @@ class Dissipator:
             raise ValueError(f"dissipation format not recognized: {dissipation_format}")
 
     def __matmul__(self, density_op: torch.tensor) -> torch.tensor:
-        #print(density_op.shape)
+        # print(density_op.shape)
         density_op_size = int(torch.prod(torch.tensor(density_op.shape)))
         num_qubits = log2_int(density_op_size) // 2
         output = self._rate_1 * sum(self._qubit_term_1(density_op, qubit, num_qubits) for qubit in range(num_qubits))
