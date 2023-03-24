@@ -5,15 +5,16 @@ import numpy as np
 import jax.numpy as jnp
 
 import run_OAT_jax as run_OAT
-from calculate_qfi_example import compute_QFI
+from calculate_qfi_example_jax import compute_QFI
 
 
 def nlopt_wrapper(x, grad, obj_params):
     # x = jnp.array([0.5, x[0], x[1], 0])
     rho = run_OAT.simulate_OAT( x, obj_params["N"], obj_params["noise"])
     qfi = compute_QFI(rho, obj_params["G"])
+
     print("x:",x, " qfi:",qfi)
-    return -1 * qfi  # negative because we are maximizing
+    return -1 * float(qfi)  # negative because we are maximizing
 
 
 if __name__ == "__main__":
