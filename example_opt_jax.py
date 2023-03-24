@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
 import nlopt
-import jax
+import numpy as np
 import jax.numpy as jnp
 
 import run_OAT_jax as run_OAT
@@ -40,10 +40,9 @@ if __name__ == "__main__":
 
     opt.set_xtol_rel(1e-4)
 
-    #jnp.random.seed(1)
-    #x0 = jnp.random.uniform(lb, ub, n)
-    x0 = jax.random.uniform(jax.random.PRNGKey(1), shape=(n,), minval=lb,
-                             maxval=ub, dtype=jnp.float64)
+    np.random.seed(1)
+    x0 = np.random.uniform(lb, ub, n)
+    print("x0:", x0)
     x = opt.optimize(x0)
     minf = opt.last_optimum_value()
     print("optimum at ", x)
