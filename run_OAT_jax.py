@@ -62,11 +62,11 @@ def simulate_OAT(
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (jnp.pi * num_qubits)
     state_2 = evolve_state(state_1, time_2, hamiltonian_2, dissipator)
 
-    # un-rotate about a chosen axis
+    # un-rotate about a chosen axis    
     time_3 = -params[2] * jnp.pi
-    rot_axis_angle = params[3] * jnp.pi / 2
+    rot_axis_angle = params[3] * 2 * jnp.pi
     hamiltonian_3 = jnp.cos(rot_axis_angle) * collective_Sx + jnp.sin(rot_axis_angle) * collective_Sy
-    state_3 = evolve_state(state_2, time_3, hamiltonian_3, dissipator)
+    state_3 = evolve_state(state_2, time_3, hamiltonian_3)
 
     return state_3
 
@@ -92,20 +92,18 @@ def evolve_state(
         hamiltonian = args[0]
         if hamiltonian.ndim == 2:
             # ... computed with ordinary matrix multiplication
-            ham_bracket = hamiltonian @ density_op - density_op @ hamiltonian
+            output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
         else:
             # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
             # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
-            ham_bracket = jnp.expand_dims(hamiltonian, 1) * density_op - density_op * hamiltonian
-            #ham_bracket = (hamiltonian[:, jnp.newaxis] * density_op - density_op * hamiltonian)
+            output = -1j * (jnp.expand_dims(hamiltonian, 1) * density_op - density_op * hamiltonian)
         if dissipator is None:
-            return -1j * ham_bracket
-        return -1j * ham_bracket + dissipator @ density_op
+            return output
+        return output + dissipator @ density_op
              
     #TODO: Decide the number of timesteps
-    #t = jnp.linspace(0., jnp.real(time), 100)
     t = jnp.linspace(0., time, 100)
-    result = odeint(time_deriv, density_op_arg, t, (hamiltonian_arg,), rtol=rtol/100., atol=atol/100., mxstep=jnp.inf, hmax=jnp.inf)
+    result = odeint(time_deriv, density_op_arg, t, (hamiltonian_arg,), rtol=rtol, atol=atol, mxstep=jnp.inf, hmax=jnp.inf)
     return result[-1]
 
 
