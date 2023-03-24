@@ -37,7 +37,7 @@ def compute_eigh(rho: jnp.ndarray):
     # Compute eigendecomposition for rho
     eigvals, eigvecs = jnp.linalg.eigh(rho)
     eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
-    
+
     return eigvals, eigvecs
 
 def compute_running_sum(eigvals, eigvecs, G: jnp.ndarray, tol: float = 1e-8) -> float:
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         qfi = compute_QFI(rho, G)
         print(f"QFI is {qfi} for {params}")
     # Let's try calculating the QFI at some random points in the domain:
-    
+
     np.random.seed(0)
     for _ in range(10):
         params_f = np.random.uniform(0, 1, 4)

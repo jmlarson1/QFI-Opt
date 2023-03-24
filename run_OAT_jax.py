@@ -22,9 +22,9 @@ pauli_Y = -1j * pauli_Z @ pauli_X
 
 
 def simulate_OAT(
-    params: tuple[float, float, float, float] | jnp.ndarray,
+    params: jnp.ndarray,
     num_qubits: int = 4,
-    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_rates: float = 0.0,
     dissipation_format: str = "XYZ",
 ) -> jnp.ndarray:
     """
@@ -55,14 +55,14 @@ def simulate_OAT(
     qubit_ket = jnp.sin(time_1 / 2) * ket_0 + 1j * jnp.cos(time_1 / 2) * ket_1
     qubit_state = jnp.outer(qubit_ket, jnp.conj(qubit_ket))
     state_1 = functools.reduce(jnp.kron, [qubit_state] * num_qubits)
-    
+
     # squeeze!
     time_2 = params[1] * jnp.pi * num_qubits
     hamiltonian_2 = jnp.diagonal(collective_Sz) ** 2 / num_qubits
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (jnp.pi * num_qubits)
     state_2 = evolve_state(state_1, time_2, hamiltonian_2, dissipator)
 
-    # un-rotate about a chosen axis    
+    # un-rotate about a chosen axis
     time_3 = -params[2] * jnp.pi
     rot_axis_angle = params[3] * 2 * jnp.pi
     hamiltonian_3 = jnp.cos(rot_axis_angle) * collective_Sx + jnp.sin(rot_axis_angle) * collective_Sy
@@ -85,7 +85,7 @@ def evolve_state(
         return density_op_arg
     if jnp.real(time) < 0:
         time, hamiltonian_arg = -time, -hamiltonian_arg
-    
+
     def time_deriv(density_op, _: float, args):
         #return dissipator @ density_op
         # compute commutator with hamiltonian
@@ -100,7 +100,7 @@ def evolve_state(
         if dissipator is None:
             return output
         return output + dissipator @ density_op
-             
+
     #TODO: Decide the number of timesteps
     t = jnp.linspace(0., time, 100)
     result = odeint(time_deriv, density_op_arg, t, (hamiltonian_arg,), rtol=rtol, atol=atol, mxstep=jnp.inf, hmax=jnp.inf)
@@ -143,17 +143,17 @@ if __name__ == "__main__":
     parser.add_argument("--dissipation", type=float, default=0.0)
     parser.add_argument("--params", type=float, nargs=4, required=True)
     args = parser.parse_args(sys.argv[1:])
-    
+
     params_jax = jnp.array(args.params, dtype=COMPLEX_DTYPE)
     jacrev_fun = jax.jacrev(simulate_OAT, argnums=(0,),holomorphic=True)
 
     #check_grads(simulate_OAT, (params_jax,), 1,  modes=("rev"))
     jac = jacrev_fun(params_jax, args.num_qubits, args.dissipation)
-    
+
     for i in range(jac[0].shape[0]):
         for j in range(jac[0].shape[1]):
             print("d(finalstate[",i,",",j,"])/d(params)= ", jac[0][i][j])
-    
+
     final_state = simulate_OAT(params_jax, args.num_qubits, args.dissipation)
     # compute collective Pauli operators
     mean_X = collective_op(pauli_X, args.num_qubits) / args.num_qubits
@@ -168,4 +168,3 @@ if __name__ == "__main__":
 ]
     print("[<X>, <Y>, <Z>]:", final_pauli_vals)
     print("[var(X), var(Y), var(Z)]:", final_pauli_vars)
-    
