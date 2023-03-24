@@ -2,6 +2,7 @@
 import itertools
 import jax
 import jax.numpy as jnp
+import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import run_OAT_jax as run_OAT
@@ -32,7 +33,7 @@ def compute_QFI(rho: jnp.ndarray, G: jnp.ndarray, tol: float = 1e-8) -> float:
 
     return 4 * running_sum
 
-def compute_eigh(rho: jnp.ndarray) -> float:
+def compute_eigh(rho: jnp.ndarray):
     # Compute eigendecomposition for rho
     eigvals, eigvecs = jnp.linalg.eigh(rho)
     eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
@@ -68,11 +69,9 @@ if __name__ == "__main__":
         print(f"QFI is {qfi} for {params}")
     # Let's try calculating the QFI at some random points in the domain:
     
-    
-    for i in range(10):
-        key = jax.random.PRNGKey(i)
-        params_f = jax.random.uniform(key, shape=(4,), minval=0, 
-                             maxval=1, dtype=jnp.float64)
+    np.random.seed(0)
+    for _ in range(10):
+        params_f = np.random.uniform(0, 1, 4)
         params = jnp.array(params_f, dtype=COMPLEX_DTYPE)
         rho = run_OAT.simulate_OAT(params, N, dissipation)
         qfi = compute_QFI(rho, G)
