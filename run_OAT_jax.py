@@ -22,9 +22,9 @@ pauli_Y = -1j * pauli_Z @ pauli_X
 
 
 def simulate_OAT(
-    params: tuple[float, float, float, float] | jnp.ndarray,
+    params: jnp.ndarray,
     num_qubits: int = 4,
-    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_rates: float = 0.0,
     dissipation_format: str = "XYZ",
 ) -> jnp.ndarray:
     """
