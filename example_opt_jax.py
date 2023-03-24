@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     #jnp.random.seed(1)
     #x0 = jnp.random.uniform(lb, ub, n)
-    x0 = jax.random.uniform(jax.random.PRNGKey(1), shape=(n,), minval=lb, 
+    x0 = jax.random.uniform(jax.random.PRNGKey(1), shape=(n,), minval=lb,
                              maxval=ub, dtype=jnp.float64)
     x = opt.optimize(x0)
     minf = opt.last_optimum_value()
