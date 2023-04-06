@@ -114,7 +114,7 @@ def _qubit_term_XYZ_1(density_op: jnp.ndarray, qubit: int) -> jnp.ndarray:
     output = output.at[:, 1, :, :, 0, :].set(-density_op[:, 1, :, :, 0, :])
     output = output.at[:, 1, :, :, 1, :].set(0)
     density_op = jnp.reshape(density_op, input_shape)
-    output =jnp.reshape(output, input_shape)
+    output = jnp.reshape(output, input_shape)
     return output
 
 
@@ -134,7 +134,7 @@ def _qubit_term_XYZ_2(density_op: jnp.ndarray, qubit: int) -> jnp.ndarray:
     output[:, 1, :, :, 0, :] = 0
     output[:, 1, :, :, 1, :] = -output[:, 0, :, :, 0, :]
     density_op = jnp.reshape(density_op, input_shape)
-    output =jnp.reshape(output, input_shape)
+    output = jnp.reshape(output, input_shape)
     return output
 
 
@@ -154,7 +154,7 @@ def _qubit_term_XYZ_3(density_op: jnp.ndarray, qubit: int) -> jnp.ndarray:
     output[:, 1, :, :, 0, :] = density_op[:, 0, :, :, 1, :]
     output[:, 1, :, :, 1, :] = 0
     density_op = jnp.reshape(density_op, input_shape)
-    output =jnp.reshape(output, input_shape)
+    output = jnp.reshape(output, input_shape)
     return output
 
 
@@ -177,7 +177,7 @@ def _qubit_term_PMZ_2(density_op: jnp.ndarray, qubit: int) -> jnp.ndarray:
     output[:, 1, :, :, 0, :] = 0
     output[:, 1, :, :, 1, :] = -density_op[:, 1, :, :, 1, :]
     density_op = jnp.reshape(density_op, input_shape)
-    output =jnp.reshape(output, input_shape)
+    output = jnp.reshape(output, input_shape)
     return output
 
 
@@ -197,5 +197,5 @@ def _qubit_term_PMZ_3(density_op: jnp.ndarray, qubit: int) -> jnp.ndarray:
     output[:, 1, :, :, 0, :] = 0
     output[:, 1, :, :, 1, :] = density_op[:, 0, :, :, 0, :]
     density_op = jnp.reshape(density_op, input_shape)
-    output =jnp.reshape(output, input_shape)
+    output = jnp.reshape(output, input_shape)
     return output

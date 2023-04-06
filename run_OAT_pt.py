@@ -14,8 +14,6 @@ from dissipation_pt import Dissipator
 # import torch.optim as optim
 
 
-
-
 COMPLEX_DTYPE = torch.complex128
 
 # qubit/spin states

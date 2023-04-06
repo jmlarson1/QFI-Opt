@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 import itertools
+
 import jax
 import jax.numpy as jnp
 import numpy as np
+
 jax.config.update("jax_enable_x64", True)
 
 import run_OAT_jax as run_OAT
 
 COMPLEX_DTYPE = jnp.complex128
+
 
 def variance(rho: jnp.ndarray, G: jnp.ndarray) -> float:
     """Variance of self-adjoint operator (observable) G in the state rho."""
@@ -33,12 +36,14 @@ def compute_QFI(rho: jnp.ndarray, G: jnp.ndarray, tol: float = 1e-8) -> float:
 
     return 4 * running_sum
 
+
 def compute_eigh(rho: jnp.ndarray):
     # Compute eigendecomposition for rho
     eigvals, eigvecs = jnp.linalg.eigh(rho)
     eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
 
     return eigvals, eigvecs
+
 
 def compute_running_sum(eigvals, eigvecs, G: jnp.ndarray, tol: float = 1e-8) -> float:
     num_vals = len(eigvals)
@@ -56,9 +61,10 @@ def compute_running_sum(eigvals, eigvecs, G: jnp.ndarray, tol: float = 1e-8) -> 
 
     return 4 * running_sum
 
+
 if __name__ == "__main__":
     N = 4
-    dissipation = 0.
+    dissipation = 0.0
     G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)
     # Let's try calculating the QFI at all corner points of the domain:
     all_perms = [",".join(seq) for seq in itertools.product("01", repeat=4)]

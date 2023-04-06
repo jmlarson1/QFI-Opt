@@ -1,11 +1,14 @@
 import argparse
-import jax
 import functools
 import sys
+
+import jax
+
 #
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from jax._src.public_test_util import check_grads as check_grads
+
 from dissipation_jax import Dissipator
 from ode_jax import odeint
 
@@ -70,6 +73,7 @@ def simulate_OAT(
 
     return state_3
 
+
 def evolve_state(
     density_op_arg,
     time: float,
@@ -87,7 +91,7 @@ def evolve_state(
         time, hamiltonian_arg = -time, -hamiltonian_arg
 
     def time_deriv(density_op, _: float, args):
-        #return dissipator @ density_op
+        # return dissipator @ density_op
         # compute commutator with hamiltonian
         hamiltonian = args[0]
         if hamiltonian.ndim == 2:
@@ -101,8 +105,8 @@ def evolve_state(
             return output
         return output + dissipator @ density_op
 
-    #TODO: Decide the number of timesteps
-    t = jnp.linspace(0., time, 100)
+    # TODO: Decide the number of timesteps
+    t = jnp.linspace(0.0, time, 100)
     result = odeint(time_deriv, density_op_arg, t, (hamiltonian_arg,), rtol=rtol, atol=atol, mxstep=jnp.inf, hmax=jnp.inf)
     return result[-1]
 
@@ -119,9 +123,7 @@ def collective_spin_ops(num_qubits: int) -> tuple[jnp.ndarray, jnp.ndarray, jnp.
 
 def collective_op(op: jnp.ndarray, num_qubits: int) -> jnp.ndarray:
     """Compute the collective version of a qubit operator: sum_q op_q."""
-    return jnp.array(sum(
-        (op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits)),
-        start=0))
+    return jnp.array(sum((op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits)), start=0))
 
 
 def op_on_qubit(op: jnp.ndarray, qubit: int, total_qubit_num: int) -> jnp.ndarray:
@@ -130,8 +132,9 @@ def op_on_qubit(op: jnp.ndarray, qubit: int, total_qubit_num: int) -> jnp.ndarra
     """
     iden_before = jnp.eye(2**qubit, dtype=op.dtype)
     iden_after = jnp.eye(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
-    #return jnp.kron(jnp.kron(iden_before, op), iden_after)
+    # return jnp.kron(jnp.kron(iden_before, op), iden_after)
     return functools.reduce(jnp.kron, [iden_before, op, iden_after])
+
 
 if __name__ == "__main__":
     # parse arguments
@@ -145,14 +148,14 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     params_jax = jnp.array(args.params, dtype=COMPLEX_DTYPE)
-    jacrev_fun = jax.jacrev(simulate_OAT, argnums=(0,),holomorphic=True)
+    jacrev_fun = jax.jacrev(simulate_OAT, argnums=(0,), holomorphic=True)
 
-    #check_grads(simulate_OAT, (params_jax,), 1,  modes=("rev"))
+    # check_grads(simulate_OAT, (params_jax,), 1,  modes=("rev"))
     jac = jacrev_fun(params_jax, args.num_qubits, args.dissipation)
 
     for i in range(jac[0].shape[0]):
         for j in range(jac[0].shape[1]):
-            print("d(finalstate[",i,",",j,"])/d(params)= ", jac[0][i][j])
+            print("d(finalstate[", i, ",", j, "])/d(params)= ", jac[0][i][j])
 
     final_state = simulate_OAT(params_jax, args.num_qubits, args.dissipation)
     # compute collective Pauli operators
@@ -163,8 +166,6 @@ if __name__ == "__main__":
 
     # print out expectation values and variances
     final_pauli_vals = [jnp.real(jnp.trace(final_state @ op)) for op in mean_ops]
-    final_pauli_vars = [
-    jnp.real(jnp.trace(final_state @ (op @ op))) - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)
-]
+    final_pauli_vars = [jnp.real(jnp.trace(final_state @ (op @ op))) - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)]
     print("[<X>, <Y>, <Z>]:", final_pauli_vals)
     print("[var(X), var(Y), var(Z)]:", final_pauli_vars)
