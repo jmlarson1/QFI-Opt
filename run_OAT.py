@@ -6,10 +6,12 @@ from typing import Optional
 
 import numpy as np
 import scipy
-import tensorflow as tf
-import tensorflow_probability as tfp
 
 from dissipation import Dissipator
+
+# import tensorflow as tf
+# import tensorflow_probability as tfp
+
 
 # qubit/spin states
 ket_0 = np.array([1, 0])  # |0>, spin up
