@@ -3,7 +3,7 @@ import itertools
 
 import numpy as np
 
-import run_OAT
+import spin_models
 
 
 def variance(rho: np.ndarray, G: np.ndarray) -> float:
@@ -34,13 +34,13 @@ def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
 if __name__ == "__main__":
     N = 4
     dissipation = 0
-    G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)
+    G = spin_models.collective_op(spin_models.pauli_Z, N) / (2 * N)
 
     # Let's try calculating the QFI at all corner points of the domain:
     all_perms = [",".join(seq) for seq in itertools.product("01", repeat=4)]
     for perm in all_perms:
         params = np.fromstring(perm, dtype=int, sep=",")
-        rho = run_OAT.simulate_OAT(N, params, dissipation)
+        rho = spin_models.simulate_OAT(N, params, dissipation)
         qfi = compute_QFI(rho, G)
         print(f"QFI is {qfi} for {params}")
 
@@ -48,6 +48,6 @@ if __name__ == "__main__":
     np.random.seed(0)
     for _ in range(10):
         params = np.random.uniform(0, 1, 4)
-        rho = run_OAT.simulate_OAT(N, params, dissipation)
+        rho = spin_models.simulate_OAT(N, params, dissipation)
         qfi = compute_QFI(rho, G)
         print(f"QFI is {qfi} for {params}")

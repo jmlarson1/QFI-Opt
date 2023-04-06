@@ -6,12 +6,12 @@ import numpy as np
 
 sys.path.append("../")
 
-import run_OAT
+import spin_models
 from calculate_qfi_example import compute_QFI
 
 N = 4
 noise = 1
-G = run_OAT.collective_op(run_OAT.pauli_Z, N) / (2 * N)
+G = spin_models.collective_op(spin_models.pauli_Z, N) / (2 * N)
 
 np.random.seed(6)
 x0 = np.random.uniform(0, 1, 4)
@@ -24,7 +24,7 @@ results = {}
 for i, alpha in enumerate(vals):
     params = alpha * x0 + (1 - alpha) * x1
 
-    rho = run_OAT.simulate_OAT(N, params, noise)
+    rho = spin_models.simulate_OAT(N, params, noise)
 
     u, v = np.linalg.eig(rho)
     results[i] = [u, v]

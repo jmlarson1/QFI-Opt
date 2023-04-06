@@ -19,18 +19,19 @@ pauli_X = np.array([[0, 1], [1, 0]])  # |0><1| + |1><0|
 pauli_Y = -1j * pauli_Z @ pauli_X
 
 
-def simulate_OAT(
+def simulate_sensing_protocol(
     num_qubits: int,
+    entangling_hamiltonian: np.ndarray,
     params: tuple[float, float, float, float] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = "XYZ",
 ) -> np.ndarray:
     """
-    Simulate a one-axis twisting (OAT) protocol, and return the final state (density matrix).
+    Simulate a sensing protocol, and return the final state (density matrix).
 
     Starting with an initial all-|1> state (all spins pointing down along the Z axis):
     1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian 'Sx').
-    2. Squeeze with Hamiltonian 'Sz^2 / num_qubits' for time 'params[1] * np.pi * num_qubits'.
+    2. Evolve under a given entangling Hamiltonian for time 'params[1] * np.pi * num_qubits'.
     3. Rotate about the axis 'X_phi' by the angle '-params[2] * np.pi',
        where 'phi = params[3] * 2 * np.pi' and 'X_phi = cos(phi) X + sin(phi) Y'.
 
@@ -55,19 +56,42 @@ def simulate_OAT(
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
-    # squeeze!
+    # entangle!
     time_2 = params[1] * np.pi * num_qubits
-    hamiltonian_2 = collective_Sz.diagonal() ** 2 / num_qubits
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    state_2 = evolve_state(state_1, time_2, hamiltonian_2, dissipator)
+    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
 
     # un-rotate about a chosen axis
     time_3 = -params[2] * np.pi
     rot_axis_angle = params[3] * 2 * np.pi
-    hamiltonian_3 = np.cos(rot_axis_angle) * collective_Sx + np.sin(rot_axis_angle) * collective_Sy
-    state_3 = evolve_state(state_2, time_3, hamiltonian_3)
+    final_hamiltonian = np.cos(rot_axis_angle) * collective_Sx + np.sin(rot_axis_angle) * collective_Sy
+    state_3 = evolve_state(state_2, time_3, final_hamiltonian)
 
     return state_3
+
+
+def simulate_OAT(
+    num_qubits: int,
+    params: tuple[float, float, float, float] | np.ndarray,
+    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_format: str = "XYZ",
+) -> np.ndarray:
+    """Simulate a one-axis twisting (OAT) protocol."""
+    _, _, collective_Sz = collective_spin_ops(num_qubits)
+    hamiltonian = collective_Sz.diagonal() ** 2 / num_qubits
+    return simulate_sensing_protocol(num_qubits, hamiltonian, params, dissipation_rates, dissipation_format)
+
+
+def simulate_TAT(
+    num_qubits: int,
+    params: tuple[float, float, float, float] | np.ndarray,
+    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_format: str = "XYZ",
+) -> np.ndarray:
+    """Simulate a two-axis twisting (TAT) protocol."""
+    collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
+    hamiltonian = (collective_Sx @ collective_Sy + collective_Sy @ collective_Sx) / num_qubits
+    return simulate_sensing_protocol(num_qubits, hamiltonian, params, dissipation_rates, dissipation_format)
 
 
 def evolve_state(
@@ -162,7 +186,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num_qubits", type=int, default=4)
     parser.add_argument("--dissipation", type=float, default=0.0)
-    parser.add_argument("--params", type=float, nargs=4, required=True)
+    parser.add_argument("--params", type=float, nargs=4, default=[0.5, 0.5, 0.5, 0])
     args = parser.parse_args(sys.argv[1:])
 
     # simulate the OAT potocol

@@ -25,7 +25,7 @@ class Dissipator:
     """
 
     def __init__(self, dissipation_rates: float | tuple[float, float, float], dissipation_format: str = "XYZ") -> None:
-        if isinstance(dissipation_rates, float):
+        if not isinstance(dissipation_rates, tuple):
             dissipation_rates = (dissipation_rates,) * 3
         assert all(rate >= 0 for rate in dissipation_rates), "dissipation rates cannot be negative!"
         self._rates = dissipation_rates
