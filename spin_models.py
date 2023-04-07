@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import functools
+import itertools
 import sys
 from typing import Optional
 
@@ -9,14 +10,16 @@ import scipy
 
 from dissipation import Dissipator
 
+DEFAULT_DISSIPATION_FORMAT = "XYZ"
+
 # qubit/spin states
-ket_0 = np.array([1, 0])  # |0>, spin up
-ket_1 = np.array([0, 1])  # |1>, spin down
+KET_0 = np.array([1, 0])  # |0>, spin up
+KET_1 = np.array([0, 1])  # |1>, spin down
 
 # Pauli operators
-pauli_Z = np.array([[1, 0], [0, -1]])  # |0><0| - |1><1|
-pauli_X = np.array([[0, 1], [1, 0]])  # |0><1| + |1><0|
-pauli_Y = -1j * pauli_Z @ pauli_X
+PAULI_Z = np.array([[1, 0], [0, -1]])  # |0><0| - |1><1|
+PAULI_X = np.array([[0, 1], [1, 0]])  # |0><1| + |1><0|
+PAULI_Y = -1j * PAULI_Z @ PAULI_X
 
 
 def simulate_sensing_protocol(
@@ -24,7 +27,7 @@ def simulate_sensing_protocol(
     entangling_hamiltonian: np.ndarray,
     params: tuple[float, float, float, float] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
-    dissipation_format: str = "XYZ",
+    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     """
     Simulate a sensing protocol, and return the final state (density matrix).
@@ -52,7 +55,7 @@ def simulate_sensing_protocol(
 
     # rotate the all-|1> state about the X axis
     time_1 = params[0] * np.pi
-    qubit_ket = np.sin(time_1 / 2) * ket_0 + 1j * np.cos(time_1 / 2) * ket_1
+    qubit_ket = np.sin(time_1 / 2) * KET_0 + 1j * np.cos(time_1 / 2) * KET_1
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
@@ -74,7 +77,7 @@ def simulate_OAT(
     num_qubits: int,
     params: tuple[float, float, float, float] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
-    dissipation_format: str = "XYZ",
+    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
@@ -86,12 +89,60 @@ def simulate_TAT(
     num_qubits: int,
     params: tuple[float, float, float, float] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
-    dissipation_format: str = "XYZ",
+    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     """Simulate a two-axis twisting (TAT) protocol."""
     collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
     hamiltonian = (collective_Sx @ collective_Sy + collective_Sy @ collective_Sx) / num_qubits
     return simulate_sensing_protocol(num_qubits, hamiltonian, params, dissipation_rates, dissipation_format)
+
+
+def simulate_spin_chain(
+    coupling_op: np.ndarray,
+    coupling_exponent: float,
+    num_qubits: int,
+    params: tuple[float, float, float, float] | np.ndarray,
+    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+) -> np.ndarray:
+    """Simulate an entangling protocol for a spin chain with power-law interactions."""
+    hamiltonian = sum(
+        act_on_subsystem(num_qubits, coupling_op, pp, qq) / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)
+    )
+    return simulate_sensing_protocol(num_qubits, hamiltonian, params, dissipation_rates, dissipation_format)
+
+
+def simulate_ising_chain(
+    coupling_exponent: float,
+    num_qubits: int,
+    params: tuple[float, float, float, float] | np.ndarray,
+    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+) -> np.ndarray:
+    coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
+    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format)
+
+
+def simulate_XX_chain(
+    coupling_exponent: float,
+    num_qubits: int,
+    params: tuple[float, float, float, float] | np.ndarray,
+    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+) -> np.ndarray:
+    coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
+    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format)
+
+
+def simulate_local_TAT_chain(
+    coupling_exponent: float,
+    num_qubits: int,
+    params: tuple[float, float, float, float] | np.ndarray,
+    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+) -> np.ndarray:
+    coupling_op = (np.kron(PAULI_X, PAULI_Y) + np.kron(PAULI_Y, PAULI_X)) / 2
+    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format)
 
 
 def evolve_state(
@@ -158,24 +209,46 @@ def time_deriv(
 def collective_spin_ops(num_qubits: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Construct collective spin operators."""
     return (
-        collective_op(pauli_X, num_qubits) / 2,
-        collective_op(pauli_Y, num_qubits) / 2,
-        collective_op(pauli_Z, num_qubits) / 2,
+        collective_op(PAULI_X, num_qubits) / 2,
+        collective_op(PAULI_Y, num_qubits) / 2,
+        collective_op(PAULI_Z, num_qubits) / 2,
     )
 
 
 def collective_op(op: np.ndarray, num_qubits: int) -> np.ndarray:
-    """Compute the collective version of a qubit operator: sum_q op_q."""
-    return sum((op_on_qubit(op, qubit, num_qubits) for qubit in range(num_qubits)), start=np.array(0))
+    """Compute the collective version of a single-qubit qubit operator: sum_q op_q."""
+    assert op.shape == (2, 2)
+    return sum((act_on_subsystem(num_qubits, op, qubit) for qubit in range(num_qubits)), start=np.array(0))
 
 
-def op_on_qubit(op: np.ndarray, qubit: int, total_qubit_num: int) -> np.ndarray:
+def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarray:
     """
-    Return an operator that acts with 'op' in the given qubit, and trivially (with the identity operator) on all other qubits.
+    Return an operator that acts with 'op' in the given qubits, and trivially (with the identity operator) on all other qubits.
     """
-    iden_before = np.eye(2**qubit, dtype=op.dtype)
-    iden_after = np.eye(2 ** (total_qubit_num - qubit - 1), dtype=op.dtype)
-    return np.kron(np.kron(iden_before, op), iden_after)
+    assert op.shape == (2 ** len(qubits),) * 2, "Operator shape {op.shape} is inconsistent with the number of target qubits provided, {num_qubits}!"
+    identity = np.eye(2 ** (num_qubits - len(qubits)), dtype=op.dtype)
+    system_op = np.kron(op, identity)
+
+    # rearrange operator into tensor factors addressing each qubit
+    system_op = np.moveaxis(
+        system_op.reshape((2,) * 2 * num_qubits),
+        range(num_qubits),
+        range(0, 2 * num_qubits, 2),
+    ).reshape((4,) * num_qubits)
+
+    # move the first len(qubits) tensor factors to the target qubits
+    system_op = np.moveaxis(
+        system_op,
+        range(len(qubits)),
+        qubits,
+    )
+
+    # split and re-combine tensor factors again to recover the operator as a matrix
+    return np.moveaxis(
+        system_op.reshape((2,) * 2 * num_qubits),
+        range(0, 2 * num_qubits, 2),
+        range(num_qubits),
+    ).reshape((2**num_qubits,) * 2)
 
 
 if __name__ == "__main__":
@@ -193,13 +266,13 @@ if __name__ == "__main__":
     final_state = simulate_OAT(args.num_qubits, args.params, args.dissipation)
 
     # compute collective Pauli operators
-    mean_X = collective_op(pauli_X, args.num_qubits) / args.num_qubits
-    mean_Y = collective_op(pauli_Y, args.num_qubits) / args.num_qubits
-    mean_Z = collective_op(pauli_Z, args.num_qubits) / args.num_qubits
+    mean_X = collective_op(PAULI_X, args.num_qubits) / args.num_qubits
+    mean_Y = collective_op(PAULI_Y, args.num_qubits) / args.num_qubits
+    mean_Z = collective_op(PAULI_Z, args.num_qubits) / args.num_qubits
     mean_ops = [mean_X, mean_Y, mean_Z]
 
     # print out expectation values and variances
-    final_pauli_vals = [(final_state @ op).trace().real for op in mean_ops]
-    final_pauli_vars = [(final_state @ (op @ op)).trace().real - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)]
-    print("[<X>, <Y>, <Z>]:", final_pauli_vals)
-    print("[var(X), var(Y), var(Z)]:", final_pauli_vars)
+    final_PAULI_vals = [(final_state @ op).trace().real for op in mean_ops]
+    final_PAULI_vars = [(final_state @ (op @ op)).trace().real - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_PAULI_vals)]
+    print("[<X>, <Y>, <Z>]:", final_PAULI_vals)
+    print("[var(X), var(Y), var(Z)]:", final_PAULI_vars)
