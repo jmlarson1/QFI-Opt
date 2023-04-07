@@ -106,10 +106,11 @@ def simulate_spin_chain(
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     """Simulate an entangling protocol for a spin chain with power-law interactions."""
+    normalization_factor = num_qubits * np.mean((1 / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)))
     hamiltonian = sum(
         act_on_subsystem(num_qubits, coupling_op, pp, qq) / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)
     )
-    return simulate_sensing_protocol(num_qubits, hamiltonian, params, dissipation_rates, dissipation_format)
+    return simulate_sensing_protocol(num_qubits, hamiltonian / normalization_factor, params, dissipation_rates, dissipation_format)
 
 
 def simulate_ising_chain(
