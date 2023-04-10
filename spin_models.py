@@ -25,49 +25,58 @@ PAULI_Y = -1j * PAULI_Z @ PAULI_X
 def simulate_sensing_protocol(
     num_qubits: int,
     entangling_hamiltonian: np.ndarray,
-    params: tuple[float, float, float, float] | np.ndarray,
+    params: tuple[float, ...] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    axial_symmetry: bool = False,
 ) -> np.ndarray:
     """
     Simulate a sensing protocol, and return the final state (density matrix).
 
     Starting with an initial all-|1> state (all spins pointing down along the Z axis):
-    1. Rotate about the X axis by the angle 'params[0] * np.pi' (with Hamiltonian 'Sx').
-    2. Evolve under a given entangling Hamiltonian for time 'params[1] * np.pi * num_qubits'.
-    3. Rotate about the axis 'X_phi' by the angle '-params[2] * np.pi',
-       where 'phi = params[3] * 2 * np.pi' and 'X_phi = cos(phi) X + sin(phi) Y'.
+    1. Rotate about an axis in the XY plane.
+    2. Evolve under a given entangling Hamiltonian.
+    3. "Un-rotate" about an axis in the XY plane.
 
-    If dissipation_rates is nonzero, qubits experience dissipation during the squeezing step (2).
+    Step 1 rotates by an angle '+np.pi * params[0]', about the axis '2 * np.pi * params[1]'.
+    Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * num_qubits * np.pi'.
+    Step 3 rotates by an angle '-np.pi * params[3]', about the axis '2 * np.pi * params[4]'.
+
+    If 'axial_symmetry == True', then a 0 is inserted into the second position of 'params'.
+
+    If dissipation_rates is nonzero, qubits experience dissipation during the entangling step (2).
     See the documentation for the Dissipator class for a general explanation of the
     dissipation_rates and dissipation_format arguments.
 
     This method additionally divides the dissipator (equivalently, all dissipation rates) by a
     factor of 'np.pi * num_qubits' in order to "normalize" dissipation time scales, and make them
-    comparable to the time scales of coherent evolution.  Dividing a Dissipator with dissipation
-    rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes with
-    probability 'e^(-params[1] * r)' by the end of the OAT protocol.
+    comparable to the time scales of coherent evolution.  Dividing a Dissipator with homogeneous
+    dissipation rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes
+    with probability 'e^(-params[2] * r)' by the end of the OAT protocol.
     """
-    assert len(params) == 4, "must provide 4 simulation parameters!"
+    if axial_symmetry:
+        params = np.insert(params, 1, 0.0)
+    assert len(params) == 5
 
     # construct collective spin operators
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
 
-    # rotate the all-|1> state about the X axis
+    # rotate the all-|1> state about a chosen axis
     time_1 = params[0] * np.pi
-    qubit_ket = np.sin(time_1 / 2) * KET_0 + 1j * np.cos(time_1 / 2) * KET_1
+    axis_angle_1 = params[1] * 2 * np.pi
+    qubit_ket = np.sin(time_1 / 2) * KET_0 + 1j * np.exp(1j * axis_angle_1) * np.cos(time_1 / 2) * KET_1
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
     # entangle!
-    time_2 = params[1] * np.pi * num_qubits
+    time_2 = params[2] * np.pi * num_qubits
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
     state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
 
     # un-rotate about a chosen axis
-    time_3 = -params[2] * np.pi
-    rot_axis_angle = params[3] * 2 * np.pi
-    final_hamiltonian = np.cos(rot_axis_angle) * collective_Sx + np.sin(rot_axis_angle) * collective_Sy
+    time_3 = -params[3] * np.pi
+    axis_angle_3 = params[4] * 2 * np.pi
+    final_hamiltonian = np.cos(axis_angle_3) * collective_Sx + np.sin(axis_angle_3) * collective_Sy
     state_3 = evolve_state(state_2, time_3, final_hamiltonian)
 
     return state_3
@@ -82,12 +91,12 @@ def simulate_OAT(
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
     hamiltonian = collective_Sz.diagonal() ** 2 / num_qubits
-    return simulate_sensing_protocol(num_qubits, hamiltonian, params, dissipation_rates, dissipation_format)
+    return simulate_sensing_protocol(num_qubits, hamiltonian, dissipation_rates, dissipation_format, axial_symmetry=True)
 
 
 def simulate_TAT(
     num_qubits: int,
-    params: tuple[float, float, float, float] | np.ndarray,
+    params: tuple[float, float, float, float, float] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
@@ -101,7 +110,7 @@ def simulate_spin_chain(
     coupling_op: np.ndarray,
     coupling_exponent: float,
     num_qubits: int,
-    params: tuple[float, float, float, float] | np.ndarray,
+    params: tuple[float, float, float, float, float] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
@@ -121,7 +130,7 @@ def simulate_ising_chain(
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
-    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format)
+    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format, axial_symmetry=True)
 
 
 def simulate_XX_chain(
@@ -132,7 +141,7 @@ def simulate_XX_chain(
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
-    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format)
+    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format, axial_symmetry=True)
 
 
 def simulate_local_TAT_chain(

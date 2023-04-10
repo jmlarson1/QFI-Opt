@@ -7,7 +7,6 @@ import numpy as np
 sys.path.append("../")
 
 import spin_models
-from calculate_qfi_example import compute_QFI
 
 N = 4
 noise = 1
