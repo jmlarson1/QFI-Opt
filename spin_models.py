@@ -91,7 +91,7 @@ def simulate_OAT(
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
     hamiltonian = collective_Sz.diagonal() ** 2 / num_qubits
-    return simulate_sensing_protocol(num_qubits, hamiltonian, dissipation_rates, dissipation_format, axial_symmetry=True)
+    return simulate_sensing_protocol(num_qubits, hamiltonian, params, dissipation_rates, dissipation_format, axial_symmetry=True)
 
 
 def simulate_TAT(
