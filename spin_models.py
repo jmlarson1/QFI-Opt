@@ -5,27 +5,41 @@ import itertools
 import sys
 from typing import Optional
 
-import numpy as np
 import scipy
 
-from dissipation import Dissipator
+USE_JAX = True
 
+if USE_JAX:
+    import jax
+
+    jax.config.update("jax_enable_x64", True)
+    import jax.numpy as np
+
+    import ode_jax
+    from dissipation import Dissipator
+
+else:
+    import numpy as np
+
+    from dissipation_jax import Dissipator
+
+COMPLEX_TYPE = np.complex128
 DEFAULT_DISSIPATION_FORMAT = "XYZ"
 
 # qubit/spin states
-KET_0 = np.array([1, 0])  # |0>, spin up
-KET_1 = np.array([0, 1])  # |1>, spin down
+KET_0 = np.array([1, 0], dtype=COMPLEX_TYPE)  # |0>, spin up
+KET_1 = np.array([0, 1], dtype=COMPLEX_TYPE)  # |1>, spin down
 
 # Pauli operators
-PAULI_Z = np.array([[1, 0], [0, -1]])  # |0><0| - |1><1|
-PAULI_X = np.array([[0, 1], [1, 0]])  # |0><1| + |1><0|
+PAULI_Z = np.array([[1, 0], [0, -1]], dtype=COMPLEX_TYPE)  # |0><0| - |1><1|
+PAULI_X = np.array([[0, 1], [1, 0]], dtype=COMPLEX_TYPE)  # |0><1| + |1><0|
 PAULI_Y = -1j * PAULI_Z @ PAULI_X
 
 
 def simulate_sensing_protocol(
     num_qubits: int,
     entangling_hamiltonian: np.ndarray,
-    params: tuple[float, ...] | np.ndarray,
+    params: tuple[float, float, float, float, float] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
     axial_symmetry: bool = False,
@@ -55,7 +69,7 @@ def simulate_sensing_protocol(
     with probability 'e^(-params[2] * r)' by the end of the OAT protocol.
     """
     if axial_symmetry:
-        params = np.insert(params, 1, 0.0)
+        params = np.insert(np.array(params), 1, 0.0)
     assert len(params) == 5
 
     # construct collective spin operators
@@ -166,22 +180,31 @@ def evolve_state(
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
     """
-    if time == 0:
-        return density_op
-    if time < 0:
-        time, hamiltonian = -time, -hamiltonian
-    solution = scipy.integrate.solve_ivp(
-        time_deriv,
-        [0, time],
-        density_op.ravel(),
-        t_eval=[time],
-        rtol=rtol,
-        atol=atol,
-        method="DOP853",
-        args=(hamiltonian, dissipator),
-    )
-    final_vec = solution.y[:, -1]
-    return final_vec.reshape(density_op.shape)
+    if USE_JAX:
+        times = np.linspace(0, time)
+        result = ode_jax.odeint(
+            time_deriv,
+            density_op.ravel(),
+            times,
+            hamiltonian,
+            rtol=rtol,
+            atol=atol,
+        )
+        return result[-1].reshape(density_op.shape)
+
+    else:
+        solution = scipy.integrate.solve_ivp(
+            time_deriv,
+            [0, time],
+            density_op.ravel(),
+            t_eval=[time],
+            rtol=rtol,
+            atol=atol,
+            method="DOP853",
+            args=(hamiltonian, dissipator),
+        )
+        final_vec = solution.y[:, -1]
+        return final_vec.reshape(density_op.shape)
 
 
 def time_deriv(
@@ -205,7 +228,7 @@ def time_deriv(
         # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
         density_op.shape = hamiltonian.shape * 2
-        output = -1j * (hamiltonian[:, np.newaxis] * density_op - density_op * hamiltonian)
+        output = -1j * (np.expand_dims(hamiltonian, 1) * density_op - density_op * hamiltonian)
 
     # dissipation
     if dissipator:
@@ -271,6 +294,20 @@ if __name__ == "__main__":
     parser.add_argument("--dissipation", type=float, default=0.0)
     parser.add_argument("--params", type=float, nargs=4, default=[0.5, 0.5, 0.5, 0])
     args = parser.parse_args(sys.argv[1:])
+
+    # convert the parameters into a complex array, which is necessary for autodiff capabilities
+    args.params = np.array(args.params, dtype=COMPLEX_TYPE)
+
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    jacrev_fun = jax.jacrev(simulate_OAT, argnums=(0,), holomorphic=True)
+
+    # check_grads(simulate_OAT, (params_jax,), 1,  modes=("rev"))
+    jac = jacrev_fun(args.params, args.num_qubits, args.dissipation)
+
+    for i in range(jac[0].shape[0]):
+        for j in range(jac[0].shape[1]):
+            print("d(finalstate[", i, ",", j, "])/d(params)= ", jac[0][i][j])
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # simulate the OAT potocol
     final_state = simulate_OAT(args.num_qubits, args.params, args.dissipation)
