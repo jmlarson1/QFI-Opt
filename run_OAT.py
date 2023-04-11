@@ -185,7 +185,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num_qubits", type=int, default=4)
     parser.add_argument("--dissipation", type=float, default=0.0)
-    parser.add_argument("--params", type=float, nargs=4, required=True)
+    parser.add_argument("--params", type=float, nargs=4, default=[0.5, 0.5, 0.5, 0])
     args = parser.parse_args(sys.argv[1:])
 
     # simulate the OAT potocol
