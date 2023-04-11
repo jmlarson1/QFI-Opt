@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, Sequence
 
 from dissipation import Dissipator
 
-USE_JAX = True
+USE_JAX = False
 
 if USE_JAX:
     import jax

@@ -1,4 +1,4 @@
-import numpy as np
+import jax.numpy as np
 
 
 class Dissipator:
@@ -107,14 +107,14 @@ def _qubit_term_XYZ_1(density_op: np.ndarray, qubit: int) -> np.ndarray:
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    density_op = density_op.reshape((dim_a, 2, dim_b, dim_a, 2, dim_b))
     output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = 0
-    output[:, 0, :, :, 1, :] = -density_op[:, 0, :, :, 1, :]
-    output[:, 1, :, :, 0, :] = -density_op[:, 1, :, :, 0, :]
-    output[:, 1, :, :, 1, :] = 0
-    density_op.shape = input_shape
-    output.shape = input_shape
+    output = output.at[:, 0, :, :, 0, :].set(0)
+    output = output.at[:, 0, :, :, 1, :].set(-density_op[:, 0, :, :, 1, :])
+    output = output.at[:, 1, :, :, 0, :].set(-density_op[:, 1, :, :, 0, :])
+    output = output.at[:, 1, :, :, 1, :].set(0)
+    density_op = density_op.reshape(input_shape)
+    output = output.reshape(input_shape)
     return output
 
 
@@ -127,14 +127,14 @@ def _qubit_term_XYZ_2(density_op: np.ndarray, qubit: int) -> np.ndarray:
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    density_op = density_op.reshape((dim_a, 2, dim_b, dim_a, 2, dim_b))
     output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :] - density_op[:, 0, :, :, 0, :]
-    output[:, 0, :, :, 1, :] = 0
-    output[:, 1, :, :, 0, :] = 0
-    output[:, 1, :, :, 1, :] = -output[:, 0, :, :, 0, :]
-    density_op.shape = input_shape
-    output.shape = input_shape
+    output = output.at[:, 0, :, :, 0, :].set(density_op[:, 1, :, :, 1, :] - density_op[:, 0, :, :, 0, :])
+    output = output.at[:, 0, :, :, 1, :].set(0)
+    output = output.at[:, 1, :, :, 0, :].set(0)
+    output = output.at[:, 1, :, :, 1, :].set(-output[:, 0, :, :, 0, :])
+    density_op = density_op.reshape(input_shape)
+    output = output.reshape(input_shape)
     return output
 
 
@@ -147,14 +147,14 @@ def _qubit_term_XYZ_3(density_op: np.ndarray, qubit: int) -> np.ndarray:
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    density_op = density_op.reshape((dim_a, 2, dim_b, dim_a, 2, dim_b))
     output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = 0
-    output[:, 0, :, :, 1, :] = density_op[:, 1, :, :, 0, :]
-    output[:, 1, :, :, 0, :] = density_op[:, 0, :, :, 1, :]
-    output[:, 1, :, :, 1, :] = 0
-    density_op.shape = input_shape
-    output.shape = input_shape
+    output = output.at[:, 0, :, :, 0, :].set(0)
+    output = output.at[:, 0, :, :, 1, :].set(density_op[:, 1, :, :, 0, :])
+    output = output.at[:, 1, :, :, 0, :].set(density_op[:, 0, :, :, 1, :])
+    output = output.at[:, 1, :, :, 1, :].set(0)
+    density_op = density_op.reshape(input_shape)
+    output = output.reshape(input_shape)
     return output
 
 
@@ -170,14 +170,14 @@ def _qubit_term_PMZ_2(density_op: np.ndarray, qubit: int) -> np.ndarray:
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    density_op = density_op.reshape((dim_a, 2, dim_b, dim_a, 2, dim_b))
     output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = density_op[:, 1, :, :, 1, :]
-    output[:, 0, :, :, 1, :] = 0
-    output[:, 1, :, :, 0, :] = 0
-    output[:, 1, :, :, 1, :] = -density_op[:, 1, :, :, 1, :]
-    density_op.shape = input_shape
-    output.shape = input_shape
+    output = output.at[:, 0, :, :, 0, :].set(density_op[:, 1, :, :, 1, :])
+    output = output.at[:, 0, :, :, 1, :].set(0)
+    output = output.at[:, 1, :, :, 0, :].set(0)
+    output = output.at[:, 1, :, :, 1, :].set(-density_op[:, 1, :, :, 1, :])
+    density_op = density_op.reshape(input_shape)
+    output = output.reshape(input_shape)
     return output
 
 
@@ -190,12 +190,12 @@ def _qubit_term_PMZ_3(density_op: np.ndarray, qubit: int) -> np.ndarray:
     num_qubits = log2_int(density_op.size) // 2
     dim_a = 2**qubit
     dim_b = 2 ** (num_qubits - qubit - 1)
-    density_op.shape = (dim_a, 2, dim_b, dim_a, 2, dim_b)
+    density_op = density_op.reshape((dim_a, 2, dim_b, dim_a, 2, dim_b))
     output = np.empty_like(density_op)
-    output[:, 0, :, :, 0, :] = -density_op[:, 0, :, :, 0, :]
-    output[:, 0, :, :, 1, :] = 0
-    output[:, 1, :, :, 0, :] = 0
-    output[:, 1, :, :, 1, :] = density_op[:, 0, :, :, 0, :]
-    density_op.shape = input_shape
-    output.shape = input_shape
+    output = output.at[:, 0, :, :, 0, :].set(-density_op[:, 0, :, :, 0, :])
+    output = output.at[:, 0, :, :, 1, :].set(0)
+    output = output.at[:, 1, :, :, 0, :].set(0)
+    output = output.at[:, 1, :, :, 1, :].set(density_op[:, 0, :, :, 0, :])
+    density_op = density_op.reshape(input_shape)
+    output = output.reshape(input_shape)
     return output
