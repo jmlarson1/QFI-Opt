@@ -5,23 +5,14 @@ import itertools
 import sys
 from typing import Any, Callable, Optional, Sequence
 
+import jax
+import jax.numpy as np
+import scipy
+
+import ode_jax
 from dissipation import Dissipator
 
-USE_JAX = False
-
-if USE_JAX:
-    import jax
-
-    import ode_jax
-
-    jax.config.update("jax_enable_x64", True)
-    import jax.numpy as np
-
-
-else:
-    import numpy as np
-    import scipy
-
+jax.config.update("jax_enable_x64", True)
 
 COMPLEX_TYPE = np.complex128
 DEFAULT_DISSIPATION_FORMAT = "XYZ"
@@ -46,6 +37,7 @@ def simulate_sensing_protocol(
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
     axial_symmetry: bool = False,
+    with_jax: bool = False,
 ) -> np.ndarray:
     """
     Simulate a sensing protocol, and return the final state (density matrix).
@@ -90,13 +82,13 @@ def simulate_sensing_protocol(
     # entangle!
     time_2 = params[2] * np.pi * num_qubits
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
+    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator, with_jax=with_jax)
 
     # un-rotate about a chosen axis
     time_3 = -params[3] * np.pi
     axis_angle_3 = params[4] * 2 * np.pi
     final_hamiltonian = np.cos(axis_angle_3) * collective_Sx + np.sin(axis_angle_3) * collective_Sy
-    state_3 = evolve_state(state_2, time_3, final_hamiltonian)
+    state_3 = evolve_state(state_2, time_3, final_hamiltonian, with_jax=with_jax)
 
     return state_3
 
@@ -106,11 +98,12 @@ def simulate_OAT(
     num_qubits: int,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    with_jax: bool = False,
 ) -> np.ndarray:
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
     hamiltonian = collective_Sz.diagonal() ** 2 / num_qubits
-    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format, axial_symmetry=True)
+    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax)
 
 
 def simulate_TAT(
@@ -118,11 +111,12 @@ def simulate_TAT(
     num_qubits: int,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    with_jax: bool = False,
 ) -> np.ndarray:
     """Simulate a two-axis twisting (TAT) protocol."""
     collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
     hamiltonian = (collective_Sx @ collective_Sy + collective_Sy @ collective_Sx) / num_qubits
-    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format)
+    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format, with_jax=with_jax)
 
 
 def simulate_spin_chain(
@@ -132,13 +126,14 @@ def simulate_spin_chain(
     coupling_exponent: float,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    with_jax: bool = False,
 ) -> np.ndarray:
     """Simulate an entangling protocol for a spin chain with power-law interactions."""
     normalization_factor = num_qubits * np.mean([1 / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)])
     hamiltonian = sum(
         act_on_subsystem(num_qubits, coupling_op, pp, qq) / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)
     )
-    return simulate_sensing_protocol(params, hamiltonian / normalization_factor, dissipation_rates, dissipation_format)
+    return simulate_sensing_protocol(params, hamiltonian / normalization_factor, dissipation_rates, dissipation_format, with_jax=with_jax)
 
 
 def simulate_ising_chain(
@@ -147,9 +142,10 @@ def simulate_ising_chain(
     coupling_exponent: float,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    with_jax: bool = False,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, params, dissipation_rates, dissipation_format, axial_symmetry=True)
+    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, params, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax)
 
 
 def simulate_XX_chain(
@@ -158,9 +154,10 @@ def simulate_XX_chain(
     coupling_exponent: float,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    with_jax: bool = False,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
-    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format, axial_symmetry=True)
+    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax)
 
 
 def simulate_local_TAT_chain(
@@ -169,9 +166,10 @@ def simulate_local_TAT_chain(
     coupling_exponent: float,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    with_jax: bool = False,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_Y) + np.kron(PAULI_Y, PAULI_X)) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format)
+    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, with_jax=with_jax)
 
 
 def evolve_state(
@@ -181,6 +179,7 @@ def evolve_state(
     dissipator: Optional[Dissipator] = None,
     rtol: float = 1e-8,
     atol: float = 1e-8,
+    with_jax: bool = False,
 ) -> np.ndarray:
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
@@ -192,7 +191,7 @@ def evolve_state(
 
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
-    if USE_JAX:
+    if with_jax:
 
         def _time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
             return time_deriv(time, density_op)
@@ -293,12 +292,11 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
 
 def get_jacobian_func(simulate_func: Callable) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
-    assert USE_JAX
 
     jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
 
     def get_jacobian(*args: Any, **kwargs: Any) -> np.ndarray:
-        return jacobian_func(*args, **kwargs)[0]
+        return jacobian_func(*args, **kwargs, with_jax=True)[0]
 
     return get_jacobian
 
@@ -312,12 +310,13 @@ if __name__ == "__main__":
     parser.add_argument("--num_qubits", type=int, default=4)
     parser.add_argument("--dissipation", type=float, default=0.0)
     parser.add_argument("--params", type=float, nargs=4, default=[0.5, 0.5, 0.5, 0])
+    parser.add_argument("--jacobian", action="store_true", default=False)
     args = parser.parse_args(sys.argv[1:])
 
     # convert the parameters into a complex array, which is necessary for autodiff capabilities
     args.params = np.array(args.params, dtype=COMPLEX_TYPE)
 
-    if USE_JAX:
+    if args.jacobian:
         get_jacobian = get_jacobian_func(simulate_OAT)
         jacobian = get_jacobian(args.params, args.num_qubits, args.dissipation)
         for pp in range(len(args.params)):
@@ -325,7 +324,7 @@ if __name__ == "__main__":
             print(jacobian[:, :, pp])
 
     # simulate the OAT potocol
-    final_state = simulate_OAT(args.params, args.num_qubits, args.dissipation)
+    final_state = simulate_OAT(args.params, args.num_qubits, args.dissipation, with_jax=args.jacobian)
 
     # compute collective Pauli operators
     mean_X = collective_op(PAULI_X, args.num_qubits) / args.num_qubits
