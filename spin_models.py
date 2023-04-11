@@ -180,19 +180,18 @@ def evolve_state(
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
     """
+    # treat negative times as evolving under the negative of the Hamiltonian
+    # NOTE: this is required for autodiff to work
+    if time.real < 0:
+        time, hamiltonian = -time, -hamiltonian
+
     if USE_JAX:
 
         def _time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
             return time_deriv(time, density_op, hamiltonian, dissipator)
 
-        times = np.linspace(0, time)
-        result = ode_jax.odeint(
-            _time_deriv,
-            density_op.astype(complex),
-            times,
-            rtol=rtol,
-            atol=atol,
-        )
+        times = np.linspace(0.0, time, 2)
+        result = ode_jax.odeint(_time_deriv, density_op, times, rtol=rtol, atol=atol)
         return result[-1]
 
     else:
