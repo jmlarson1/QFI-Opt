@@ -7,7 +7,6 @@ from typing import Any, Callable, Optional, Sequence
 
 import jax
 import jax.numpy as np
-import scipy
 
 import ode_jax
 from dissipation import Dissipator
@@ -37,7 +36,6 @@ def simulate_sensing_protocol(
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
     axial_symmetry: bool = False,
-    with_jax: bool = False,
 ) -> np.ndarray:
     """
     Simulate a sensing protocol, and return the final state (density matrix).
@@ -82,13 +80,13 @@ def simulate_sensing_protocol(
     # entangle!
     time_2 = params[2] * np.pi * num_qubits
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator, with_jax=with_jax)
+    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
 
     # un-rotate about a chosen axis
     time_3 = -params[3] * np.pi
     axis_angle_3 = params[4] * 2 * np.pi
     final_hamiltonian = np.cos(axis_angle_3) * collective_Sx + np.sin(axis_angle_3) * collective_Sy
-    state_3 = evolve_state(state_2, time_3, final_hamiltonian, with_jax=with_jax)
+    state_3 = evolve_state(state_2, time_3, final_hamiltonian)
 
     return state_3
 
@@ -98,12 +96,11 @@ def simulate_OAT(
     num_qubits: int,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    with_jax: bool = False,
 ) -> np.ndarray:
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
     hamiltonian = collective_Sz.diagonal() ** 2 / num_qubits
-    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax)
+    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format, axial_symmetry=True)
 
 
 def simulate_TAT(
@@ -111,12 +108,11 @@ def simulate_TAT(
     num_qubits: int,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    with_jax: bool = False,
 ) -> np.ndarray:
     """Simulate a two-axis twisting (TAT) protocol."""
     collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
     hamiltonian = (collective_Sx @ collective_Sy + collective_Sy @ collective_Sx) / num_qubits
-    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format, with_jax=with_jax)
+    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format)
 
 
 def simulate_spin_chain(
@@ -127,16 +123,13 @@ def simulate_spin_chain(
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
     axial_symmetry: bool = False,
-    with_jax: bool = False,
 ) -> np.ndarray:
     """Simulate an entangling protocol for a spin chain with power-law interactions."""
     normalization_factor = num_qubits * np.array([1 / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)]).mean()
     hamiltonian = sum(
         act_on_subsystem(num_qubits, coupling_op, pp, qq) / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)
     )
-    return simulate_sensing_protocol(
-        params, hamiltonian / normalization_factor, dissipation_rates, dissipation_format, axial_symmetry=axial_symmetry, with_jax=with_jax
-    )
+    return simulate_sensing_protocol(params, hamiltonian / normalization_factor, dissipation_rates, dissipation_format, axial_symmetry=axial_symmetry)
 
 
 def simulate_ising_chain(
@@ -145,12 +138,9 @@ def simulate_ising_chain(
     coupling_exponent: float,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    with_jax: bool = False,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
-    return simulate_spin_chain(
-        params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax
-    )
+    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, axial_symmetry=True)
 
 
 def simulate_XX_chain(
@@ -159,12 +149,9 @@ def simulate_XX_chain(
     coupling_exponent: float,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    with_jax: bool = False,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
-    return simulate_spin_chain(
-        params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax
-    )
+    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, axial_symmetry=True)
 
 
 def simulate_local_TAT_chain(
@@ -173,10 +160,9 @@ def simulate_local_TAT_chain(
     coupling_exponent: float,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    with_jax: bool = False,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_Y) + np.kron(PAULI_Y, PAULI_X)) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, with_jax=with_jax)
+    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format)
 
 
 def evolve_state(
@@ -186,7 +172,6 @@ def evolve_state(
     dissipator: Optional[Dissipator] = None,
     rtol: float = 1e-8,
     atol: float = 1e-8,
-    with_jax: bool = False,
 ) -> np.ndarray:
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
@@ -195,42 +180,14 @@ def evolve_state(
     # NOTE: this is required for autodiff to work
     if time.real < 0:
         time, hamiltonian = -time, -hamiltonian
-
+    times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
-
-    if with_jax:
-
-        def time_deriv_jax(density_op: np.ndarray, time: float) -> np.ndarray:
-            return time_deriv(time, density_op)
-
-        times = np.linspace(0.0, time, 2)
-        result = ode_jax.odeint(time_deriv_jax, density_op, times, rtol=rtol, atol=atol)
-        return result[-1]
-
-    else:
-        density_op_shape = density_op.shape
-
-        def time_deriv_scipy(time: float, density_op: np.ndarray) -> np.ndarray:
-            density_op = density_op.reshape(density_op_shape)
-            output = time_deriv(time, density_op)
-            density_op = density_op.reshape((-1,))
-            return output.ravel()
-
-        solution = scipy.integrate.solve_ivp(
-            time_deriv_scipy,
-            [0, time.real],
-            density_op.astype(complex).ravel(),
-            t_eval=[time.real],
-            rtol=rtol,
-            atol=atol,
-            method="DOP853",
-        )
-        final_vec = solution.y[:, -1]
-        return final_vec.reshape(density_op_shape)
+    result = ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)
+    return result[-1]
 
 
-def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = None) -> Callable[[float, np.ndarray], np.ndarray]:
-    """Construct a time derivative function that maps (time, state) --> d(state)/d(time)."""
+def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = None) -> Callable[[np.ndarray, float], np.ndarray]:
+    """Construct a time derivative function that maps (state, time) --> d(state)/d(time)."""
 
     # construct the time derivative from coherent evolution
     if hamiltonian.ndim == 2:
@@ -247,8 +204,8 @@ def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = N
             return -1j * (expanded_hamiltonian * density_op - density_op * hamiltonian)
 
     if not dissipator:
-        return lambda time, state: coherent_time_deriv(state)
-    return lambda time, state: coherent_time_deriv(state) + dissipator @ state
+        return lambda state, time: coherent_time_deriv(state)
+    return lambda state, time: coherent_time_deriv(state) + dissipator @ state
 
 
 @functools.cache
@@ -303,7 +260,7 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
     jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
 
     def get_jacobian(*args: Any, **kwargs: Any) -> np.ndarray:
-        return jacobian_func(*args, **kwargs, with_jax=True)[0]
+        return jacobian_func(*args, **kwargs)[0]
 
     return get_jacobian
 
@@ -331,7 +288,7 @@ if __name__ == "__main__":
             print(jacobian[:, :, pp])
 
     # simulate the OAT potocol
-    final_state = simulate_OAT(args.params, args.num_qubits, args.dissipation, with_jax=args.jacobian)
+    final_state = simulate_OAT(args.params, args.num_qubits, args.dissipation)
 
     # compute collective Pauli operators
     mean_X = collective_op(PAULI_X, args.num_qubits) / args.num_qubits
