@@ -11,6 +11,7 @@ USE_JAX = False
 
 if USE_JAX:
     import jax
+
     import ode_jax
 
     jax.config.update("jax_enable_x64", True)
@@ -189,21 +190,23 @@ def evolve_state(
     if time.real < 0:
         time, hamiltonian = -time, -hamiltonian
 
+    time_deriv = get_time_deriv(hamiltonian, dissipator)
+
     if USE_JAX:
 
         def _time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
-            return time_deriv(time, density_op, hamiltonian, dissipator)
+            return time_deriv(time, density_op)
 
         times = np.linspace(0.0, time, 2)
         result = ode_jax.odeint(_time_deriv, density_op, times, rtol=rtol, atol=atol)
         return result[-1]
 
     else:
-        matrix_shape = density_op.shape
+        density_op_shape = density_op.shape
 
         def _time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
-            density_op.shape = matrix_shape
-            output = time_deriv(time, density_op, hamiltonian, dissipator)
+            density_op.shape = density_op_shape
+            output = time_deriv(time, density_op)
             density_op.shape = (-1,)
             return output.ravel()
 
@@ -217,30 +220,29 @@ def evolve_state(
             method="DOP853",
         )
         final_vec = solution.y[:, -1]
-        return final_vec.reshape(matrix_shape)
+        return final_vec.reshape(density_op_shape)
 
 
-def time_deriv(
-    time: float,
-    density_op: np.ndarray,
-    hamiltonian: np.ndarray,
-    dissipator: Optional[Dissipator] = None,
-) -> np.ndarray:
-    """Compute the time derivative of the given density operator undergoing Markovian evolution."""
-    # coherent evolution
+def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = None) -> Callable[[float, np.ndarray], np.ndarray]:
+    """Construct a time derivative function that maps (time, state) --> d(state)/d(time)."""
+
+    # construct the time derivative from coherent evolution
     if hamiltonian.ndim == 2:
-        # ... computed with ordinary matrix multiplication
-        output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
+        # ... with ordinary matrix multiplication
+        def coherent_time_deriv(density_op: float) -> np.ndarray:
+            return -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
+
     else:
         # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
-        output = -1j * (np.expand_dims(hamiltonian, 1) * density_op - density_op * hamiltonian)
+        expanded_hamiltonian = np.expand_dims(hamiltonian, 1)
 
-    # dissipation
-    if dissipator:
-        output += dissipator @ density_op
+        def coherent_time_deriv(density_op: float) -> np.ndarray:
+            return -1j * (expanded_hamiltonian * density_op - density_op * hamiltonian)
 
-    return output
+    if not dissipator:
+        return lambda time, state: coherent_time_deriv(state)
+    return lambda time, state: coherent_time_deriv(state) + disipator @ state
 
 
 @functools.cache
