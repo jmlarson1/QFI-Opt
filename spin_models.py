@@ -340,7 +340,7 @@ if __name__ == "__main__":
     mean_ops = [mean_X, mean_Y, mean_Z]
 
     # print out expectation values and variances
-    final_PAULI_vals = np.array([(final_state @ op).trace().real for op in mean_ops])
-    final_PAULI_vars = np.array([(final_state @ (op @ op)).trace().real - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_PAULI_vals)])
-    print("[<X>, <Y>, <Z>]:", final_PAULI_vals)
-    print("[var(X), var(Y), var(Z)]:", final_PAULI_vars)
+    final_pauli_vals = np.array([(final_state @ op).trace().real for op in mean_ops])
+    final_pauli_vars = np.array([(final_state @ (op @ op)).trace().real - mean_op_val**2 for op, mean_op_val in zip(mean_ops, final_pauli_vals)])
+    print("[<X>, <Y>, <Z>]:", final_pauli_vals)
+    print("[var(X), var(Y), var(Z)]:", final_pauli_vars)
