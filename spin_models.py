@@ -145,7 +145,9 @@ def simulate_ising_chain(
     with_jax: bool = False,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, params, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax)
+    return simulate_spin_chain(
+        params, num_qubits, coupling_op, coupling_exponent, params, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax
+    )
 
 
 def simulate_XX_chain(
@@ -157,7 +159,9 @@ def simulate_XX_chain(
     with_jax: bool = False,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
-    return simulate_spin_chain(coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax)
+    return simulate_spin_chain(
+        coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax
+    )
 
 
 def simulate_local_TAT_chain(
