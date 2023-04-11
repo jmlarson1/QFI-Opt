@@ -126,14 +126,17 @@ def simulate_spin_chain(
     coupling_exponent: float,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    axial_symmetry: bool = False,
     with_jax: bool = False,
 ) -> np.ndarray:
     """Simulate an entangling protocol for a spin chain with power-law interactions."""
-    normalization_factor = num_qubits * np.mean([1 / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)])
+    normalization_factor = num_qubits * np.array([1 / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)]).mean()
     hamiltonian = sum(
         act_on_subsystem(num_qubits, coupling_op, pp, qq) / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)
     )
-    return simulate_sensing_protocol(params, hamiltonian / normalization_factor, dissipation_rates, dissipation_format, with_jax=with_jax)
+    return simulate_sensing_protocol(
+        params, hamiltonian / normalization_factor, dissipation_rates, dissipation_format, axial_symmetry=axial_symmetry, with_jax=with_jax
+    )
 
 
 def simulate_ising_chain(
@@ -146,7 +149,7 @@ def simulate_ising_chain(
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
     return simulate_spin_chain(
-        params, num_qubits, coupling_op, coupling_exponent, params, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax
+        params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax
     )
 
 
@@ -160,7 +163,7 @@ def simulate_XX_chain(
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
     return simulate_spin_chain(
-        coupling_op, coupling_exponent, num_qubits, params, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax
+        params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, axial_symmetry=True, with_jax=with_jax
     )
 
 
@@ -178,7 +181,7 @@ def simulate_local_TAT_chain(
 
 def evolve_state(
     density_op: np.ndarray,
-    time: float,
+    time: float | np.ndarray,
     hamiltonian: np.ndarray,
     dissipator: Optional[Dissipator] = None,
     rtol: float = 1e-8,
@@ -197,24 +200,24 @@ def evolve_state(
 
     if with_jax:
 
-        def _time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
+        def time_deriv_jax(density_op: np.ndarray, time: float) -> np.ndarray:
             return time_deriv(time, density_op)
 
         times = np.linspace(0.0, time, 2)
-        result = ode_jax.odeint(_time_deriv, density_op, times, rtol=rtol, atol=atol)
+        result = ode_jax.odeint(time_deriv_jax, density_op, times, rtol=rtol, atol=atol)
         return result[-1]
 
     else:
         density_op_shape = density_op.shape
 
-        def _time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
-            density_op.shape = density_op_shape
+        def time_deriv_scipy(time: float, density_op: np.ndarray) -> np.ndarray:
+            density_op = density_op.reshape(density_op_shape)
             output = time_deriv(time, density_op)
-            density_op.shape = (-1,)
+            density_op = density_op.reshape((-1,))
             return output.ravel()
 
         solution = scipy.integrate.solve_ivp(
-            _time_deriv,
+            time_deriv_scipy,
             [0, time.real],
             density_op.astype(complex).ravel(),
             t_eval=[time.real],
@@ -232,7 +235,7 @@ def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = N
     # construct the time derivative from coherent evolution
     if hamiltonian.ndim == 2:
         # ... with ordinary matrix multiplication
-        def coherent_time_deriv(density_op: float) -> np.ndarray:
+        def coherent_time_deriv(density_op: np.ndarray) -> np.ndarray:
             return -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
 
     else:
@@ -240,12 +243,12 @@ def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = N
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
         expanded_hamiltonian = np.expand_dims(hamiltonian, 1)
 
-        def coherent_time_deriv(density_op: float) -> np.ndarray:
+        def coherent_time_deriv(density_op: np.ndarray) -> np.ndarray:
             return -1j * (expanded_hamiltonian * density_op - density_op * hamiltonian)
 
     if not dissipator:
         return lambda time, state: coherent_time_deriv(state)
-    return lambda time, state: coherent_time_deriv(state) + disipator @ state
+    return lambda time, state: coherent_time_deriv(state) + dissipator @ state
 
 
 @functools.cache
