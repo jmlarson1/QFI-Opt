@@ -16,12 +16,12 @@ if USE_JAX:
     import jax.numpy as np
 
     import ode_jax
-    from dissipation import Dissipator
+    from dissipation_jax import Dissipator
 
 else:
     import numpy as np
 
-    from dissipation_jax import Dissipator
+    from dissipation import Dissipator
 
 COMPLEX_TYPE = np.complex128
 DEFAULT_DISSIPATION_FORMAT = "XYZ"
@@ -181,61 +181,63 @@ def evolve_state(
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
     """
     if USE_JAX:
+
+        def _time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
+            return time_deriv(time, density_op, hamiltonian, dissipator)
+
         times = np.linspace(0, time)
         result = ode_jax.odeint(
-            time_deriv,
-            density_op.ravel(),
+            _time_deriv,
+            density_op.astype(complex),
             times,
-            hamiltonian,
             rtol=rtol,
             atol=atol,
         )
-        return result[-1].reshape(density_op.shape)
+        return result[-1]
 
     else:
+        matrix_shape = density_op.shape
+
+        def _time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
+            density_op.shape = matrix_shape
+            output = time_deriv(time, density_op, hamiltonian, dissipator)
+            density_op.shape = (-1,)
+            return output.ravel()
+
         solution = scipy.integrate.solve_ivp(
-            time_deriv,
-            [0, time],
-            density_op.ravel(),
-            t_eval=[time],
+            _time_deriv,
+            [0, time.real],
+            density_op.astype(complex).ravel(),
+            t_eval=[time.real],
             rtol=rtol,
             atol=atol,
             method="DOP853",
-            args=(hamiltonian, dissipator),
         )
         final_vec = solution.y[:, -1]
-        return final_vec.reshape(density_op.shape)
+        return final_vec.reshape(matrix_shape)
 
 
 def time_deriv(
-    _: float,
+    time: float,
     density_op: np.ndarray,
     hamiltonian: np.ndarray,
     dissipator: Optional[Dissipator] = None,
 ) -> np.ndarray:
-    """
-    Compute the time derivative of the given density operator (flattened to a 1D vector) undergoing Markovian evolution.
-
-    The first argument is a time parameter, indicating this function should return the time derivative of 'density_op' at a particular time.
-    The time parameter is not used here, but it is necessary for compatibility with scipy.integrate.solve_ivp.
-    """
+    """Compute the time derivative of the given density operator undergoing Markovian evolution."""
     # coherent evolution
     if hamiltonian.ndim == 2:
         # ... computed with ordinary matrix multiplication
-        density_op.shape = hamiltonian.shape
         output = -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
     else:
         # 'hamiltonian' is a 1-D array of the values on the diagonal of the actual Hamiltonian,
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
-        density_op.shape = hamiltonian.shape * 2
         output = -1j * (np.expand_dims(hamiltonian, 1) * density_op - density_op * hamiltonian)
 
     # dissipation
     if dissipator:
         output += dissipator @ density_op
 
-    density_op.shape = (-1,)
-    return output.ravel()
+    return output
 
 
 @functools.cache
@@ -299,14 +301,15 @@ if __name__ == "__main__":
     args.params = np.array(args.params, dtype=COMPLEX_TYPE)
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    jacrev_fun = jax.jacrev(simulate_OAT, argnums=(0,), holomorphic=True)
+    if USE_JAX:
+        get_jacobian = jax.jacrev(simulate_OAT, argnums=(1,), holomorphic=True)
 
-    # check_grads(simulate_OAT, (params_jax,), 1,  modes=("rev"))
-    jac = jacrev_fun(args.params, args.num_qubits, args.dissipation)
+        # check_grads(simulate_OAT, (args.params,), 1,  modes=("rev"))
+        jacobian = get_jacobian(args.num_qubits, args.params, args.dissipation)
 
-    for i in range(jac[0].shape[0]):
-        for j in range(jac[0].shape[1]):
-            print("d(finalstate[", i, ",", j, "])/d(params)= ", jac[0][i][j])
+        for i in range(jacobian[0].shape[0]):
+            for j in range(jacobian[0].shape[1]):
+                print("d(finalstate[", i, ",", j, "])/d(params)= ", jacobian[0][i][j])
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # simulate the OAT potocol
