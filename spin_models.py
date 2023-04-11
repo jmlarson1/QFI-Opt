@@ -192,7 +192,7 @@ def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = N
     # construct the time derivative from coherent evolution
     if hamiltonian.ndim == 2:
         # ... with ordinary matrix multiplication
-        def coherent_time_deriv(density_op: np.ndarray) -> np.ndarray:
+        def coherent_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
             return -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
 
     else:
@@ -200,12 +200,12 @@ def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = N
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
         expanded_hamiltonian = np.expand_dims(hamiltonian, 1)
 
-        def coherent_time_deriv(density_op: np.ndarray) -> np.ndarray:
+        def coherent_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
             return -1j * (expanded_hamiltonian * density_op - density_op * hamiltonian)
 
     if not dissipator:
-        return lambda state, time: coherent_time_deriv(state)
-    return lambda state, time: coherent_time_deriv(state) + dissipator @ state
+        return coherent_time_deriv
+    return lambda state, time: coherent_time_deriv(state, time) + dissipator @ state
 
 
 @functools.cache
