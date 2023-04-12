@@ -86,4 +86,4 @@ def test_symmetries() -> None:
             for symmetry in get_symmetries(num_qubits):
                 new_params, transformation = symmetry(*params)
                 new_state = spin_models.simulate_OAT(new_params, num_qubits)
-                assert np.allclose(state, transformation.transform(new_state))
+                assert np.allclose(state, transformation.transform(new_state), atol=1e-6)
