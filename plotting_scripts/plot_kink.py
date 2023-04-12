@@ -9,8 +9,8 @@ sys.path.append("../")
 import spin_models
 
 N = 4
-noise = 1
-G = spin_models.collective_op(spin_models.pauli_Z, N) / (2 * N)
+dissipation = 1
+G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
 np.random.seed(6)
 x0 = np.random.uniform(0, 1, 4)
@@ -23,7 +23,7 @@ results = {}
 for i, alpha in enumerate(vals):
     params = alpha * x0 + (1 - alpha) * x1
 
-    rho = spin_models.simulate_OAT(N, params, noise)
+    rho = spin_models.simulate_OAT(params, N, dissipation)
 
     u, v = np.linalg.eig(rho)
     results[i] = [u, v]

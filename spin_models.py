@@ -176,10 +176,14 @@ def evolve_state(
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
     """
+    if time.real == 0:
+        return density_op
+
     # treat negative times as evolving under the negative of the Hamiltonian
     # NOTE: this is required for autodiff to work
     if time.real < 0:
         time, hamiltonian = -time, -hamiltonian
+
     times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
     result = ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)

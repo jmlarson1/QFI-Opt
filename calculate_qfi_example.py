@@ -48,6 +48,6 @@ if __name__ == "__main__":
     np.random.seed(0)
     for _ in range(10):
         params = np.random.uniform(0, 1, 4)
-        rho = spin_models.simulate_OAT(N, params, dissipation)
+        rho = spin_models.simulate_OAT(params, N, dissipation)
         qfi = compute_QFI(rho, G)
         print(f"QFI is {qfi} for {params}")

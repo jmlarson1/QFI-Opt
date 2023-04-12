@@ -82,8 +82,8 @@ def test_symmetries() -> None:
     for _ in range(10):  # test several random parameters
         params = np.random.random(4)
         for num_qubits in [2, 3]:  # test both even and odd qubit numbers
-            state = spin_models.simulate_OAT(num_qubits, params)
+            state = spin_models.simulate_OAT(params, num_qubits)
             for symmetry in get_symmetries(num_qubits):
                 new_params, transformation = symmetry(*params)
-                new_state = spin_models.simulate_OAT(num_qubits, new_params)
+                new_state = spin_models.simulate_OAT(new_params, num_qubits)
                 assert np.allclose(state, transformation.transform(new_state))
