@@ -51,7 +51,7 @@ if __name__ == "__main__":
             case 4:
                 models = ['simulate_OAT', 'simulate_ising_chain', 'simulate_XX_chain']
             case 5:
-                models = ['simulate_TAT','simulate_spin_chain','simulate_local_TAT_chain']
+                models = ['simulate_TAT','simulate_local_TAT_chain']
 
         for model in models:
             np.random.seed(0)
