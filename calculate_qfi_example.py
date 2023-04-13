@@ -58,6 +58,6 @@ if __name__ == "__main__":
             obj = getattr(spin_models, model)
             for _ in range(num_rand_pts):
                 params = np.random.uniform(0, 1, num_params)
-                rho = obj(params, N, dissipation)
+                rho = obj(params, N, dissipation_rates=dissipation)
                 qfi = compute_QFI(rho, G)
                 print(f"QFI is {qfi} for {params}")
