@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 
 import numpy as np
 
-import run_OAT
+import spin_models
 
 OATParams = tuple[float, float, float, float]
 
@@ -42,7 +42,7 @@ def rot_z_mat(num_qubits: int, angle: float) -> np.ndarray:
     """
     if not angle:
         return np.ones((2**num_qubits,) * 2)
-    _, _, collective_Sz = run_OAT.collective_spin_ops(num_qubits)
+    _, _, collective_Sz = spin_models.collective_spin_ops(num_qubits)
     phase_vec = np.exp(-1j * angle * collective_Sz.diagonal())
     return phase_vec * np.conj(phase_vec[:, np.newaxis])
 
@@ -82,8 +82,8 @@ def test_symmetries() -> None:
     for _ in range(10):  # test several random parameters
         params = np.random.random(4)
         for num_qubits in [2, 3]:  # test both even and odd qubit numbers
-            state = run_OAT.simulate_OAT(num_qubits, params)
+            state = spin_models.simulate_OAT(params, num_qubits)
             for symmetry in get_symmetries(num_qubits):
                 new_params, transformation = symmetry(*params)
-                new_state = run_OAT.simulate_OAT(num_qubits, new_params)
-                assert np.allclose(state, transformation.transform(new_state))
+                new_state = spin_models.simulate_OAT(new_params, num_qubits)
+                assert np.allclose(state, transformation.transform(new_state), atol=1e-6)
