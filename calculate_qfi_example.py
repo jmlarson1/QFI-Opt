@@ -54,10 +54,21 @@ if __name__ == "__main__":
                 models = ["simulate_TAT", "simulate_local_TAT_chain"]
 
         for model in models:
+            print(model)
             np.random.seed(0)
             obj = getattr(spin_models, model)
-            for _ in range(num_rand_pts):
-                params = np.random.uniform(0, 1, num_params)
-                rho = obj(params, N, dissipation_rates=dissipation)
-                qfi = compute_QFI(rho, G)
-                print(f"QFI is {qfi} for {params}")
+            # for _ in range(num_rand_pts):
+            #     params = np.random.uniform(0, 1, num_params)
+            #     rho = obj(params, N, dissipation_rates=dissipation)
+            #     qfi = compute_QFI(rho, G)
+            #     print(f"QFI is {qfi} for {params}")
+
+            params = 0.5 * np.ones(num_params)
+            rho = obj(params, N, dissipation_rates=dissipation)
+            qfi = compute_QFI(rho, G)
+            print(f"QFI is {qfi} for {params}")
+
+            params[-1] = 1.0
+            rho = obj(params, N, dissipation_rates=dissipation)
+            qfi = compute_QFI(rho, G)
+            print(f"QFI is {qfi} for {params}")
