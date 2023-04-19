@@ -68,6 +68,11 @@ if __name__ == "__main__":
             qfi = compute_QFI(rho, G)
             print(f"QFI is {qfi} for {params}")
 
+            params[-1] = 0.0
+            rho = obj(params, N, dissipation_rates=dissipation)
+            qfi = compute_QFI(rho, G)
+            print(f"QFI is {qfi} for {params}")
+
             params[-1] = 1.0
             rho = obj(params, N, dissipation_rates=dissipation)
             qfi = compute_QFI(rho, G)
