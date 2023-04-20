@@ -1,6 +1,7 @@
+import os
+
 import matplotlib.pyplot as plt
 import nlopt
-import os
 import numpy as np
 
 import spin_models
@@ -8,7 +9,7 @@ from calculate_qfi_example import compute_QFI
 
 
 def nlopt_wrapper(x, grad, obj, obj_params):
-    database = obj.__name__ + '_' + str(obj_params["N"]) + '_' + str(obj_params["dissipation"]) + "_database.npy"
+    database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
     match = 0
     if os.path.exists(database):
