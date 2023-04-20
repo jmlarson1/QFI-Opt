@@ -9,6 +9,7 @@ from calculate_qfi_example import compute_QFI
 
 
 def nlopt_wrapper(x, grad, obj, obj_params):
+    global all_f
     database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
     match = 0
@@ -30,11 +31,14 @@ def nlopt_wrapper(x, grad, obj, obj_params):
 
     qfi = compute_QFI(rho, obj_params["G"])
     print(x, qfi, flush=True)
+    all_f.append(qfi)
     return -1 * qfi  # negative because we are maximizing
 
 
-def run_nlopt(obj, obj_params, num_params):
-    opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
+def run_nlopt(obj, obj_params, num_params, solver):
+
+    opt = nlopt.opt(getattr(nlopt, solver), num_params)
+    # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
     # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
 
     opt.set_min_objective(lambda x, grad: nlopt_wrapper(x, grad, obj, obj_params))
@@ -78,4 +82,19 @@ if __name__ == "__main__":
             print(model)
             obj = getattr(spin_models, model)
 
-            run_nlopt(obj, obj_params, num_params)
+            for solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
+                filename = solver + "_" + model + ".txt"
+                if not os.path.exists(filename):
+                    global all_f
+                    all_f = []
+                    run_nlopt(obj, obj_params, num_params, solver)
+                    np.savetxt(filename, all_f)
+                else: 
+                    all_f = np.loadtxt(filename)
+
+                plt.plot(all_f, label=filename)
+
+    plt.legend()
+    plt.savefig("Results.png",dpi=300)
+    
+
