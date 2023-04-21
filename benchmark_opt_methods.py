@@ -8,14 +8,12 @@ import numpy as np
 import spin_models
 from calculate_qfi_example import compute_QFI
 
-
 sys.path.append("/home/jlarson/research/poptus/orbit/py")
 sys.path.append("/home/jlarson/research/poptus/minq/py/minq5/")
 sys.path.append("/home/jlarson/research/poptus/IBCDFO/pounders/py")
+from general_h_funs import identity_combine as combinemodels
 from orbit4py import ORBIT2
 from pounders import pounders
-from general_h_funs import identity_combine as combinemodels
-
 
 
 def nlopt_wrapper(x, grad, obj, obj_params):
@@ -44,8 +42,8 @@ def nlopt_wrapper(x, grad, obj, obj_params):
     all_f.append(qfi)
     return -1 * qfi  # negative because we are maximizing
 
-def run_orbit(obj, obj_params, num_params, x0):
 
+def run_orbit(obj, obj_params, num_params, x0):
     calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
     gtol = 1e-9  # Gradient tolerance used to stop the local minimization [1e-5]
     rbftype = "cubic"  # Type of RBF (multiquadric, cubic, Gaussian) ['cubic']
@@ -62,7 +60,10 @@ def run_orbit(obj, obj_params, num_params, x0):
     X = np.array(x0)
     F = np.array(calfun(X))
 
-    [X, F, xkin, nf, exitflag, xkin_mat, xkin_val] = ORBIT2(calfun, rbftype, gamma_m, n, max_evals, npmax, delta, maxdelta, trnorm, gtol, Low, Upp, nfs, X, F, xkin)
+    [X, F, xkin, nf, exitflag, xkin_mat, xkin_val] = ORBIT2(
+        calfun, rbftype, gamma_m, n, max_evals, npmax, delta, maxdelta, trnorm, gtol, Low, Upp, nfs, X, F, xkin
+    )
+
 
 def run_pounder(obj, obj_params, n, x0):
     calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
@@ -78,6 +79,7 @@ def run_pounder(obj, obj_params, n, x0):
     spsolver = 2
 
     [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
+
 
 def run_nlopt(obj, obj_params, num_params, x0, solver):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
