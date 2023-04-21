@@ -48,6 +48,7 @@ def run_nlopt(obj, obj_params, num_params, solver):
     lb = np.zeros(num_params)
     ub = np.ones(num_params)
     # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
+    # np.random.seed(0)
     np.random.seed(1)
     x0 = np.random.uniform(lb, ub, num_params)
 
@@ -82,6 +83,8 @@ if __name__ == "__main__":
             print(model)
             obj = getattr(spin_models, model)
 
+            plt.figure()
+
             for solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
                 filename = solver + "_" + model + ".txt"
                 if not os.path.exists(filename):
@@ -93,8 +96,7 @@ if __name__ == "__main__":
                     all_f = np.loadtxt(filename)
 
                 plt.plot(all_f, label=filename)
-
-    plt.legend()
-    plt.savefig("Results.png",dpi=300)
+            plt.legend()
+            plt.savefig("Results_" + model + ".png",dpi=300)
     
 
