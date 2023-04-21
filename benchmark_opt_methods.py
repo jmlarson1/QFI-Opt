@@ -77,7 +77,7 @@ def run_pounder(obj, obj_params, n, x0):
     nfs = 1
     printf = True
     spsolver = 2
-    gtol = 1e-9 
+    gtol = 1e-9
     xind = 0
     hfun = lambda F: F
 
