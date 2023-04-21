@@ -1,4 +1,5 @@
 import os
+import sys
 
 import matplotlib.pyplot as plt
 import nlopt
@@ -6,6 +7,15 @@ import numpy as np
 
 import spin_models
 from calculate_qfi_example import compute_QFI
+
+
+sys.path.append("/home/jlarson/research/poptus/orbit/py")
+sys.path.append("/home/jlarson/research/poptus/minq/py/minq5/")
+sys.path.append("/home/jlarson/research/poptus/IBCDFO/pounders/py")
+from orbit4py import ORBIT2
+from pounders import pounders
+from general_h_funs import identity_combine as combinemodels
+
 
 
 def nlopt_wrapper(x, grad, obj, obj_params):
@@ -34,8 +44,42 @@ def nlopt_wrapper(x, grad, obj, obj_params):
     all_f.append(qfi)
     return -1 * qfi  # negative because we are maximizing
 
+def run_orbit(obj, obj_params, num_params, x0):
 
-def run_nlopt(obj, obj_params, num_params, solver):
+    calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
+    gtol = 1e-9  # Gradient tolerance used to stop the local minimization [1e-5]
+    rbftype = "cubic"  # Type of RBF (multiquadric, cubic, Gaussian) ['cubic']
+    npmax = 2 * n + 1  # Maximum number of interpolation points [2*n+1]
+    trnorm = 0  # Type f trust-region norm [0]
+    Low = -5000 * np.ones(n)  # 1-by-n Vector of lower bounds [zeros(1,n)]
+    Upp = 5000 * np.ones(n)  # 1-by-n Vector of upper bounds [ones(1,n)]
+    gamma_m = 0.5  # Reduction factor = factor of the LHS points you'd start a local run from [.5]
+    maxdelta = np.inf
+    delta = 1
+    nfs = 1
+
+    xkin = 0
+    X = np.array(x0)
+    F = np.array(calfun(X))
+
+    [X, F, xkin, nf, exitflag, xkin_mat, xkin_val] = ORBIT2(calfun, rbftype, gamma_m, n, max_evals, npmax, delta, maxdelta, trnorm, gtol, Low, Upp, nfs, X, F, xkin)
+
+def run_pounder(obj, obj_params, n, x0):
+    calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
+    X = np.array(x0)
+    F = np.array(calfun(X))
+    Low = -np.inf * np.ones((1, n))
+    Upp = np.inf * np.ones((1, n))
+    mpmax = 2 * n + 1
+    delta = 0.1
+    m = 1
+    nfs = 1
+    printf = True
+    spsolver = 2
+
+    [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
+
+def run_nlopt(obj, obj_params, num_params, x0, solver):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
     # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
     # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
@@ -43,13 +87,6 @@ def run_nlopt(obj, obj_params, num_params, solver):
     opt.set_min_objective(lambda x, grad: nlopt_wrapper(x, grad, obj, obj_params))
     opt.set_xtol_rel(1e-4)
     opt.set_maxeval(500)
-
-    lb = np.zeros(num_params)
-    ub = np.ones(num_params)
-    # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
-    # np.random.seed(0)
-    np.random.seed(1)
-    x0 = np.random.uniform(lb, ub, num_params)
 
     # # Because the objective is periodic, don't set bounds (but don't need to sample so much)
     # opt.set_lower_bounds(lb)
@@ -72,6 +109,13 @@ if __name__ == "__main__":
     obj_params["G"] = G
 
     for num_params in [4, 5]:
+        lb = np.zeros(num_params)
+        ub = np.ones(num_params)
+        # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
+        # np.random.seed(0)
+        np.random.seed(1)
+        x0 = np.random.uniform(lb, ub, num_params)
+
         match num_params:
             case 4:
                 models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
@@ -84,12 +128,17 @@ if __name__ == "__main__":
 
             plt.figure()
 
-            for solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
+            for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
                 filename = solver + "_" + model + ".txt"
                 if not os.path.exists(filename):
                     global all_f
                     all_f = []
-                    run_nlopt(obj, obj_params, num_params, solver)
+                    if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
+                        run_nlopt(obj, obj_params, num_params, x0, solver)
+                    elif solver in ["ORBIT"]:
+                        run_orbit(obj, obj_params, num_params, x0)
+                    elif solver in ["POUNDER"]:
+                        run_pounder(obj, obj_params, num_params, x0)
                     np.savetxt(filename, all_f)
                 else:
                     all_f = np.loadtxt(filename)
