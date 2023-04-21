@@ -43,7 +43,7 @@ def nlopt_wrapper(x, grad, obj, obj_params):
     return -1 * qfi  # negative because we are maximizing
 
 
-def run_orbit(obj, obj_params, num_params, x0):
+def run_orbit(obj, obj_params, n, x0):
     calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
     gtol = 1e-9  # Gradient tolerance used to stop the local minimization [1e-5]
     rbftype = "cubic"  # Type of RBF (multiquadric, cubic, Gaussian) ['cubic']
@@ -77,6 +77,9 @@ def run_pounder(obj, obj_params, n, x0):
     nfs = 1
     printf = True
     spsolver = 2
+    gtol = 1e-9 
+    xind = 0
+    hfun = lambda F: F
 
     [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
 
@@ -88,7 +91,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
 
     opt.set_min_objective(lambda x, grad: nlopt_wrapper(x, grad, obj, obj_params))
     opt.set_xtol_rel(1e-4)
-    opt.set_maxeval(500)
+    opt.set_maxeval(max_evals)
 
     # # Because the objective is periodic, don't set bounds (but don't need to sample so much)
     # opt.set_lower_bounds(lb)
@@ -109,6 +112,8 @@ if __name__ == "__main__":
     obj_params["N"] = N
     obj_params["dissipation"] = 0
     obj_params["G"] = G
+
+    max_evals = 100
 
     for num_params in [4, 5]:
         lb = np.zeros(num_params)
