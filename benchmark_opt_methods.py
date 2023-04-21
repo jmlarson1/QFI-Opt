@@ -36,7 +36,6 @@ def nlopt_wrapper(x, grad, obj, obj_params):
 
 
 def run_nlopt(obj, obj_params, num_params, solver):
-
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
     # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
     # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
@@ -92,11 +91,9 @@ if __name__ == "__main__":
                     all_f = []
                     run_nlopt(obj, obj_params, num_params, solver)
                     np.savetxt(filename, all_f)
-                else: 
+                else:
                     all_f = np.loadtxt(filename)
 
                 plt.plot(all_f, label=filename)
             plt.legend()
-            plt.savefig("Results_" + model + ".png",dpi=300)
-    
-
+            plt.savefig("Results_" + model + ".png", dpi=300)
