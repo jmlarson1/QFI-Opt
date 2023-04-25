@@ -119,8 +119,8 @@ if __name__ == "__main__":
         lb = np.zeros(num_params)
         ub = np.ones(num_params)
         # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
-        # np.random.seed(0)
-        np.random.seed(1)
+        np.random.seed(0)
+        # np.random.seed(1)
         x0 = np.random.uniform(lb, ub, num_params)
 
         match num_params:
@@ -133,7 +133,6 @@ if __name__ == "__main__":
             print(model)
             obj = getattr(spin_models, model)
 
-            plt.figure()
 
             for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
                 filename = solver + "_" + model + ".txt"
@@ -150,6 +149,20 @@ if __name__ == "__main__":
                 else:
                     all_f = np.loadtxt(filename)
 
+                plt.figure(model)
                 plt.plot(all_f, label=filename)
+
+                for i in range(2,len(all_f)):
+                    all_f[i] = max(all_f[i-1],all_f[i])
+
+                plt.figure(model+'best')
+                plt.plot(all_f, label=filename)
+
+
+            plt.figure(model)
             plt.legend()
             plt.savefig("Results_" + model + ".png", dpi=300)
+
+            plt.figure(model+'best')
+            plt.legend()
+            plt.savefig("Results_" + model + "_best.png", dpi=300)
