@@ -108,8 +108,7 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for d in np.append([0],np.linspace(0.1,5,20)):
-
+    for d in np.append([0], np.linspace(0.1, 5, 20)):
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = d
@@ -121,7 +120,7 @@ if __name__ == "__main__":
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
-            for seed in [0,1]:
+            for seed in [0, 1]:
                 # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
                 np.random.seed(seed)
                 x0 = np.random.uniform(lb, ub, num_params)
@@ -139,9 +138,7 @@ if __name__ == "__main__":
                         continue
                     obj = getattr(spin_models, model)
 
-
                     for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
-
                         global all_f
                         all_f = []
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
@@ -154,19 +151,18 @@ if __name__ == "__main__":
                         plt.figure(fig_filename)
                         plt.plot(all_f, label=solver)
 
-                        for i in range(1,len(all_f)):
-                            all_f[i] = max(all_f[i-1],all_f[i])
+                        for i in range(1, len(all_f)):
+                            all_f[i] = max(all_f[i - 1], all_f[i])
 
-                        plt.figure(fig_filename+'best')
+                        plt.figure(fig_filename + "best")
                         plt.plot(all_f, label=solver)
-
 
                     plt.figure(fig_filename)
                     plt.legend()
                     plt.title(fig_filename)
                     plt.savefig(fig_filename + ".png", dpi=300)
 
-                    plt.figure(fig_filename+'best')
+                    plt.figure(fig_filename + "best")
                     plt.legend()
                     plt.title(fig_filename)
-                    plt.savefig(fig_filename+ "best" + ".png", dpi=300)
+                    plt.savefig(fig_filename + "best" + ".png", dpi=300)
