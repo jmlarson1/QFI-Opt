@@ -108,61 +108,65 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    obj_params = {}
-    obj_params["N"] = N
-    obj_params["dissipation"] = 0
-    obj_params["G"] = G
+    for d in np.append([0],np.linspace(0.1,5,20)):
 
-    max_evals = 100
+        obj_params = {}
+        obj_params["N"] = N
+        obj_params["dissipation"] = d
+        obj_params["G"] = G
 
-    for num_params in [4, 5]:
-        lb = np.zeros(num_params)
-        ub = np.ones(num_params)
-        # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
-        np.random.seed(0)
-        # np.random.seed(1)
-        x0 = np.random.uniform(lb, ub, num_params)
+        max_evals = 100
 
-        match num_params:
-            case 4:
-                models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
-            case 5:
-                models = ["simulate_TAT", "simulate_local_TAT_chain"]
+        for num_params in [4, 5]:
+            lb = np.zeros(num_params)
+            ub = np.ones(num_params)
 
-        for model in models:
-            print(model)
-            obj = getattr(spin_models, model)
+            for seed in [0,1]:
+                # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
+                np.random.seed(seed)
+                x0 = np.random.uniform(lb, ub, num_params)
 
+                match num_params:
+                    case 4:
+                        models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
+                    case 5:
+                        models = ["simulate_TAT", "simulate_local_TAT_chain"]
 
-            for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
-                filename = solver + "_" + model + ".txt"
-                if not os.path.exists(filename):
-                    global all_f
-                    all_f = []
-                    if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
-                        run_nlopt(obj, obj_params, num_params, x0, solver)
-                    elif solver in ["ORBIT"]:
-                        run_orbit(obj, obj_params, num_params, x0)
-                    elif solver in ["POUNDER"]:
-                        run_pounder(obj, obj_params, num_params, x0)
-                    np.savetxt(filename, all_f)
-                else:
-                    all_f = np.loadtxt(filename)
-
-                plt.figure(model)
-                plt.plot(all_f, label=filename)
-
-                for i in range(2,len(all_f)):
-                    all_f[i] = max(all_f[i-1],all_f[i])
-
-                plt.figure(model+'best')
-                plt.plot(all_f, label=filename)
+                for model in models:
+                    print(model)
+                    fig_filename = "Results_" + model + "_" + str(d) + "_" + str(seed)
+                    if os.path.exists(fig_filename + ".png"):
+                        continue
+                    obj = getattr(spin_models, model)
 
 
-            plt.figure(model)
-            plt.legend()
-            plt.savefig("Results_" + model + ".png", dpi=300)
+                    for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
 
-            plt.figure(model+'best')
-            plt.legend()
-            plt.savefig("Results_" + model + "_best.png", dpi=300)
+                        global all_f
+                        all_f = []
+                        if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
+                            run_nlopt(obj, obj_params, num_params, x0, solver)
+                        elif solver in ["ORBIT"]:
+                            run_orbit(obj, obj_params, num_params, x0)
+                        elif solver in ["POUNDER"]:
+                            run_pounder(obj, obj_params, num_params, x0)
+
+                        plt.figure(fig_filename)
+                        plt.plot(all_f, label=solver)
+
+                        for i in range(1,len(all_f)):
+                            all_f[i] = max(all_f[i-1],all_f[i])
+
+                        plt.figure(fig_filename+'best')
+                        plt.plot(all_f, label=solver)
+
+
+                    plt.figure(fig_filename)
+                    plt.legend()
+                    plt.title(fig_filename)
+                    plt.savefig(fig_filename + ".png", dpi=300)
+
+                    plt.figure(fig_filename+'best')
+                    plt.legend()
+                    plt.title(fig_filename)
+                    plt.savefig(fig_filename+ "best" + ".png", dpi=300)
