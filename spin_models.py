@@ -90,9 +90,9 @@ def simulate_sensing_protocol(
 def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
     """Decorator to enable an axially-symmetric version of a simulation method.
 
-    Axial symmetry means that the second parameter (which controls the axis of the first rotation) get be set to zero.
+    Axial symmetry means that the second parameter (which controls the axis of the first rotation) can be set to zero without loss of generality.
     For this reason, if the simulation method is run with `axial_symmetry=True` (which this decorator sets by default), then the method accepts only
-    four parameters rather than the usual five.  The method additionally checks that the dissipation rates respect the axial symmetry.
+    four parameters rather than the usual five.  The method additionally checks that the dissipation rates respect the axial symmetry, if applicable.
     """
 
     def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: Any, axial_symmetry: bool = True, **kwargs: Any):
