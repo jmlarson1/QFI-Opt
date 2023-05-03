@@ -104,7 +104,7 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
                 rate_sx, rate_sy, *_ = dissipation_rates
                 if not rate_sx == rate_sy:
                     raise ValueError(
-                        rf"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
+                        f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
                         "\nTry running passing the argument `axial_symmetry=False` to the simulation method."
                     )
 
@@ -129,7 +129,12 @@ def simulate_OAT(
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
     hamiltonian = collective_Sz.diagonal() ** 2 / num_qubits
-    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates=dissipation_rates, dissipation_format=dissipation_format)
+    return simulate_sensing_protocol(
+        params,
+        hamiltonian,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 def simulate_TAT(
@@ -142,7 +147,12 @@ def simulate_TAT(
     """Simulate a two-axis twisting (TAT) protocol."""
     collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
     hamiltonian = (collective_Sx @ collective_Sy + collective_Sy @ collective_Sx) / num_qubits
-    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates=dissipation_rates, dissipation_format=dissipation_format)
+    return simulate_sensing_protocol(
+        params,
+        hamiltonian,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 def simulate_spin_chain(
@@ -159,7 +169,12 @@ def simulate_spin_chain(
     hamiltonian = sum(
         act_on_subsystem(num_qubits, coupling_op, pp, qq) / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)
     )
-    return simulate_sensing_protocol(params, hamiltonian / normalization_factor, dissipation_rates=dissipation_rates, dissipation_format=dissipation_format)
+    return simulate_sensing_protocol(
+        params,
+        hamiltonian / normalization_factor,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 @enable_axial_symmetry
@@ -172,7 +187,14 @@ def simulate_ising_chain(
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates=dissipation_rates, dissipation_format=dissipation_format)
+    return simulate_spin_chain(
+        params,
+        num_qubits,
+        coupling_op,
+        coupling_exponent,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 @enable_axial_symmetry
@@ -185,7 +207,14 @@ def simulate_XX_chain(
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates=dissipation_rates, dissipation_format=dissipation_format)
+    return simulate_spin_chain(
+        params,
+        num_qubits,
+        coupling_op,
+        coupling_exponent,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 def simulate_local_TAT_chain(
@@ -197,7 +226,14 @@ def simulate_local_TAT_chain(
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_Y) + np.kron(PAULI_Y, PAULI_X)) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates=dissipation_rates, dissipation_format=dissipation_format)
+    return simulate_spin_chain(
+        params,
+        num_qubits,
+        coupling_op,
+        coupling_exponent,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 def evolve_state(
