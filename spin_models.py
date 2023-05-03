@@ -97,11 +97,6 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
 
     def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: Any, axial_symmetry: bool = True, **kwargs: Any):
         if axial_symmetry:
-            # Check that there are only four parameters (initial rotation angle, entangling time, final rotation angle + axis).
-            # Insert an initial rotation axis of 0 into the first location of the parameter array (at index 1).
-            assert len(params) == 4, "Spin sensing protocols with axial symmetry accept four parameters."
-            params = np.insert(np.array(params), 1, 0.0)
-
             # Verify that dissipation satisfies axial symmetry.
             dissipation_rates = kwargs.get("dissipation_rates", 0.0)
             dissipation_format = kwargs.get("dissipation_format", DEFAULT_DISSIPATION_FORMAT)
@@ -112,6 +107,11 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
                         rf"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
                         "\nTry running passing the argument `axial_symmetry=False` to the simulation method."
                     )
+
+            # Check that there are only four parameters (initial rotation angle, entangling time, final rotation angle + axis).
+            # Insert an initial rotation axis of 0 into the first location of the parameter array (at index 1).
+            assert len(params) == 4, "Spin sensing protocols with axial symmetry accept four parameters."
+            params = np.insert(np.array(params), 1, 0.0)
 
         return simulate_func(params, *args, **kwargs)
 
