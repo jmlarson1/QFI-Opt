@@ -95,7 +95,7 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
     four parameters rather than the usual five.  The method additionally checks that the dissipation rates respect the axial symmetry, if applicable.
     """
 
-    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: Any, axial_symmetry: bool = True, **kwargs: Any):
+    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: Any, axial_symmetry: bool = True, **kwargs: Any) -> np.ndarray:
         if axial_symmetry:
             # Verify that dissipation satisfies axial symmetry.
             dissipation_rates = kwargs.get("dissipation_rates", 0.0)
