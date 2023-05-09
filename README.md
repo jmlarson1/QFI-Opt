@@ -1,9 +1,5 @@
 ![image info](./images/qfi-opt.png)
 
-=======
-QFI-Opt
-=======
-
 This repository contains codes for optimizing the [quantum fisher information (QFI)](https://en.wikipedia.org/wiki/Quantum_Fisher_information) of quantum systems.
 
 Python library dependencies for this repository specified in `requirements.txt`, and can be installed with `pip install -r requirements.txt`.  These requirements are currently rather strict, but will be relaxed eventually.
