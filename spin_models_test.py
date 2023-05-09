@@ -2,7 +2,8 @@ import dataclasses
 import functools
 from typing import Callable, List, Optional
 
-import numpy as np
+import numpy
+import jax.numpy as np
 
 import spin_models
 
@@ -80,7 +81,7 @@ def get_symmetries(num_qubits: int) -> List[Callable[[float, float, float, float
 def test_symmetries() -> None:
     """Test the symmetry transformations that we used to cut down the domain of the parameters for the OAT protocol."""
     for _ in range(10):  # test several random parameters
-        params = np.random.random(4)
+        params = numpy.random.random(4)
         for num_qubits in [2, 3]:  # test both even and odd qubit numbers
             state = spin_models.simulate_OAT(params, num_qubits)
             for symmetry in get_symmetries(num_qubits):

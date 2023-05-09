@@ -24,10 +24,10 @@ for i in range(num_pts):
     for j in range(num_pts):
         #     for k in range(num_pts):
         #         params = np.array([x[i,j,k], y[i,j,k], z[i,j,k], 0])
-        #         rho = spin_models.simulate_OAT(params, N, dissipation)
+        #         rho = spin_models.simulate_OAT(params, N, dissipation_rates=dissipation)
         #         qfi = compute_QFI(rho, G)
         params = np.array([0.5, y[i, j], z[i, j], 0])
-        rho = spin_models.simulate_OAT(params, N, dissipation)
+        rho = spin_models.simulate_OAT(params, N, dissipation_rates=dissipation)
         qfi = compute_QFI(rho, G)
         obj_vals[i, j] = qfi
 
