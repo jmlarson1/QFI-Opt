@@ -352,8 +352,6 @@ if __name__ == "__main__":
     parser.add_argument("--jacobian", action="store_true", default=False)
     args = parser.parse_args(sys.argv[1:])
 
-    args.dissipation = (0, 1, 2)
-
     # convert the parameters into a complex array, which is necessary for autodiff capabilities
     args.params = np.array(args.params, dtype=COMPLEX_TYPE)
 
