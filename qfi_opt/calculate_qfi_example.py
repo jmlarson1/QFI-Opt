@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import itertools
-
 import numpy as np
 
 from qfi_opt import spin_models
