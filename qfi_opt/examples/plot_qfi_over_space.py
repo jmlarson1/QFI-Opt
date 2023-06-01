@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from qfi_opt import spin_models
-from qfi_opt.calculate_qfi_example import compute_QFI
+from qfi_opt.examples.calculate_qfi import compute_QFI
 
 N = 4
 dissipation = 0
