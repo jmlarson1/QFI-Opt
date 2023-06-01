@@ -1,0 +1,35 @@
+# general package info
+[project]
+name = "QFI-Opt"
+version = "0.0.1"
+description = "This repository contains codes for optimizing the quantum fisher information (QFI) of quantum systems."
+authors = [
+    {name = "Jeffrey Larson", email = "jmlarson@anl.gov"},
+    {name = "Sri Hari Krishna Narayanan", email = "snarayan@anl.gov"},
+    {name = "Michael A. Perlin", email = "mika.perlin@gmail.com"},
+    {name = "Robert J. Lewis-Swan", email = "lewisswan@ou.edu"},
+]
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["quantum fisher information", "QFI"]
+dynamic = ["dependencies", "optional-dependencies"]
+
+# setuptools and associated options
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["qfi_opt"]
+
+[tool.setuptools.dynamic.dependencies]
+file = ["requirements.txt"]
+
+[tool.setuptools.dynamic.optional-dependencies.dev]
+file = ["dev-requirements.txt"]
+
+# miscellaneous package configuration options
+
+[tool.black]
+line-length = 160

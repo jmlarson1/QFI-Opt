@@ -26,7 +26,7 @@ def run(
     files = parsed_args.files or check_utils.get_tracked_files(include, exclude)
 
     diff_check_args = ["--diff", "--check"] if not parsed_args.apply else []
-    returncode_black = subprocess.call(["cblack", "--color", *files, *diff_check_args], cwd=check_utils.root_dir)
+    returncode_black = subprocess.call(["black", "--color", *files, *diff_check_args], cwd=check_utils.root_dir)
 
     if returncode_black > 1:
         # this only occurs if black could not parse a file (for example due to a syntax error)

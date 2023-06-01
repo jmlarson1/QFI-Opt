@@ -1,4 +1,3 @@
-configparser-black~=0.2.0
 black[jupyter]~=23.1.0
 flake8~=5.0.4
 isort[colors]~=5.10.1

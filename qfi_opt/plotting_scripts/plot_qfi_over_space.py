@@ -4,10 +4,8 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
-sys.path.append("../")
-
-import spin_models
-from calculate_qfi_example import compute_QFI
+from qfi_opt import spin_models
+from qfi_opt.calculate_qfi_example import compute_QFI
 
 N = 4
 dissipation = 0

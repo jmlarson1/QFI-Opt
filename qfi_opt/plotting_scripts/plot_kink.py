@@ -4,9 +4,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
-sys.path.append("../")
-
-import spin_models
+from qfi_opt import spin_models
 
 N = 4
 dissipation = 1
