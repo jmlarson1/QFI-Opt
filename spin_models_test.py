@@ -19,7 +19,7 @@ class Transformation:
     conjugate: bool = False
 
     def transform(self, state: np.ndarray) -> np.ndarray:
-        num_qubits = int(np.log2(state.shape[0]))
+        num_qubits = spin_models.log2_int(state.shape[0])
         new_state = state.copy()
         if self.flip_z:
             # apply the global spin rotation 'Rz(pi)'
