@@ -5,7 +5,7 @@ from typing import Callable, List, Optional
 import numpy
 import jax.numpy as np
 
-import spin_models
+from qfi_opt import spin_models
 
 OATParams = tuple[float, float, float, float]
 
