@@ -4,5 +4,6 @@ __all__ = [
     "__version__",
     "dissipation",
     "examples",
+    "ode_jax",
     "spin_models",
 ]
