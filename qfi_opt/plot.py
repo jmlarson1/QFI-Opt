@@ -103,7 +103,6 @@ def husimi(  # type: ignore[no-untyped-def]
         axes = [figure.add_subplot(111, projection="3d")]
     else:
         axes = [figure.add_subplot(121, projection="3d"), figure.add_subplot(122, projection="3d")]
-    print(type(axes[0]))
 
     for axis, side in zip(axes, [+1, -1]):
         axis.plot_surface(side * x_vals, side * y_vals, z_vals, rstride=1, cstride=1, facecolors=color_map, rasterized=rasterized, shade=shade)
