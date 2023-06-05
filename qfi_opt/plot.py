@@ -20,28 +20,33 @@ except ModuleNotFoundError:
         return plt.get_cmap("inferno")(color_vals)
 
 
-def get_net_spin_projections(state: np.ndarray) -> dict[float, np.ndarray]:
-    """Compute the projections of a state onto manifolds of fixed net spin S."""
+def get_spin_length_projections(state: np.ndarray) -> dict[float, np.ndarray]:
+    """Compute the projections of a state onto manifolds of fixed spin length S.
+
+    More specifically, compute the dictionry `{S: state_S for S in spin_length_vals}`, where
+    - `state_S` = `P_S state P_S`, and
+    - `P_S` is a projector onto the manifold with fixed spin length S.
+    """
     num_qubits = spin_models.log2_int(state.shape[0])
-    net_spin_projectors = get_net_spin_projectors(num_qubits)
-    return {val: proj @ state @ proj for val, proj in net_spin_projectors.items()}
+    spin_length_projectors = get_spin_length_projectors(num_qubits)
+    return {val: proj @ state @ proj for val, proj in spin_length_projectors.items()}
 
 
 @functools.cache
-def get_net_spin_projectors(num_qubits: int) -> dict[float, np.ndarray]:
-    """Construct projectors onto manifolds of fixed net spin S."""
+def get_spin_length_projectors(num_qubits: int) -> dict[float, np.ndarray]:
+    """Construct projectors onto manifolds of fixed spin length S."""
     spin_x, spin_y, spin_z = spin_models.collective_spin_ops(num_qubits)
     vals, vecs = np.linalg.eigh(spin_x @ spin_x + spin_y @ spin_y + spin_z @ spin_z)
     vals = np.round(np.sqrt(4 * vals + 1) - 1) / 2
 
     projectors: dict[float, np.ndarray] = collections.defaultdict(lambda: np.zeros((2**num_qubits,) * 2, dtype=complex))
-    for net_spin_val, net_spin_vec in zip(vals, vecs.T):
-        projectors[net_spin_val] += np.outer(net_spin_vec, net_spin_vec.conj())
+    for spin_length_val, spin_length_vec in zip(vals, vecs.T):
+        projectors[spin_length_val] += np.outer(spin_length_vec, spin_length_vec.conj())
     return projectors
 
 
 def axis_spin_op(theta: float, phi: float, num_qubits: int) -> np.ndarray:
-    """Construct the spin operator along a given axis."""
+    """Construct the spin operator oriented along a given axis."""
     spin_x, spin_y, spin_z = spin_models.collective_spin_ops(num_qubits)
     return np.cos(theta) * spin_z + np.sin(theta) * (np.cos(phi) * spin_x + np.sin(phi) * spin_y)
 
@@ -49,21 +54,21 @@ def axis_spin_op(theta: float, phi: float, num_qubits: int) -> np.ndarray:
 def get_polarization(state_projections: dict[float, np.ndarray], theta: float, phi: float, cutoff: float = 1e-3) -> float:
     """
     Compute the polarization of a given state in the given direction.
+    The polarization is defined by the average over all Husimi probability distribution functions (averaged over manifolds with fixed spin length S).
 
-    The state is provided by its projections onto manifolds with fixed net spin S.
+    The input state is a dictionary of the full state's projections onto manifolds of fixed spin length S.
     """
     num_qubits = spin_models.log2_int(next(iter(state_projections.values())).shape[0])
-    max_spin_val = num_qubits / 2
     spin_op = axis_spin_op(theta, phi, num_qubits)
     spin_op_vals, spin_op_vecs = np.linalg.eigh(spin_op)
 
     polarization = 0
-    for net_spin_val, state_projection in state_projections.items():
-        weight = net_spin_val / max_spin_val
+    for spin_length_val, state_projection in state_projections.items():
+        weight = 2 * spin_length_val + 1  # normalization factor for Husimi probability distribution
         if weight * np.trace(state_projection) < cutoff:
             continue
 
-        max_spin_indices = np.isclose(spin_op_vals, net_spin_val)
+        max_spin_indices = np.isclose(spin_op_vals, spin_length_val)
         for spin_op_vec in spin_op_vecs[:, max_spin_indices].T:
             polarization += weight * (spin_op_vec.conj() @ state_projection @ spin_op_vec).real
 
@@ -90,7 +95,7 @@ def husimi(  # type: ignore[no-untyped-def]
     x_vals = np.sin(theta) * np.cos(phi)
     y_vals = np.sin(theta) * np.sin(phi)
 
-    state_projections = get_net_spin_projections(state)
+    state_projections = get_spin_length_projections(state)
     color_vals = np.vectorize(functools.partial(get_polarization, state_projections))(theta, phi)
     vmax = np.max(abs(color_vals)) if not color_max else color_max
     norm = mpl.colors.Normalize(vmax=vmax, vmin=0)
