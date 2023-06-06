@@ -2,7 +2,7 @@
 
 This repository contains codes for optimizing the [quantum fisher information (QFI)](https://en.wikipedia.org/wiki/Quantum_Fisher_information) of quantum systems.
 
-You can install this repository as a local Python package named `qfi_opt` by running `pip install .` in the root directory of this repository.  Run `pip install '.[dev]'` to additionally install developer tools.
+You can install this repository as a local Python package named `qfi_opt` by running `pip install .` in the root directory of this repository.  Run `pip install -e '.[dev]'` to additionally install developer tools and make the installation reflect local changes to the repo.
 
 There are four test scripts that check python codes in this repository:
 - `check/format_.py` tests adherence to [`black`](https://black.readthedocs.io/en/stable/) and [`isort`](https://pycqa.github.io/isort/) formatting guidelines.  If this test fails, you can run `check/format_.py --apply` to apply the corresponding fixes.
