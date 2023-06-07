@@ -4,13 +4,13 @@ name = "QFI-Opt"
 version = "0.0.1"
 description = "This repository contains codes for optimizing the quantum fisher information (QFI) of quantum systems."
 authors = [
-    {name = "Jeffrey Larson", email = "jmlarson@anl.gov"},
-    {name = "Robert J. Lewis-Swan", email = "lewisswan@ou.edu"},
-    {name = "Sri Hari Krishna Narayanan", email = "snarayan@anl.gov"},
-    {name = "Michael A. Perlin", email = "mika.perlin@gmail.com"},
+  { name = "Jeffrey Larson", email = "jmlarson@anl.gov" },
+  { name = "Robert J. Lewis-Swan", email = "lewisswan@ou.edu" },
+  { name = "Sri Hari Krishna Narayanan", email = "snarayan@anl.gov" },
+  { name = "Michael A. Perlin", email = "mika.perlin@gmail.com" },
 ]
 readme = "README.md"
-license = {file = "LICENSE.txt"}
+license = { file = "LICENSE.txt" }
 requires-python = ">=3.10"
 keywords = ["quantum fisher information", "QFI"]
 dynamic = ["dependencies", "optional-dependencies"]
@@ -54,7 +54,13 @@ no_implicit_optional = true
 [tool.flake8]
 max-line-length = 160
 max-complexity = 10
-extend-ignore = ["E203", "I100", "I101", "I201", "I202"]  # these errors conflict with black and/or isort
 show_source = true
 statistics = true
 count = true
+extend-ignore = [
+  "E203",
+  "I100",
+  "I101",
+  "I201",
+  "I202",
+] # these errors conflict with black and/or isort
