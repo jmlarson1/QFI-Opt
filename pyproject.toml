@@ -5,9 +5,9 @@ version = "0.0.1"
 description = "This repository contains codes for optimizing the quantum fisher information (QFI) of quantum systems."
 authors = [
     {name = "Jeffrey Larson", email = "jmlarson@anl.gov"},
+    {name = "Robert J. Lewis-Swan", email = "lewisswan@ou.edu"},
     {name = "Sri Hari Krishna Narayanan", email = "snarayan@anl.gov"},
     {name = "Michael A. Perlin", email = "mika.perlin@gmail.com"},
-    {name = "Robert J. Lewis-Swan", email = "lewisswan@ou.edu"},
 ]
 readme = "README.md"
 license = {file = "LICENSE.txt"}
