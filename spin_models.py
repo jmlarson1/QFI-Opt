@@ -33,9 +33,9 @@ def log2_int(val: int) -> int:
 def simulate_sensing_protocol(
     params: Sequence[float] | np.ndarray,
     entangling_hamiltonian: np.ndarray,
+    *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = False,
 ) -> np.ndarray:
     """
     Simulate a sensing protocol, and return the final state (density matrix).
@@ -49,8 +49,6 @@ def simulate_sensing_protocol(
     Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * num_qubits * np.pi'.
     Step 3 rotates by an angle '-np.pi * params[3]', about the axis '2 * np.pi * params[4]'.
 
-    If 'axial_symmetry == True', then a 0 is inserted into the second position of 'params'.
-
     If dissipation_rates is nonzero, qubits experience dissipation during the entangling step (2).
     See the documentation for the Dissipator class for a general explanation of the
     dissipation_rates and dissipation_format arguments.
@@ -61,9 +59,7 @@ def simulate_sensing_protocol(
     dissipation rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes
     with probability 'e^(-params[2] * r)' by the end of the OAT protocol.
     """
-    if axial_symmetry:
-        params = np.insert(np.array(params), 1, 0.0)
-    assert len(params) == 5
+    assert len(params) == 5, "Spin sensing protocols accept five parameters."
 
     num_qubits = log2_int(entangling_hamiltonian.shape[0])
 
@@ -91,28 +87,72 @@ def simulate_sensing_protocol(
     return state_3
 
 
+def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
+    """Decorator to enable an axially-symmetric version of a simulation method.
+
+    Axial symmetry means that the second parameter (which controls the axis of the first rotation) can be set to zero without loss of generality.
+    For this reason, if the simulation method is run with `axial_symmetry=True` (which this decorator sets by default), then the method accepts only
+    four parameters rather than the usual five.  The method additionally checks that the dissipation rates respect the axial symmetry, if applicable.
+    """
+
+    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: Any, axial_symmetry: bool = True, **kwargs: Any) -> np.ndarray:
+        if axial_symmetry:
+            # Verify that dissipation satisfies axial symmetry.
+            dissipation_rates = kwargs.get("dissipation_rates", 0.0)
+            dissipation_format = kwargs.get("dissipation_format", DEFAULT_DISSIPATION_FORMAT)
+            if dissipation_format == "XYZ" and hasattr(dissipation_rates, "__iter__"):
+                rate_sx, rate_sy, *_ = dissipation_rates
+                if not rate_sx == rate_sy:
+                    raise ValueError(
+                        f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
+                        "\nTry running passing the argument `axial_symmetry=False` to the simulation method."
+                    )
+
+            # Check that there are only four parameters (initial rotation angle, entangling time, final rotation angle + axis).
+            # Insert an initial rotation axis of 0 into the first location of the parameter array (at index 1).
+            assert len(params) == 4, "Spin sensing protocols with axial symmetry accept four parameters."
+            params = np.insert(np.array(params), 1, 0.0)
+
+        return simulate_func(params, *args, **kwargs)
+
+    return simulate_func_with_symmetry
+
+
+@enable_axial_symmetry
 def simulate_OAT(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
+    *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
     hamiltonian = collective_Sz.diagonal() ** 2 / num_qubits
-    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format, axial_symmetry=True)
+    return simulate_sensing_protocol(
+        params,
+        hamiltonian,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 def simulate_TAT(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
+    *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     """Simulate a two-axis twisting (TAT) protocol."""
     collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
     hamiltonian = (collective_Sx @ collective_Sy + collective_Sy @ collective_Sx) / num_qubits
-    return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format)
+    return simulate_sensing_protocol(
+        params,
+        hamiltonian,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 def simulate_spin_chain(
@@ -120,49 +160,80 @@ def simulate_spin_chain(
     num_qubits: int,
     coupling_op: np.ndarray,
     coupling_exponent: float = 0.0,
+    *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = False,
 ) -> np.ndarray:
     """Simulate an entangling protocol for a spin chain with power-law interactions."""
     normalization_factor = num_qubits * np.array([1 / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)]).mean()
     hamiltonian = sum(
         act_on_subsystem(num_qubits, coupling_op, pp, qq) / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)
     )
-    return simulate_sensing_protocol(params, hamiltonian / normalization_factor, dissipation_rates, dissipation_format, axial_symmetry=axial_symmetry)
+    return simulate_sensing_protocol(
+        params,
+        hamiltonian / normalization_factor,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
+@enable_axial_symmetry
 def simulate_ising_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
     coupling_exponent: float = 0.0,
+    *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, axial_symmetry=True)
+    return simulate_spin_chain(
+        params,
+        num_qubits,
+        coupling_op,
+        coupling_exponent,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
+@enable_axial_symmetry
 def simulate_XX_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
     coupling_exponent: float = 0.0,
+    *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format, axial_symmetry=True)
+    return simulate_spin_chain(
+        params,
+        num_qubits,
+        coupling_op,
+        coupling_exponent,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 def simulate_local_TAT_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
     coupling_exponent: float = 0.0,
+    *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_Y) + np.kron(PAULI_Y, PAULI_X)) / 2
-    return simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent, dissipation_rates, dissipation_format)
+    return simulate_spin_chain(
+        params,
+        num_qubits,
+        coupling_op,
+        coupling_exponent,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 
 def evolve_state(
@@ -286,13 +357,13 @@ if __name__ == "__main__":
 
     if args.jacobian:
         get_jacobian = get_jacobian_func(simulate_OAT)
-        jacobian = get_jacobian(args.params, args.num_qubits, args.dissipation)
+        jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
         for pp in range(len(args.params)):
             print(f"d(final_state/d(params[{pp}]):")
             print(jacobian[:, :, pp])
 
     # simulate the OAT potocol
-    final_state = simulate_OAT(args.params, args.num_qubits, args.dissipation)
+    final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
 
     # compute collective Pauli operators
     mean_X = collective_op(PAULI_X, args.num_qubits) / args.num_qubits

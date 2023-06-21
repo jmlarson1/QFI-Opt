@@ -23,7 +23,7 @@ results = {}
 for i, alpha in enumerate(vals):
     params = alpha * x0 + (1 - alpha) * x1
 
-    rho = spin_models.simulate_OAT(params, N, dissipation)
+    rho = spin_models.simulate_OAT(params, N, dissipation_rates=dissipation)
 
     u, v = np.linalg.eig(rho)
     results[i] = [u, v]

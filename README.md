@@ -1,4 +1,4 @@
-# qfi-opt
+![image info](./images/qfi-opt.png)
 
 This repository contains codes for optimizing the [quantum fisher information (QFI)](https://en.wikipedia.org/wiki/Quantum_Fisher_information) of quantum systems.
 
