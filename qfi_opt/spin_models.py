@@ -369,7 +369,7 @@ if __name__ == "__main__":
     # simulate a TAT protocol
     args.params = np.insert(args.params, 1, 1)
     final_state = simulate_TAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
-    cat_state_fidelity = sum(abs(final_state[ii, jj]).real ** 2 for ii in [0, -1] for jj in [0, -1])
+    cat_state_fidelity = 0.5 * sum(abs(final_state[ii, jj]).real for ii in [0, -1] for jj in [0, -1])
 
     print("cat state fidelity:", cat_state_fidelity)
 
