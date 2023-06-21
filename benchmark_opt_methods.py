@@ -10,10 +10,9 @@ from calculate_qfi_example import compute_QFI
 
 sys.path.append("/home/jlarson/research/poptus/orbit/py")
 sys.path.append("/home/jlarson/research/poptus/minq/py/minq5/")
-sys.path.append("/home/jlarson/research/poptus/IBCDFO/pounders/py")
-from general_h_funs import identity_combine as combinemodels
+from ibcdfo import pounders
+from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
 from orbit4py import ORBIT2
-from pounders import pounders
 
 
 def nlopt_wrapper(x, grad, obj, obj_params):
@@ -116,7 +115,7 @@ if __name__ == "__main__":
 
         max_evals = 100
 
-        for num_params in [4, 5]:
+        for num_params in [5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
@@ -129,7 +128,7 @@ if __name__ == "__main__":
                     case 4:
                         models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
                     case 5:
-                        models = ["simulate_TAT", "simulate_local_TAT_chain"]
+                        models = ["simulate_TAT"]
 
                 for model in models:
                     print(model)
@@ -138,7 +137,7 @@ if __name__ == "__main__":
                         continue
                     obj = getattr(spin_models, model)
 
-                    for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
+                    for solver in ["LN_BOBYQA", "POUNDER"]:
                         global all_f
                         all_f = []
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
