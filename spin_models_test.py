@@ -2,8 +2,8 @@ import dataclasses
 import functools
 from typing import Callable, List, Optional
 
-import numpy
 import jax.numpy as np
+import numpy
 
 import spin_models
 
