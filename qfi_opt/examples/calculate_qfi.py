@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-import itertools
-
 import numpy as np
 
-import spin_models
+from qfi_opt import spin_models
 
 
 def variance(rho: np.ndarray, G: np.ndarray) -> float:

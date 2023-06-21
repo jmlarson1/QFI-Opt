@@ -1,0 +1,66 @@
+# general package info
+[project]
+name = "QFI-Opt"
+version = "0.0.1"
+description = "This repository contains codes for optimizing the quantum fisher information (QFI) of quantum systems."
+authors = [
+  { name = "Jeffrey Larson", email = "jmlarson@anl.gov" },
+  { name = "Robert J. Lewis-Swan", email = "lewisswan@ou.edu" },
+  { name = "Sri Hari Krishna Narayanan", email = "snarayan@anl.gov" },
+  { name = "Michael A. Perlin", email = "mika.perlin@gmail.com" },
+]
+readme = "README.md"
+license = { file = "LICENSE.txt" }
+requires-python = ">=3.10"
+keywords = ["quantum fisher information", "QFI"]
+dynamic = ["dependencies", "optional-dependencies"]
+
+# setuptools and associated options
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["qfi_opt*"]
+
+[tool.setuptools.dynamic.dependencies]
+file = ["requirements.txt"]
+
+[tool.setuptools.dynamic.optional-dependencies.dev]
+file = ["dev-requirements.txt"]
+
+# miscellaneous package configuration options
+
+[tool.black]
+color = true
+line_length = 160
+
+[tool.isort]
+profile = "black"
+line_length = 160
+color_output = true
+
+[tool.mypy]
+ignore_missing_imports = true
+show_error_codes = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+install_types = true
+non_interactive = true
+no_implicit_optional = true
+
+[tool.flake8]
+max-line-length = 160
+max-complexity = 10
+show_source = true
+statistics = true
+count = true
+extend-ignore = [
+  "E203",
+  "I100",
+  "I101",
+  "I201",
+  "I202",
+] # these errors conflict with black and/or isort

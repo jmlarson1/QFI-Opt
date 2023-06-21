@@ -8,8 +8,8 @@ from typing import Any, Callable, Optional, Sequence
 import jax
 import jax.numpy as np
 
-import ode_jax
-from dissipation import Dissipator
+from qfi_opt import ode_jax
+from qfi_opt.dissipation import Dissipator
 
 jax.config.update("jax_enable_x64", True)
 

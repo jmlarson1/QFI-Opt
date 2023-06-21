@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import nlopt
 import numpy as np
 
-import spin_models
-from calculate_qfi_example import compute_QFI
+from qfi_opt import spin_models
+from qfi_opt.examples.calculate_qfi import compute_QFI
 
 sys.path.append("/home/jlarson/research/poptus/orbit/py")
 sys.path.append("/home/jlarson/research/poptus/minq/py/minq5/")
