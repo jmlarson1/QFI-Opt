@@ -10,7 +10,7 @@ from calculate_qfi_example import compute_QFI
 
 sys.path.append("/home/jlarson/research/poptus/orbit/py")
 sys.path.append("/home/jlarson/research/poptus/minq/py/minq5/")
-from ibcdfo import pounders
+from ibcdfo.pounders import pounders
 from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
 from orbit4py import ORBIT2
 
