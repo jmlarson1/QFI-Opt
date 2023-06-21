@@ -8,7 +8,6 @@ import numpy as np
 import spin_models
 from calculate_qfi_example import compute_QFI
 
-
 sys.path.append("/home/jlarson/research/poptus/orbit/py")
 sys.path.append("/home/jlarson/research/poptus/minq/py/minq5/")
 from ibcdfo import pounders
