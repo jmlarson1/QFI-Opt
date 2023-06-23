@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional, Sequence
 import jax
 import jax.numpy as np
 
-from qfi_opt import ode_jax
+import qfi_opt
 from qfi_opt.dissipation import Dissipator
 
 jax.config.update("jax_enable_x64", True)
@@ -257,7 +257,7 @@ def evolve_state(
 
     times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
-    result = ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)
+    result = qfi_opt.ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)
     return result[-1]
 
 
@@ -362,25 +362,27 @@ if __name__ == "__main__":
             print(f"d(final_state/d(params[{pp}]):")
             print(jacobian[:, :, pp])
 
-    #############################################################
+    ################################################################################################
+    # EXAMPLE USAGE OF PLOTTING METHODS
+
     # # simulate the OAT potocol
     # final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
 
-    # simulate a TAT protocol
+    # Simulate a TAT protocol.
+    # This propocol needs 5 arguments, but Jeff has been optimizing over 4, with the second parameter fixed to 1,
+    # so inject a 1 into the second entry of the parameter vector.
     args.params = np.insert(args.params, 1, 1)
     final_state = simulate_TAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
-    cat_state_fidelity = 0.5 * sum(abs(final_state[ii, jj]).real for ii in [0, -1] for jj in [0, -1])
 
+    cat_state_fidelity = 0.5 * sum(abs(final_state[ii, jj]) for ii in [0, -1] for jj in [0, -1])
     print("cat state fidelity:", cat_state_fidelity)
 
     import matplotlib.pyplot as plt
 
-    from qfi_opt import plot
-
-    plot.husimi(final_state)
-    plot.histogram(final_state)
+    qfi_opt.plot.husimi(final_state)
+    qfi_opt.plot.histogram(final_state)
     plt.show()
-    #############################################################
+    ################################################################################################
 
     # compute collective Pauli operators
     mean_X = collective_op(PAULI_X, args.num_qubits) / args.num_qubits
