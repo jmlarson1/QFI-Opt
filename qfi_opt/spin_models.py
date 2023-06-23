@@ -378,6 +378,7 @@ if __name__ == "__main__":
     from qfi_opt import plot
 
     plot.husimi(final_state)
+    plot.histogram(final_state)
     plt.show()
     #############################################################
 

@@ -88,7 +88,7 @@ def husimi(  # type: ignore[no-untyped-def]
     if figsize is None:
         figsize = plt.figaspect(1 if single_sphere else 0.5)
 
-    # initialize grid and color map
+    ### initialize grid and color map
 
     theta, phi = np.meshgrid(np.linspace(0, np.pi, grid_size), np.linspace(0, 2 * np.pi, grid_size))
     z_vals = np.cos(theta)
@@ -101,7 +101,7 @@ def husimi(  # type: ignore[no-untyped-def]
     norm = mpl.colors.Normalize(vmax=vmax, vmin=0)
     color_map = sphere_cmap(norm(color_vals))
 
-    # plot sphe
+    ### plot sphere
 
     figure = plt.figure(figsize=figsize)
     if single_sphere:
@@ -112,7 +112,7 @@ def husimi(  # type: ignore[no-untyped-def]
     for axis, side in zip(axes, [+1, -1]):
         axis.plot_surface(side * x_vals, side * y_vals, z_vals, rstride=1, cstride=1, facecolors=color_map, rasterized=rasterized, shade=shade)
 
-    # clean up figure
+    ### clean up figure
 
     elev, azim = view_angles
     ax_lims = np.array([-1, 1]) * 0.7
@@ -130,3 +130,31 @@ def husimi(  # type: ignore[no-untyped-def]
     rect = [left, bottom, right, top]
     figure.tight_layout(pad=0, w_pad=0, h_pad=0, rect=rect)
     return figure, axes
+
+
+def histogram(  # type: ignore[no-untyped-def]
+    state: np.ndarray,
+    figsize: tuple[int, int] = (4, 3),
+):
+    """Plot the distribution function over collective-Sz measurement outcomes."""
+    num_spins = spin_models.log2_int(state.shape[0])
+    state_tensor = np.reshape(state, (2,) * num_spins * 2)
+
+    ### collect the probabilities for different numbers of |1> states
+
+    probabilities = np.zeros(num_spins + 1)
+    for bitstring in np.ndindex((2,) * num_spins):
+        num_spins_up = num_spins - sum(bitstring)  # number of zeros in the bitstring
+        tensor_index = bitstring + bitstring
+        probabilities[num_spins_up] += state_tensor[tensor_index].real
+
+    ### plot a histogram and return
+
+    measurement_outcomes = np.arange(num_spins + 1) - num_spins / 2
+
+    figure, axis = plt.subplots(figsize=figsize)
+    axis.bar(measurement_outcomes, probabilities, width=0.9)
+    axis.set_ylabel("Probability")
+    axis.set_xlabel("Axial spin projection")
+    figure.tight_layout()
+    return figure, axis
