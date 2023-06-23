@@ -376,7 +376,6 @@ if __name__ == "__main__":
 
     cat_state_fidelity = 0.5 * sum(abs(final_state[ii, jj]) for ii in [0, -1] for jj in [0, -1])
     print("cat state fidelity:", cat_state_fidelity)
-    print(type(final_state))
 
     import matplotlib.pyplot as plt
 
