@@ -1,12 +1,18 @@
 import collections
 import functools
-from typing import Optional, Sequence
+import typing
+from typing import Optional, Sequence, Union
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
 from qfi_opt import spin_models
+
+if typing.TYPE_CHECKING:
+    import jax.numpy as jnp
+
+STATE_TYPE = Union[np.ndarray, "jnp.ndarray"]
 
 try:
     import cmocean
@@ -20,7 +26,7 @@ except ModuleNotFoundError:
         return plt.get_cmap("inferno")(color_vals)
 
 
-def get_spin_length_projections(state: np.ndarray) -> dict[float, np.ndarray]:
+def get_spin_length_projections(state: STATE_TYPE) -> dict[float, np.ndarray]:
     """Compute the projections of a state onto manifolds of fixed spin length S.
 
     More specifically, compute the dictionry `{S: state_S for S in spin_length_vals}`, where
@@ -76,7 +82,7 @@ def get_polarization(state_projections: dict[float, np.ndarray], theta: float, p
 
 
 def husimi(  # type: ignore[no-untyped-def]
-    state: np.ndarray,
+    state: STATE_TYPE,
     grid_size: int = 101,
     single_sphere: bool = True,
     figsize: Optional[tuple[int, int]] = None,
@@ -133,7 +139,7 @@ def husimi(  # type: ignore[no-untyped-def]
 
 
 def histogram(  # type: ignore[no-untyped-def]
-    state: np.ndarray,
+    state: STATE_TYPE,
     figsize: tuple[int, int] = (4, 3),
 ):
     """Plot the distribution function over collective-Sz measurement outcomes."""
