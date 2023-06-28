@@ -105,7 +105,7 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
                 if not rate_sx == rate_sy:
                     raise ValueError(
                         f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
-                        "\nTry running passing the argument `axial_symmetry=False` to the simulation method."
+                        "\nTry passing the argument `axial_symmetry=False` to the simulation method."
                     )
 
             # Check that there are only four parameters (initial rotation angle, entangling time, final rotation angle + axis).
