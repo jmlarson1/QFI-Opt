@@ -8,16 +8,16 @@ import numpy as np
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_QFI
 
-try: 
+try:
     from ibcdfo.pounders import pounders
     from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
-except: 
+except:
     sys.exit("Please 'pip install ibcdfo'")
 
-try: 
-    sys.path.append("../minq/py/minq5/") # Needed by pounders, but not pip installable
+try:
+    sys.path.append("../minq/py/minq5/")  # Needed by pounders, but not pip installable
     from minqsw import minqsw
-except: 
+except:
     sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is on your path")
 
 # sys.path.append("../orbit/py")
