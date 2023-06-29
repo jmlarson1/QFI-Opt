@@ -8,11 +8,20 @@ import numpy as np
 import spin_models
 from calculate_qfi_example import compute_QFI
 
-sys.path.append("/home/jlarson/research/poptus/orbit/py")
-sys.path.append("/home/jlarson/research/poptus/minq/py/minq5/")
-from ibcdfo.pounders import pounders
-from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
-from orbit4py import ORBIT2
+try: 
+    from ibcdfo.pounders import pounders
+    from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
+except: 
+    sys.exit("Please 'pip install ibcdfo'")
+
+try: 
+    sys.path.append("../minq/py/minq5/") # Needed by pounders, but not pip installable
+    from minqsw import minqsw
+except: 
+    sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is on your path")
+
+# sys.path.append("../orbit/py")
+# from orbit4py import ORBIT2
 
 
 def nlopt_wrapper(x, grad, obj, obj_params):
@@ -137,7 +146,7 @@ if __name__ == "__main__":
                         continue
                     obj = getattr(spin_models, model)
 
-                    for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
+                    for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER"]:
                         global all_f
                         all_f = []
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
