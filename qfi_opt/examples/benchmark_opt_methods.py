@@ -123,7 +123,7 @@ if __name__ == "__main__":
     for dissipation_rate in np.append([0], np.linspace(0.1, 5, 20)):
         obj_params = {}
         obj_params["N"] = N
-        obj_params["dissipation"] = d
+        obj_params["dissipation"] = dissipation_rate
         obj_params["G"] = G
 
         max_evals = 100
@@ -145,7 +145,7 @@ if __name__ == "__main__":
 
                 for model in models:
                     print(model)
-                    fig_filename = "Results_" + model + "_" + str(d) + "_" + str(seed)
+                    fig_filename = "Results_" + model + "_" + str(dissipation_rate) + "_" + str(seed)
                     if os.path.exists(fig_filename + ".png"):
                         continue
                     obj = getattr(spin_models, model)
