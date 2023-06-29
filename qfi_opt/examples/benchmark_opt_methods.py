@@ -18,7 +18,7 @@ try:
     sys.path.append("../../../minq/py/minq5/")  # Needed by pounders, but not pip installable
     from minqsw import minqsw
 except:
-    sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is on your path")
+    sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is installed (or symlinked) in the same directory as your QFI-Opt package")
 
 # sys.path.append("../orbit/py")
 # from orbit4py import ORBIT2
