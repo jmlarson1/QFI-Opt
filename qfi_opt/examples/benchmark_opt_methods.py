@@ -24,7 +24,7 @@ except:
 # from orbit4py import ORBIT2
 
 
-def nlopt_wrapper(x, grad, obj, obj_params):
+def sim_wrapper(x, grad, obj, obj_params):
     """Wrapper for `nlopt` that creates and updates a database of simulation inputs/outputs.
 
     Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
@@ -56,7 +56,7 @@ def nlopt_wrapper(x, grad, obj, obj_params):
 
 
 def run_orbit(obj, obj_params, n, x0):
-    calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
+    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     gtol = 1e-9  # Gradient tolerance used to stop the local minimization [1e-5]
     rbftype = "cubic"  # Type of RBF (multiquadric, cubic, Gaussian) ['cubic']
     npmax = 2 * n + 1  # Maximum number of interpolation points [2*n+1]
@@ -78,7 +78,7 @@ def run_orbit(obj, obj_params, n, x0):
 
 
 def run_pounder(obj, obj_params, n, x0):
-    calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
+    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     X = np.array(x0)
     F = np.array(calfun(X))
     Low = -np.inf * np.ones((1, n))
@@ -101,7 +101,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
     # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
     # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
 
-    opt.set_min_objective(lambda x, grad: nlopt_wrapper(x, grad, obj, obj_params))
+    opt.set_min_objective(lambda x, grad: sim_wrapper(x, grad, obj, obj_params))
     opt.set_xtol_rel(1e-4)
     opt.set_maxeval(max_evals)
 
