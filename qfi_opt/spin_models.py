@@ -8,8 +8,8 @@ from typing import Any, Callable, Optional, Sequence
 import jax
 import jax.numpy as np
 
-import ode_jax
-from dissipation import Dissipator
+from qfi_opt import ode_jax
+from qfi_opt.dissipation import Dissipator
 
 jax.config.update("jax_enable_x64", True)
 
@@ -105,7 +105,7 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
                 if not rate_sx == rate_sy:
                     raise ValueError(
                         f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
-                        "\nTry running passing the argument `axial_symmetry=False` to the simulation method."
+                        "\nTry passing the argument `axial_symmetry=False` to the simulation method."
                     )
 
             # Check that there are only four parameters (initial rotation angle, entangling time, final rotation angle + axis).
