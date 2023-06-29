@@ -25,9 +25,10 @@ except:
 
 
 def nlopt_wrapper(x, grad, obj, obj_params):
-    # Note that this objective function creates/updates a database of 
-    # simulations inputs/outputs. For large databases (or fast simulations), the
-    # database lookup can be more expensive than performing the simulation.
+    """Wrapper for `nlopt` that creates and updates a database of simulation inputs/outputs.
+
+    Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
+    """
     global all_f
     database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
