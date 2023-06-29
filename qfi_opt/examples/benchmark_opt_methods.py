@@ -15,7 +15,7 @@ except:
     sys.exit("Please 'pip install ibcdfo'")
 
 try:
-    sys.path.append("../minq/py/minq5/")  # Needed by pounders, but not pip installable
+    sys.path.append("../../../minq/py/minq5/")  # Needed by pounders, but not pip installable
     from minqsw import minqsw
 except:
     sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is on your path")
@@ -25,6 +25,9 @@ except:
 
 
 def nlopt_wrapper(x, grad, obj, obj_params):
+    # Note that this objective function creates/updates a database of 
+    # simulations inputs/outputs. For large databases (or fast simulations), the
+    # database lookup can be more expensive than performing the simulation.
     global all_f
     database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
