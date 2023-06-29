@@ -120,7 +120,7 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for d in np.append([0], np.linspace(0.1, 5, 20)):
+    for dissipation_rate in np.append([0], np.linspace(0.1, 5, 20)):
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = d
