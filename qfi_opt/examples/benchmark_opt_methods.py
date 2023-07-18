@@ -30,24 +30,24 @@ def sim_wrapper(x, grad, obj, obj_params):
     Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
     """
     global all_f
-    database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
-    DB = []
+    # database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
+    # DB = []
     match = 0
-    if os.path.exists(database):
-        DB = np.load(database, allow_pickle=True)
-        for db_entry in DB:
-            if np.allclose(db_entry["var_vals"], x, rtol=1e-12, atol=1e-12):
-                rho = db_entry["rho"]
-                match = 1
-                break
+    # if os.path.exists(database):
+    #     DB = np.load(database, allow_pickle=True)
+    #     for db_entry in DB:
+    #         if np.allclose(db_entry["var_vals"], x, rtol=1e-12, atol=1e-12):
+    #             rho = db_entry["rho"]
+    #             match = 1
+    #             break
 
     if match == 0:
         # Do the sim
-        rho = obj(x, obj_params["N"], dissipation_rates=obj_params["dissipation"])
+        rho = obj(x, obj_params["N"], dissipation_rates=obj_params["dissipation"], coupling_exponent=3)
 
-        to_save = {"rho": rho, "var_vals": x}
-        DB = np.append(DB, to_save)
-        np.save(database, DB)
+        # to_save = {"rho": rho, "var_vals": x}
+        # DB = np.append(DB, to_save)
+        # np.save(database, DB)
 
     qfi = compute_QFI(rho, obj_params["G"])
     print(x, qfi, flush=True)
@@ -117,7 +117,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
 
 
 if __name__ == "__main__":
-    N = 4
+    N = 8
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
     for dissipation_rate in np.append([0], np.linspace(0.1, 5, 20)):
@@ -139,9 +139,11 @@ if __name__ == "__main__":
 
                 match num_params:
                     case 4:
-                        models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
+                        # models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
+                        models = ["simulate_ising_chain", "simulate_XX_chain"]
                     case 5:
-                        models = ["simulate_TAT", "simulate_local_TAT_chain"]
+                        # models = ["simulate_TAT", "simulate_local_TAT_chain"]
+                        models = ["simulate_local_TAT_chain"]
 
                 for model in models:
                     print(model)
