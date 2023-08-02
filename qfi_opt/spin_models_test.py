@@ -14,26 +14,21 @@ Params = tuple[float, float, float, float, float]
 class Transformation:
     """An object representing a sequence of transformations of a quantum state."""
 
-    final_z: float = 0
-    flip_z: bool = False
+    final_rz: float = 0
     flip_xy: Optional[float] = None
     conjugate: bool = False
 
     def transform(self, state: np.ndarray) -> np.ndarray:
         num_qubits = spin_models.log2_int(state.shape[0])
         new_state = state.copy()
-        if self.final_z:
-            # apply a global spin rotation 'Rz(phi)'
-            phi = 2 * np.pi * self.final_z
-            new_state = rot_z_mat(num_qubits, phi) * new_state
-        if self.flip_z:
-            # apply the global spin rotation 'Rz(pi)'
-            new_state = rot_z_mat(num_qubits, np.pi) * new_state
+        if self.final_rz:
+            # apply a global spin rotation 'Rz(self.final_rz)'
+            phase_mat = rot_z_mat(num_qubits, self.final_rz)
+            new_state = phase_mat * new_state
         if self.flip_xy is not None:
-            # apply a global spin rotation by an angle 'pi' about an axis in the X-Y plane
-            phi = 2 * np.pi * self.flip_xy
-            phase_mat = rot_z_mat(num_qubits, phi)
-            new_state = phase_mat.conj() * (phase_mat * new_state)[::-1, ::-1]
+            # apply a global spin rotation by an angle 'pi' about a specified axis in the X-Y plane
+            phase_mat = rot_z_mat(num_qubits, 2 * np.pi * self.flip_xy)
+            new_state = phase_mat * (phase_mat.conj() * new_state)[::-1, ::-1]
         if self.conjugate:
             # complex conjugate the state
             new_state = new_state.conj()
@@ -74,7 +69,7 @@ def get_symmetries_common() -> List[Callable[..., tuple[Params, Transformation]]
         return (t_1, a_1, t_ent, -t_2, a_2 + 0.5), Transformation()
 
     def shift_2(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        return (t_1, a_1, t_ent, t_2 + 1, a_2), Transformation(flip_xy=-a_2)
+        return (t_1, a_1, t_ent, t_2 + 1, a_2), Transformation(flip_xy=a_2)
 
     return [reflect_1, reflect_2, shift_2]
 
@@ -83,13 +78,15 @@ def get_symmetries_OAT(even_qubit_number: bool) -> List[Callable[..., tuple[Para
     """Generate a list of symmetries of the OAT protocol at zero dissipation."""
 
     def eliminate_axis(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        return (t_1, 0, t_ent, t_2, a_2 - a_1), Transformation(final_z=a_1)
+        final_rz = 2 * np.pi * a_1
+        return (t_1, 0, t_ent, t_2, a_2 - a_1), Transformation(final_rz=final_rz)
 
     def shift_1(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        return (t_1 + 1, a_1, t_ent, t_2, 2 * a_1 - a_2), Transformation(flip_xy=-a_1)
+        return (t_1 + 1, a_1, t_ent, t_2, 2 * a_1 - a_2), Transformation(flip_xy=a_1)
 
     def shift_ent(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        return (t_1, a_1, t_ent + 1, t_2, a_2 + 0.5 * even_qubit_number), Transformation(flip_z=even_qubit_number)
+        final_rz = np.pi * even_qubit_number
+        return (t_1, a_1, t_ent + 1, t_2, a_2 + 0.5 * even_qubit_number), Transformation(final_rz=final_rz)
 
     def conjugate(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         return (-t_1, -a_1, -t_ent, -t_2, -a_2), Transformation(conjugate=True)
@@ -104,7 +101,8 @@ def get_symmetries_TAT() -> List[Callable[..., tuple[Params, Transformation]]]:
         return (t_1, a_1 + 1, t_ent, t_2, a_2 + 1), Transformation()
 
     def reflect_x(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        return (t_1 + 1, -a_1, -t_ent, t_2 + 1, -a_2), Transformation(final_z=2 * a_2)
+        final_rz = 4 * np.pi * a_2
+        return (t_1 + 1, -a_1, -t_ent, t_2 + 1, -a_2), Transformation(final_rz=final_rz)
 
     def conjugate(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         return (-t_1, -a_1, t_ent, -t_2, -a_2), Transformation(conjugate=True)
@@ -115,6 +113,7 @@ def get_symmetries_TAT() -> List[Callable[..., tuple[Params, Transformation]]]:
 def test_symmetries(atol: float = 1e-6) -> None:
     """Test the symmetry transformations that we used to cut down the domain of the parameters for the OAT protocol."""
     for _ in range(5):  # test several random instances
+        print(_)
         params = list(numpy.random.random(5))
         coupling_op = get_random_hamiltonian(4)
         coupling_exponent = numpy.random.random() * 3
