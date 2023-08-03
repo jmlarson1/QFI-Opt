@@ -1,6 +1,6 @@
 import dataclasses
 import functools
-from typing import Callable, Sequence, Optional
+from typing import Callable, Optional, Sequence
 
 import jax.numpy as np
 import numpy
