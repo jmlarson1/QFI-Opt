@@ -362,27 +362,8 @@ if __name__ == "__main__":
             print(f"d(final_state/d(params[{pp}]):")
             print(jacobian[:, :, pp])
 
-    ################################################################################################
-    # EXAMPLE USAGE OF PLOTTING METHODS
-
-    # # simulate the OAT potocol
-    # final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
-
-    # Simulate a TAT protocol.
-    # This propocol needs 5 arguments, but Jeff has been optimizing over 4, with the second parameter fixed to 1,
-    # so inject a 1 into the second entry of the parameter vector.
-    args.params = np.insert(args.params, 1, 1)
-    final_state = simulate_TAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
-
-    cat_state_fidelity = 0.5 * sum(abs(final_state[ii, jj]) for ii in [0, -1] for jj in [0, -1])
-    print("cat state fidelity:", cat_state_fidelity)
-
-    import matplotlib.pyplot as plt
-
-    qfi_opt.plot.husimi(final_state)
-    qfi_opt.plot.histogram(final_state)
-    plt.show()
-    ################################################################################################
+    # simulate the OAT potocol
+    final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
 
     # compute collective Pauli operators
     mean_X = collective_op(PAULI_X, args.num_qubits) / args.num_qubits
