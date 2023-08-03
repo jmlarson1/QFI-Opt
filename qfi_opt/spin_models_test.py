@@ -106,7 +106,7 @@ def get_symmetries_Z2_Z2() -> List[Callable[..., tuple[Params, Transformation]]]
     """Generate a list of symmetries for protocol with Z_2 x Z_2 symmetry."""
 
     def reflect_z(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        return (t_1, a_1 + 1, t_ent, t_2, a_2 + 1), Transformation()
+        return (t_1, a_1 + 0.5, t_ent, t_2, a_2 + 0.5), Transformation(final_rz=np.pi)
 
     def reflect_x(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         final_rz = 4 * np.pi * a_2
@@ -121,7 +121,6 @@ def get_symmetries_Z2_Z2() -> List[Callable[..., tuple[Params, Transformation]]]
 def test_symmetries(atol: float = 1e-6) -> None:
     """Test the symmetry transformations that we used to cut down the domain of the parameters for the OAT protocol."""
     for _ in range(5):  # test several random instances
-        print(_)
         params = list(numpy.random.random(5))
         coupling_op = get_random_hamiltonian(4)
         coupling_exponent = numpy.random.random() * 3
