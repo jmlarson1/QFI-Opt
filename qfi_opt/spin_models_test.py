@@ -10,7 +10,7 @@ from qfi_opt import spin_models
 
 @dataclasses.dataclass(kw_only=True)
 class Transformation:
-    """An object representing a sequence of transformations of a quantum state."""
+    """An object representing a sequence of transformations to apply to a quantum state."""
 
     final_rz: float = 0
     flip_xy: Optional[float] = None
@@ -33,7 +33,14 @@ class Transformation:
         return new_state
 
 
+# Type signature for the parameters of a sensing protocol.
 Params = tuple[float, float, float, float, float]
+
+# A symmetry `S` maps a set of parameters `p_old` to a set of parameters `p_new` together with a transformation `T`, i.e., `S: p_old --> (p_new, T)`.
+# The symmetry is such that the following two procedures yield the same state:
+# - Running a sensing protocol with parameters `p_old`.
+# - Running the same sensing protocol with parameters `p_new`, and applying the transformation `T` to the resulting state.
+# In other words, if `rho(p)` is the state returned by a sensing protocol with parameters `p`, then `rho(p_old) = T(rho(p_new))`.
 Symmetry = Callable[[float, float, float, float, float], tuple[Params, Transformation]]
 
 
