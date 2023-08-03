@@ -88,9 +88,10 @@ def get_symmetries_common() -> Sequence[Symmetry]:
 def get_symmetries_U1_Z2() -> Sequence[Symmetry]:
     """Generate a list of symmetries for protocol with an axial U(1) and transverse Z_2 symmetry."""
 
-    def eliminate_axis(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        final_rz = 2 * np.pi * a_1
-        return (t_1, 0, t_ent, t_2, a_2 - a_1), Transformation(final_rz=final_rz)
+    def shift_axes(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
+        axis_shift = numpy.random.random()
+        final_rz = 2 * np.pi * axis_shift
+        return (t_1, a_1 - axis_shift, t_ent, t_2, a_2 - axis_shift), Transformation(final_rz=final_rz)
 
     def shift_1(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         return (t_1 + 1, a_1, t_ent, t_2, 2 * a_1 - a_2), Transformation(flip_xy=a_1)
@@ -98,7 +99,7 @@ def get_symmetries_U1_Z2() -> Sequence[Symmetry]:
     def conjugate(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         return (-t_1, -a_1, -t_ent, -t_2, -a_2), Transformation(conjugate=True)
 
-    return [eliminate_axis, shift_1, conjugate]
+    return [shift_axes, shift_1, conjugate]
 
 
 def get_symmetries_Z2_Z2() -> Sequence[Symmetry]:
