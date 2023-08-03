@@ -1,13 +1,11 @@
 import dataclasses
 import functools
-from typing import Callable, List, Optional
+from typing import Callable, Sequence, Optional
 
 import jax.numpy as np
 import numpy
 
 from qfi_opt import spin_models
-
-Params = tuple[float, float, float, float, float]
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -54,7 +52,11 @@ def rot_z_mat(num_qubits: int, angle: float) -> np.ndarray:
     return phase_vec[:, np.newaxis] * np.conj(phase_vec)
 
 
-def get_symmetries_common() -> List[Callable[..., tuple[Params, Transformation]]]:
+Params = tuple[float, float, float, float, float]
+Symmetry = Callable[[float, float, float, float, float], tuple[Params, Transformation]]
+
+
+def get_symmetries_common() -> Sequence[Symmetry]:
     """
     Generate a list of parameter symmetries common to all protocols.
 
@@ -76,18 +78,8 @@ def get_symmetries_common() -> List[Callable[..., tuple[Params, Transformation]]
     return [reflect_1, reflect_2, shift_2]
 
 
-def get_symmetries_OAT(even_qubit_number: bool) -> List[Callable[..., tuple[Params, Transformation]]]:
-    """Generate a list of symmetries unique to the OAT protocol."""
-
-    def shift_ent(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        final_rz = np.pi * even_qubit_number
-        return (t_1, a_1, t_ent + 1, t_2, a_2 + 0.5 * even_qubit_number), Transformation(final_rz=final_rz)
-
-    return [shift_ent]
-
-
-def get_symmetries_U1_Z2() -> List[Callable[..., tuple[Params, Transformation]]]:
-    """Generate a list of symmetries for protocol with U(1) x Z_2 symmetry."""
+def get_symmetries_U1_Z2() -> Sequence[Symmetry]:
+    """Generate a list of symmetries for protocol with an axial U(1) and transverse Z_2 symmetry."""
 
     def eliminate_axis(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         final_rz = 2 * np.pi * a_1
@@ -102,8 +94,8 @@ def get_symmetries_U1_Z2() -> List[Callable[..., tuple[Params, Transformation]]]
     return [eliminate_axis, shift_1, conjugate]
 
 
-def get_symmetries_Z2_Z2() -> List[Callable[..., tuple[Params, Transformation]]]:
-    """Generate a list of symmetries for protocol with Z_2 x Z_2 symmetry."""
+def get_symmetries_Z2_Z2() -> Sequence[Symmetry]:
+    """Generate a list of symmetries for protocol with an axial Z_2 and transverse Z_2 symmetry."""
 
     def reflect_z(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         return (t_1, a_1 + 0.5, t_ent, t_2, a_2 + 0.5), Transformation(final_rz=np.pi)
@@ -118,31 +110,54 @@ def get_symmetries_Z2_Z2() -> List[Callable[..., tuple[Params, Transformation]]]
     return [reflect_z, reflect_x, conjugate]
 
 
-def test_symmetries(atol: float = 1e-6) -> None:
-    """Test the symmetry transformations that we used to cut down the domain of the parameters for the OAT protocol."""
+def get_symmetries_OAT(even_qubit_number: bool) -> Sequence[Symmetry]:
+    """Generate a list of symmetries unique to the OAT protocol."""
+
+    def shift_ent(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
+        final_rz = np.pi * even_qubit_number
+        return (t_1, a_1, t_ent + 1, t_2, a_2 + 0.5 * even_qubit_number), Transformation(final_rz=final_rz)
+
+    return [shift_ent]
+
+
+def run_symmetry_tests(simulate_method: Callable[[Sequence[float]], np.ndarray], symmetries: Sequence[Symmetry], atol: float = 1e-6) -> None:
+    """Test that the given simulation method obeys the given symmetries."""
+    params = tuple(numpy.random.random(5))
+    state = simulate_method(params)
+    for symmetry in symmetries:
+        new_params, transformation = symmetry(*params)
+        new_state = simulate_method(new_params)
+        assert np.allclose(state, transformation.transform(new_state), atol=atol)
+
+
+def test_symmetries() -> None:
+    """Test the symmetry transformations that we use to cut down the parameter domain of sensing protocols."""
     for _ in range(5):  # test several random instances
-        params = list(numpy.random.random(5))
         coupling_op = get_random_hamiltonian(4)
         coupling_exponent = numpy.random.random() * 3
 
         for num_qubits in [2, 3]:  # test both even and odd qubit numbers
             # test common symmetries
-            state = spin_models.simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent)
-            for symmetry_common in get_symmetries_common():
-                new_params, transformation = symmetry_common(*params)
-                new_state = spin_models.simulate_spin_chain(new_params, num_qubits, coupling_op, coupling_exponent)
-                assert np.allclose(state, transformation.transform(new_state), atol=atol)
+            run_symmetry_tests(
+                lambda params: spin_models.simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent),
+                get_symmetries_common(),
+            )
+
+            # test U(1) x Z_2 symmetries
+            for simulate_method in [
+                lambda params: spin_models.simulate_ising_chain(params, num_qubits, coupling_exponent),
+                lambda params: spin_models.simulate_XX_chain(params, num_qubits, coupling_exponent),
+            ]:
+                run_symmetry_tests(simulate_method, get_symmetries_U1_Z2())
+
+            # test Z_2 x Z_2 symmetries
+            run_symmetry_tests(
+                lambda params: spin_models.simulate_local_TAT_chain(params, num_qubits, coupling_exponent),
+                get_symmetries_Z2_Z2(),
+            )
 
             # test OAT symmetries
-            state = spin_models.simulate_OAT(params, num_qubits)
-            for symmetry in get_symmetries_U1_Z2() + get_symmetries_OAT(num_qubits % 2 == 0):
-                new_params, transformation = symmetry(*params)
-                new_state = spin_models.simulate_OAT(new_params, num_qubits)
-                assert np.allclose(state, transformation.transform(new_state), atol=atol)
-
-            # test TAT symmetries
-            state = spin_models.simulate_TAT(params, num_qubits)
-            for symmetry in get_symmetries_Z2_Z2():
-                new_params, transformation = symmetry(*params)
-                new_state = spin_models.simulate_TAT(new_params, num_qubits)
-                assert np.allclose(state, transformation.transform(new_state), atol=atol)
+            run_symmetry_tests(
+                lambda params: spin_models.simulate_OAT(params, num_qubits),
+                get_symmetries_OAT(num_qubits % 2 == 0),
+            )
