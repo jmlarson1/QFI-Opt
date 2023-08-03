@@ -104,17 +104,18 @@ def get_symmetries_U1_Z2() -> Sequence[Symmetry]:
 def get_symmetries_Z2_Z2() -> Sequence[Symmetry]:
     """Generate a list of symmetries for protocol with an axial Z_2 and transverse Z_2 symmetry."""
 
-    def reflect_z(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
-        return (t_1, a_1 + 0.5, t_ent, t_2, a_2 + 0.5), Transformation(final_rz=np.pi)
+    def rot_z(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
+        final_rz = -np.pi / 2
+        return (t_1, a_1 + 0.25, -t_ent, t_2, a_2 + 0.25), Transformation(final_rz=final_rz)
 
-    def reflect_x(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
+    def pi_x(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         final_rz = 4 * np.pi * a_2
         return (t_1 + 1, -a_1, -t_ent, t_2 + 1, -a_2), Transformation(final_rz=final_rz)
 
     def conjugate(t_1: float, a_1: float, t_ent: float, t_2: float, a_2: float) -> tuple[Params, Transformation]:
         return (-t_1, -a_1, t_ent, -t_2, -a_2), Transformation(conjugate=True)
 
-    return [reflect_z, reflect_x, conjugate]
+    return [rot_z, pi_x, conjugate]
 
 
 def get_symmetries_OAT(even_qubit_number: bool) -> Sequence[Symmetry]:
