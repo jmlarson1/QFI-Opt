@@ -4,3 +4,4 @@ flake8-pyproject
 isort[colors]~=5.10.1
 mypy~=0.982
 pytest~=7.2.1
+ibcdfo

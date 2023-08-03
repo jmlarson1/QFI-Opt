@@ -8,15 +8,27 @@ import numpy as np
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_QFI
 
-sys.path.append("/home/jlarson/research/poptus/orbit/py")
-sys.path.append("/home/jlarson/research/poptus/minq/py/minq5/")
-sys.path.append("/home/jlarson/research/poptus/IBCDFO/pounders/py")
-from general_h_funs import identity_combine as combinemodels
-from orbit4py import ORBIT2
-from pounders import pounders
+try:
+    from ibcdfo.pounders import pounders
+    from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
+except:
+    sys.exit("Please 'pip install ibcdfo'")
+
+try:
+    sys.path.append("../../../minq/py/minq5/")  # Needed by pounders, but not pip installable
+    from minqsw import minqsw
+except:
+    sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is installed (or symlinked) in the same directory as your QFI-Opt package")
+
+# sys.path.append("../orbit/py")
+# from orbit4py import ORBIT2
 
 
-def nlopt_wrapper(x, grad, obj, obj_params):
+def sim_wrapper(x, grad, obj, obj_params):
+    """Wrapper for `nlopt` that creates and updates a database of simulation inputs/outputs.
+
+    Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
+    """
     global all_f
     database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
@@ -44,7 +56,7 @@ def nlopt_wrapper(x, grad, obj, obj_params):
 
 
 def run_orbit(obj, obj_params, n, x0):
-    calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
+    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     gtol = 1e-9  # Gradient tolerance used to stop the local minimization [1e-5]
     rbftype = "cubic"  # Type of RBF (multiquadric, cubic, Gaussian) ['cubic']
     npmax = 2 * n + 1  # Maximum number of interpolation points [2*n+1]
@@ -66,7 +78,7 @@ def run_orbit(obj, obj_params, n, x0):
 
 
 def run_pounder(obj, obj_params, n, x0):
-    calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
+    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     X = np.array(x0)
     F = np.array(calfun(X))
     Low = -np.inf * np.ones((1, n))
@@ -89,7 +101,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
     # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
     # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
 
-    opt.set_min_objective(lambda x, grad: nlopt_wrapper(x, grad, obj, obj_params))
+    opt.set_min_objective(lambda x, grad: sim_wrapper(x, grad, obj, obj_params))
     opt.set_xtol_rel(1e-4)
     opt.set_maxeval(max_evals)
 
@@ -108,48 +120,61 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    obj_params = {}
-    obj_params["N"] = N
-    obj_params["dissipation"] = 0
-    obj_params["G"] = G
+    for dissipation_rate in np.append([0], np.linspace(0.1, 5, 20)):
+        obj_params = {}
+        obj_params["N"] = N
+        obj_params["dissipation"] = dissipation_rate
+        obj_params["G"] = G
 
-    max_evals = 100
+        max_evals = 100
 
-    for num_params in [4, 5]:
-        lb = np.zeros(num_params)
-        ub = np.ones(num_params)
-        # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
-        # np.random.seed(0)
-        np.random.seed(1)
-        x0 = np.random.uniform(lb, ub, num_params)
+        for num_params in [4, 5]:
+            lb = np.zeros(num_params)
+            ub = np.ones(num_params)
 
-        match num_params:
-            case 4:
-                models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
-            case 5:
-                models = ["simulate_TAT", "simulate_local_TAT_chain"]
+            for seed in [0, 1]:
+                # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
+                np.random.seed(seed)
+                x0 = np.random.uniform(lb, ub, num_params)
 
-        for model in models:
-            print(model)
-            obj = getattr(spin_models, model)
+                match num_params:
+                    case 4:
+                        models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
+                    case 5:
+                        models = ["simulate_TAT", "simulate_local_TAT_chain"]
 
-            plt.figure()
+                for model in models:
+                    print(model)
+                    fig_filename = "Results_" + model + "_" + str(dissipation_rate) + "_" + str(seed)
+                    if os.path.exists(fig_filename + ".png"):
+                        continue
+                    obj = getattr(spin_models, model)
 
-            for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
-                filename = solver + "_" + model + ".txt"
-                if not os.path.exists(filename):
-                    global all_f
-                    all_f = []
-                    if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
-                        run_nlopt(obj, obj_params, num_params, x0, solver)
-                    elif solver in ["ORBIT"]:
-                        run_orbit(obj, obj_params, num_params, x0)
-                    elif solver in ["POUNDER"]:
-                        run_pounder(obj, obj_params, num_params, x0)
-                    np.savetxt(filename, all_f)
-                else:
-                    all_f = np.loadtxt(filename)
+                    for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER"]:
+                        global all_f
+                        all_f = []
+                        if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
+                            run_nlopt(obj, obj_params, num_params, x0, solver)
+                        elif solver in ["ORBIT"]:
+                            run_orbit(obj, obj_params, num_params, x0)
+                        elif solver in ["POUNDER"]:
+                            run_pounder(obj, obj_params, num_params, x0)
 
-                plt.plot(all_f, label=filename)
-            plt.legend()
-            plt.savefig("Results_" + model + ".png", dpi=300)
+                        plt.figure(fig_filename)
+                        plt.plot(all_f, label=solver)
+
+                        for i in range(1, len(all_f)):
+                            all_f[i] = max(all_f[i - 1], all_f[i])
+
+                        plt.figure(fig_filename + "best")
+                        plt.plot(all_f, label=solver)
+
+                    plt.figure(fig_filename)
+                    plt.legend()
+                    plt.title(fig_filename)
+                    plt.savefig(fig_filename + ".png", dpi=300)
+
+                    plt.figure(fig_filename + "best")
+                    plt.legend()
+                    plt.title(fig_filename)
+                    plt.savefig(fig_filename + "best" + ".png", dpi=300)
