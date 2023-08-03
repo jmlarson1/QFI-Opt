@@ -33,6 +33,10 @@ class Transformation:
         return new_state
 
 
+Params = tuple[float, float, float, float, float]
+Symmetry = Callable[[float, float, float, float, float], tuple[Params, Transformation]]
+
+
 def get_random_hamiltonian(dim: int) -> np.ndarray:
     """Construct a random Hamiltonian on a system of with the given dimension."""
     ham = numpy.random.random((dim, dim)) + 1j * numpy.random.random((dim, dim))
@@ -50,10 +54,6 @@ def rot_z_mat(num_qubits: int, angle: float) -> np.ndarray:
     _, _, collective_Sz = spin_models.collective_spin_ops(num_qubits)
     phase_vec = np.exp(-1j * angle * collective_Sz.diagonal())
     return phase_vec[:, np.newaxis] * np.conj(phase_vec)
-
-
-Params = tuple[float, float, float, float, float]
-Symmetry = Callable[[float, float, float, float, float], tuple[Params, Transformation]]
 
 
 def get_symmetries_common() -> Sequence[Symmetry]:
