@@ -362,7 +362,7 @@ if __name__ == "__main__":
             print(f"d(final_state/d(params[{pp}]):")
             print(jacobian[:, :, pp])
 
-    # simulate the OAT potocol
+    # simulate the OAT protocol
     final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
 
     # compute collective Pauli operators
