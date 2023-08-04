@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional, Sequence
 import jax
 import jax.numpy as np
 
-from qfi_opt import ode_jax
+import qfi_opt
 from qfi_opt.dissipation import Dissipator
 
 jax.config.update("jax_enable_x64", True)
@@ -257,7 +257,7 @@ def evolve_state(
 
     times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
-    result = ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)
+    result = qfi_opt.ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)
     return result[-1]
 
 
