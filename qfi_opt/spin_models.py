@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional, Sequence
 import jax
 import jax.numpy as np
 
-from qfi_opt import ode_jax
+import qfi_opt
 from qfi_opt.dissipation import Dissipator
 
 jax.config.update("jax_enable_x64", True)
@@ -108,10 +108,10 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
                         "\nTry passing the argument `axial_symmetry=False` to the simulation method."
                     )
 
-            # Check that there are only four parameters (initial rotation angle, entangling time, final rotation angle + axis).
-            # Insert an initial rotation axis of 0 into the first location of the parameter array (at index 1).
-            assert len(params) == 4, "Spin sensing protocols with axial symmetry accept four parameters."
-            params = np.insert(np.array(params), 1, 0.0)
+            # If there are only four parameters, (initial_rotation_angle, entangling_time, final_rotation_angle, final_rotation_axis),
+            # inject an initial_rotation_axis of 0 into the first location of the parameter array (at index 1).
+            if len(params) == 4:
+                params = np.insert(np.array(params), 1, 0.0)
 
         return simulate_func(params, *args, **kwargs)
 
@@ -257,7 +257,7 @@ def evolve_state(
 
     times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
-    result = ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)
+    result = qfi_opt.ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)
     return result[-1]
 
 
@@ -362,7 +362,7 @@ if __name__ == "__main__":
             print(f"d(final_state/d(params[{pp}]):")
             print(jacobian[:, :, pp])
 
-    # simulate the OAT potocol
+    # simulate the OAT protocol
     final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
 
     # compute collective Pauli operators
