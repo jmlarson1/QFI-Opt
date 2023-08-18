@@ -1,7 +1,7 @@
-black[jupyter]~=23.1.0
-flake8~=5.0.4
+black[jupyter]>=23.1.0
+flake8>=5.0.4
 flake8-pyproject
-isort[colors]~=5.10.1
-mypy~=0.982
-pytest~=7.2.1
+isort[colors]>=5.10.1
+mypy>=0.982
+pytest>=7.2.1
 ibcdfo
