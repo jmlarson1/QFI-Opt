@@ -33,7 +33,7 @@ def sim_wrapper(x, grad, obj, obj_params):
     """
     use_DB = False
     match = 0
-    if use_DB: 
+    if use_DB:
         # Look through the database to see if there is a match
         database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
         DB = []
@@ -50,7 +50,7 @@ def sim_wrapper(x, grad, obj, obj_params):
         rho = obj(x, obj_params["N"], dissipation_rates=obj_params["dissipation"])
 
         if use_DB:
-            # Update database 
+            # Update database
             to_save = {"rho": rho, "var_vals": x}
             DB = np.append(DB, to_save)
             np.save(database, DB)
@@ -87,7 +87,7 @@ def run_orbit(obj, obj_params, n, x0):
     # print("optimum at ", X[xkin])
     # print("minimum value = ", F[xkin])
 
-    return F[xkin], X[xkin] 
+    return F[xkin], X[xkin]
 
 
 def run_pounder(obj, obj_params, n, x0):
@@ -111,7 +111,8 @@ def run_pounder(obj, obj_params, n, x0):
     # print("optimum at ", X[xkin])
     # print("minimum value = ", F[xkin])
 
-    return F[xkin], X[xkin] 
+    return F[xkin], X[xkin]
+
 
 def run_nlopt(obj, obj_params, num_params, x0, solver):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
@@ -136,7 +137,6 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
 
 
 if __name__ == "__main__":
-
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -157,7 +157,7 @@ if __name__ == "__main__":
             ub = np.ones(num_params)
 
             for seed in range(size):
-                if seed % size == rank: 
+                if seed % size == rank:
                     # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
                     np.random.seed(seed)
                     x0 = np.random.uniform(lb, ub, num_params)
@@ -171,7 +171,7 @@ if __name__ == "__main__":
                             # models = ["simulate_TAT"]
 
                     for model in models:
-                        filename = model + '_' + str(dissipation_rate) + '_'  + str(seed) + '.pkl'
+                        filename = model + "_" + str(dissipation_rate) + "_" + str(seed) + ".pkl"
                         fig_filename = "Results_" + model + "_" + str(dissipation_rate) + "_" + str(seed)
                         if os.path.exists(filename):
                             continue
@@ -205,10 +205,10 @@ if __name__ == "__main__":
                         dic["best_val"] = best_val[best_method]
                         dic["best_pt"] = best_pt[best_method]
 
-                        with open(filename, 'wb') as f:
+                        with open(filename, "wb") as f:
                             pickle.dump(dic, f)
 
-                        sys.exit('a')
+                        sys.exit("a")
 
                         #     plt.figure(fig_filename)
                         #     plt.plot(all_f, label=solver)
