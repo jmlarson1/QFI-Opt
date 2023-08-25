@@ -33,6 +33,25 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: fl
     return 4 * running_sum
 
 
+def vec_compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
+    # To be given to pounders, which will maximize sum squares of a vector input
+    # Note: The eigenvectors must be rows of eigvecs
+    num_vals = len(eigvals)
+
+    count = -1
+    vecout = np.zeros(num_vals*(num_vals-1)//2)
+    # Compute QFI
+    for i in range(num_vals):
+        for j in range(i + 1, num_vals):
+            denom = eigvals[i] + eigvals[j]
+            count += 1 
+            if not np.isclose(denom, 0, atol=tol):
+                numer = (eigvals[i] - eigvals[j])
+                term = eigvecs[i].conj() @ G @ eigvecs[j]
+                vecout[count] = numer / np.sqrt(denom) * np.linalg.norm(term)
+
+    return 2 * vecout
+
 if __name__ == "__main__":
     num_spins = 4
     dissipation = 0

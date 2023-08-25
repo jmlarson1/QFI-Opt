@@ -10,7 +10,7 @@ from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion
 
 try:
     from ibcdfo.pounders import pounders
-    from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
+    from ibcdfo.pounders.general_h_funs import identity_combine, neg_leastsquares
 except:
     sys.exit("Please 'pip install ibcdfo'")
 
@@ -24,7 +24,7 @@ except:
 # from orbit4py import ORBIT2
 
 
-def sim_wrapper(x, grad, obj, obj_params):
+def sim_wrapper(x, grad, obj, obj_params, vecout=False):
     """Wrapper for `nlopt` that creates and updates a database of simulation inputs/outputs.
 
     Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
@@ -50,10 +50,14 @@ def sim_wrapper(x, grad, obj, obj_params):
         np.save(database, DB)
 
     vals, vecs = compute_eigendecompotion(rho)
-    qfi = compute_QFI(vals, vecs, obj_params["G"])
-    print(x, qfi, flush=True)
-    all_f.append(qfi)
-    return -1 * qfi  # negative because we are maximizing
+    if vecout:
+        vecqfi = compute_QFI(vals, vecs, obj_params["G"])
+        return vecqfi 
+    else:
+        qfi = compute_QFI(vals, vecs, obj_params["G"])
+        print(x, qfi, flush=True)
+        all_f.append(qfi)
+        return -1 * qfi  # negative because we are maximizing
 
 
 def run_orbit(obj, obj_params, n, x0):
@@ -78,8 +82,17 @@ def run_orbit(obj, obj_params, n, x0):
     )
 
 
-def run_pounder(obj, obj_params, n, x0):
-    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
+def run_pounder(obj, obj_params, n, x0, use_struct = False):
+
+    if use_struct: 
+        calfun = lambda x: sim_wrapper(x, [], obj, obj_params, vecout=True)
+        hfun = lambda F: -1*np.sum(F**2)
+        combinemodels = neg_leastsquares
+    else:
+        calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
+        hfun = lambda F: F
+        combinemodels = identity_combine
+
     X = np.array(x0)
     F = np.array(calfun(X))
     Low = -np.inf * np.ones((1, n))
@@ -92,7 +105,6 @@ def run_pounder(obj, obj_params, n, x0):
     spsolver = 2
     gtol = 1e-9
     xind = 0
-    hfun = lambda F: F
 
     [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
 
@@ -151,7 +163,7 @@ if __name__ == "__main__":
                         continue
                     obj = getattr(spin_models, model)
 
-                    for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER"]:
+                    for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER", "POUNDERS"]:
                         global all_f
                         all_f = []
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
@@ -160,6 +172,8 @@ if __name__ == "__main__":
                             run_orbit(obj, obj_params, num_params, x0)
                         elif solver in ["POUNDER"]:
                             run_pounder(obj, obj_params, num_params, x0)
+                        elif solver in ["POUNDERS"]:
+                            run_pounder(obj, obj_params, num_params, x0, True)
 
                         plt.figure(fig_filename)
                         plt.plot(all_f, label=solver)
