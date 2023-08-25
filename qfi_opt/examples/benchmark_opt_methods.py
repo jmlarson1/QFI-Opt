@@ -49,8 +49,8 @@ def sim_wrapper(x, grad, obj, obj_params):
         DB = np.append(DB, to_save)
         np.save(database, DB)
 
-    E, V = compute_eigendecompotion(rho)
-    qfi = compute_QFI(E, V, obj_params["G"])
+    Vals, Vecs = compute_eigendecompotion(rho)
+    qfi = compute_QFI(Vals, Vecs, obj_params["G"])
     print(x, qfi, flush=True)
     all_f.append(qfi)
     return -1 * qfi  # negative because we are maximizing
