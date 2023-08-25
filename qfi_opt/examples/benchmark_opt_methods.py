@@ -52,7 +52,7 @@ def sim_wrapper(x, grad, obj, obj_params, vecout=False):
     vals, vecs = compute_eigendecompotion(rho)
     if vecout:
         vecqfi = compute_QFI(vals, vecs, obj_params["G"])
-        return vecqfi 
+        return vecqfi
     else:
         qfi = compute_QFI(vals, vecs, obj_params["G"])
         print(x, qfi, flush=True)
@@ -82,11 +82,10 @@ def run_orbit(obj, obj_params, n, x0):
     )
 
 
-def run_pounder(obj, obj_params, n, x0, use_struct = False):
-
-    if use_struct: 
+def run_pounder(obj, obj_params, n, x0, use_struct=False):
+    if use_struct:
         calfun = lambda x: sim_wrapper(x, [], obj, obj_params, vecout=True)
-        hfun = lambda F: -1*np.sum(F**2)
+        hfun = lambda F: -1 * np.sum(F**2)
         combinemodels = neg_leastsquares
     else:
         calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
