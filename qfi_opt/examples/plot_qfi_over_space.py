@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_QFI
+from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion
 
 N = 4
 dissipation = 0
@@ -18,13 +18,10 @@ obj_vals = np.zeros_like(y)
 for i in range(num_pts):
     print(i, flush=True)
     for j in range(num_pts):
-        #     for k in range(num_pts):
-        #         params = np.array([x[i,j,k], y[i,j,k], z[i,j,k], 0])
-        #         rho = spin_models.simulate_OAT(params, N, dissipation_rates=dissipation)
-        #         qfi = compute_QFI(rho, G)
         params = np.array([0.5, y[i, j], z[i, j], 0])
         rho = spin_models.simulate_OAT(params, N, dissipation_rates=dissipation)
-        qfi = compute_QFI(rho, G)
+        E, V, = compute_eigendecompotion(rho)
+        qfi = compute_QFI(E, V, G)
         obj_vals[i, j] = qfi
 
 fig, ax = plt.subplots()

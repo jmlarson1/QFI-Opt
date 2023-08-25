@@ -6,7 +6,7 @@ import nlopt
 import numpy as np
 
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_QFI
+from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion
 
 try:
     from ibcdfo.pounders import pounders
@@ -49,7 +49,8 @@ def sim_wrapper(x, grad, obj, obj_params):
         DB = np.append(DB, to_save)
         np.save(database, DB)
 
-    qfi = compute_QFI(rho, obj_params["G"])
+    E, V = compute_eigendecompotion(rho)
+    qfi = compute_QFI(E, V, obj_params["G"])
     print(x, qfi, flush=True)
     all_f.append(qfi)
     return -1 * qfi  # negative because we are maximizing
