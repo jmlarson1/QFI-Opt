@@ -20,7 +20,7 @@ for i in range(num_pts):
     for j in range(num_pts):
         params = np.array([0.5, y[i, j], z[i, j], 0])
         rho = spin_models.simulate_OAT(params, N, dissipation_rates=dissipation)
-        E, V, = compute_eigendecompotion(rho)
+        E, V = compute_eigendecompotion(rho)
         qfi = compute_QFI(E, V, G)
         obj_vals[i, j] = qfi
 
