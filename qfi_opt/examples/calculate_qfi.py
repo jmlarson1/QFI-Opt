@@ -8,6 +8,7 @@ def variance(rho: np.ndarray, G: np.ndarray) -> float:
     """Variance of self-adjoint operator (observable) G in the state rho."""
     return (G @ G @ rho).trace().real - (G @ rho).trace().real ** 2
 
+
 def compute_eigendecompotion(rho: np.ndarray):
     # Compute eigendecomposition for rho
     eigvals, eigvecs = np.linalg.eigh(rho)
@@ -60,18 +61,18 @@ if __name__ == "__main__":
 
             params = 0.5 * np.ones(num_params)
             rho = obj(params, N, dissipation_rates=dissipation)
-            V,E = compute_eigendecompotion(rho)
-            qfi = compute_QFI(V,E, G)
+            V, E = compute_eigendecompotion(rho)
+            qfi = compute_QFI(V, E, G)
             print(f"QFI is {qfi} for {params}")
 
             params[-1] = 0.0
             rho = obj(params, N, dissipation_rates=dissipation)
-            V,E = compute_eigendecompotion(rho)
-            qfi = compute_QFI(V,E, G)
+            V, E = compute_eigendecompotion(rho)
+            qfi = compute_QFI(V, E, G)
             print(f"QFI is {qfi} for {params}")
 
             params[-1] = 1.0
             rho = obj(params, N, dissipation_rates=dissipation)
-            V,E = compute_eigendecompotion(rho)
-            qfi = compute_QFI(V,E, G)
+            V, E = compute_eigendecompotion(rho)
+            qfi = compute_QFI(V, E, G)
             print(f"QFI is {qfi} for {params}")
