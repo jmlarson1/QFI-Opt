@@ -1,3 +1,4 @@
 .python-version
 *.nb
 *.png
+*__pycache__

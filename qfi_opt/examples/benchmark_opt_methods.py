@@ -4,22 +4,34 @@ import pickle
 
 import matplotlib.pyplot as plt
 import nlopt
+from mpi4py import MPI
 import numpy as np
 
-from mpi4py import MPI
-import spin_models
-from calculate_qfi_example import compute_QFI
+from qfi_opt import spin_models
+from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion
 
-sys.path.append("/home/jmlarson/research/poptus/orbit/py")
-sys.path.append("/home/jmlarson/research/poptus/minq/py/minq5/")
+try:
+    from ibcdfo.pounders import pounders
+    from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
+except:
+    sys.exit("Please 'pip install ibcdfo'")
 
-from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
-from orbit4py import ORBIT2
-import ibcdfo.pounders.pounders as pounders
+try:
+    sys.path.append("../../../minq/py/minq5/")  # Needed by pounders, but not pip installable
+    from minqsw import minqsw
+except:
+    sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is installed (or symlinked) in the same directory as your QFI-Opt package")
+
+# sys.path.append("../orbit/py")
+# from orbit4py import ORBIT2
 
 
-def nlopt_wrapper(x, grad, obj, obj_params):
-    global all_f, all_X
+def sim_wrapper(x, grad, obj, obj_params):
+    """Wrapper for `nlopt` that creates and updates a database of simulation inputs/outputs.
+
+    Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
+    """
+    global all_f
     database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
     match = 0
@@ -39,15 +51,16 @@ def nlopt_wrapper(x, grad, obj, obj_params):
         # DB = np.append(DB, to_save)
         # np.save(database, DB)
 
-    qfi = compute_QFI(rho, obj_params["G"])
-    # print(x, qfi, flush=True)
+    vals, vecs = compute_eigendecompotion(rho)
+    qfi = compute_QFI(vals, vecs, obj_params["G"])
+    print(x, qfi, flush=True)
     all_f.append(qfi)
     all_X.append(x)
     return -1 * qfi  # negative because we are maximizing
 
 
 def run_orbit(obj, obj_params, n, x0):
-    calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
+    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     gtol = 1e-9  # Gradient tolerance used to stop the local minimization [1e-5]
     rbftype = "cubic"  # Type of RBF (multiquadric, cubic, Gaussian) ['cubic']
     npmax = 2 * n + 1  # Maximum number of interpolation points [2*n+1]
@@ -74,7 +87,7 @@ def run_orbit(obj, obj_params, n, x0):
 
 
 def run_pounder(obj, obj_params, n, x0):
-    calfun = lambda x: nlopt_wrapper(x, [], obj, obj_params)
+    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     X = np.array(x0)
     F = np.array(calfun(X))
     Low = -np.inf * np.ones((1, n))
@@ -101,7 +114,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
     # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
     # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
 
-    opt.set_min_objective(lambda x, grad: nlopt_wrapper(x, grad, obj, obj_params))
+    opt.set_min_objective(lambda x, grad: sim_wrapper(x, grad, obj, obj_params))
     opt.set_xtol_rel(1e-4)
     opt.set_maxeval(max_evals)
 
@@ -127,13 +140,13 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for d in np.append([0], np.linspace(0.1, 5, 20)):
+    for dissipation_rate in np.append([0], np.linspace(0.1, 5, 20)):
         obj_params = {}
         obj_params["N"] = N
-        obj_params["dissipation"] = d
+        obj_params["dissipation"] = dissipation_rate
         obj_params["G"] = G
 
-        max_evals = 500
+        max_evals = 10
 
         for num_params in [4, 5]:
             lb = np.zeros(num_params)
@@ -154,8 +167,8 @@ if __name__ == "__main__":
                             # models = ["simulate_TAT"]
 
                     for model in models:
-                        filename = model + '_' + str(d) + '_'  + str(seed) + '.pkl'
-                        fig_filename = "Results_" + model + "_" + str(d) + "_" + str(seed)
+                        filename = model + '_' + str(dissipation_rate) + '_'  + str(seed) + '.pkl'
+                        fig_filename = "Results_" + model + "_" + str(dissipation_rate) + "_" + str(seed)
                         if os.path.exists(filename):
                             continue
                         if os.path.exists(fig_filename + ".png"):
@@ -164,7 +177,7 @@ if __name__ == "__main__":
 
                         best_val = {}
                         best_pt = {}
-                        for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
+                        for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER"]:
                             global all_f, all_X
                             all_f = []
                             all_X = []
