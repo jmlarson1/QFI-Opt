@@ -31,25 +31,29 @@ def sim_wrapper(x, grad, obj, obj_params):
 
     Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
     """
-    global all_f
-    database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
-    DB = []
+    use_DB = False
     match = 0
-    # if os.path.exists(database):
-    #     DB = np.load(database, allow_pickle=True)
-    #     for db_entry in DB:
-    #         if np.allclose(db_entry["var_vals"], x, rtol=1e-12, atol=1e-12):
-    #             rho = db_entry["rho"]
-    #             match = 1
-    #             break
+    if use_DB: 
+        # Look through the database to see if there is a match
+        database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
+        DB = []
+        if os.path.exists(database):
+            DB = np.load(database, allow_pickle=True)
+            for db_entry in DB:
+                if np.allclose(db_entry["var_vals"], x, rtol=1e-12, atol=1e-12):
+                    rho = db_entry["rho"]
+                    match = 1
+                    break
 
     if match == 0:
         # Do the sim
         rho = obj(x, obj_params["N"], dissipation_rates=obj_params["dissipation"])
 
-        # to_save = {"rho": rho, "var_vals": x}
-        # DB = np.append(DB, to_save)
-        # np.save(database, DB)
+        if use_DB:
+            # Update database 
+            to_save = {"rho": rho, "var_vals": x}
+            DB = np.append(DB, to_save)
+            np.save(database, DB)
 
     vals, vecs = compute_eigendecompotion(rho)
     qfi = compute_QFI(vals, vecs, obj_params["G"])
