@@ -18,12 +18,10 @@ def compute_eigendecompotion(rho: np.ndarray):
 
 def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
     # Note: The eigenvectors must be rows of eigvecs
-
     num_vals = len(eigvals)
 
     # Compute QFI
     running_sum = 0
-
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             denom = eigvals[i] + eigvals[j]
@@ -36,9 +34,9 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: fl
 
 
 if __name__ == "__main__":
-    N = 4
+    num_spins = 4
     dissipation = 0
-    G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
+    op = spin_models.collective_op(spin_models.PAULI_Z, num_spins) / (2 * num_spins)
 
     num_rand_pts = 2
     # Calculate QFI for models at random points in the domain.
@@ -55,19 +53,19 @@ if __name__ == "__main__":
             obj = getattr(spin_models, model)
 
             params = 0.5 * np.ones(num_params)
-            rho = obj(params, N, dissipation_rates=dissipation)
-            Vals, Vecs = compute_eigendecompotion(rho)
-            qfi = compute_QFI(Vals, Vecs, G)
+            rho = obj(params, num_spins, dissipation_rates=dissipation)
+            vals, vecs = compute_eigendecompotion(rho)
+            qfi = compute_QFI(vals, vecs, op)
             print(f"QFI is {qfi} for {params}")
 
             params[-1] = 0.0
-            rho = obj(params, N, dissipation_rates=dissipation)
-            Vals, Vecs = compute_eigendecompotion(rho)
-            qfi = compute_QFI(Vals, Vecs, G)
+            rho = obj(params, num_spins, dissipation_rates=dissipation)
+            vals, vecs = compute_eigendecompotion(rho)
+            qfi = compute_QFI(vals, vecs, op)
             print(f"QFI is {qfi} for {params}")
 
             params[-1] = 1.0
-            rho = obj(params, N, dissipation_rates=dissipation)
-            Vals, Vecs = compute_eigendecompotion(rho)
-            qfi = compute_QFI(Vals, Vecs, G)
+            rho = obj(params, num_spins, dissipation_rates=dissipation)
+            vals, vecs = compute_eigendecompotion(rho)
+            qfi = compute_QFI(vals, vecs, op)
             print(f"QFI is {qfi} for {params}")
