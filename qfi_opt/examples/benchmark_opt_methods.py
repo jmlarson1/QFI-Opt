@@ -1,14 +1,14 @@
 import os
-import sys
 import pickle
+import sys
 
 import matplotlib.pyplot as plt
 import nlopt
-from mpi4py import MPI
 import numpy as np
+from mpi4py import MPI
 
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion
+from qfi_opt.examples.calculate_qfi import compute_eigendecompotion, compute_QFI
 
 try:
     from ibcdfo.pounders import pounders
