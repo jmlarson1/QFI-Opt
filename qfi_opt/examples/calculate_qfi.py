@@ -8,11 +8,16 @@ def variance(rho: np.ndarray, G: np.ndarray) -> float:
     """Variance of self-adjoint operator (observable) G in the state rho."""
     return (G @ G @ rho).trace().real - (G @ rho).trace().real ** 2
 
-
-def compute_QFI(rho: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
+def compute_eigendecompotion(rho: np.ndarray):
     # Compute eigendecomposition for rho
     eigvals, eigvecs = np.linalg.eigh(rho)
     eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
+    return eigvals, eigvecs
+
+
+def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
+    # Note: The eigenvectors must be rows of eigvecs
+
     num_vals = len(eigvals)
 
     # Compute QFI
@@ -34,14 +39,6 @@ if __name__ == "__main__":
     dissipation = 0
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    # # Let's try calculating the QFI at all corner points of the domain:
-    # all_perms = [",".join(seq) for seq in itertools.product("01", repeat=4)]
-    # for perm in all_perms:
-    #     params = np.fromstring(perm, dtype=int, sep=",")
-    #     rho = spin_models.simulate_OAT(params, N, dissipation)
-    #     qfi = compute_QFI(rho, G)
-    #     print(f"QFI is {qfi} for {params}")
-
     num_rand_pts = 2
     # Calculate QFI for models at random points in the domain.
     for num_params in [4, 5]:
@@ -58,20 +55,23 @@ if __name__ == "__main__":
             # for _ in range(num_rand_pts):
             #     params = np.random.uniform(0, 1, num_params)
             #     rho = obj(params, N, dissipation_rates=dissipation)
-            #     qfi = compute_QFI(rho, G)
+            #     qfi = compute_QFI(compute_eigendecompotion(rho), G)
             #     print(f"QFI is {qfi} for {params}")
 
             params = 0.5 * np.ones(num_params)
             rho = obj(params, N, dissipation_rates=dissipation)
-            qfi = compute_QFI(rho, G)
+            V,E = compute_eigendecompotion(rho)
+            qfi = compute_QFI(V,E, G)
             print(f"QFI is {qfi} for {params}")
 
             params[-1] = 0.0
             rho = obj(params, N, dissipation_rates=dissipation)
-            qfi = compute_QFI(rho, G)
+            V,E = compute_eigendecompotion(rho)
+            qfi = compute_QFI(V,E, G)
             print(f"QFI is {qfi} for {params}")
 
             params[-1] = 1.0
             rho = obj(params, N, dissipation_rates=dissipation)
-            qfi = compute_QFI(rho, G)
+            V,E = compute_eigendecompotion(rho)
+            qfi = compute_QFI(V,E, G)
             print(f"QFI is {qfi} for {params}")
