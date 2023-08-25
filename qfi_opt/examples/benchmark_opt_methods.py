@@ -6,7 +6,7 @@ import nlopt
 import numpy as np
 
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion
+from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion, vec_compute_QFI
 
 try:
     from ibcdfo.pounders import pounders
@@ -15,7 +15,7 @@ except:
     sys.exit("Please 'pip install ibcdfo'")
 
 try:
-    sys.path.append("../../../minq/py/minq5/")  # Needed by pounders, but not pip installable
+    sys.path.append("../../../../poptus/minq/py/minq5/")  # Needed by pounders, but not pip installable
     from minqsw import minqsw
 except:
     sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is installed (or symlinked) in the same directory as your QFI-Opt package")
@@ -51,7 +51,8 @@ def sim_wrapper(x, grad, obj, obj_params, vecout=False):
 
     vals, vecs = compute_eigendecompotion(rho)
     if vecout:
-        vecqfi = compute_QFI(vals, vecs, obj_params["G"])
+        vecqfi = vec_compute_QFI(vals, vecs, obj_params["G"])
+        all_f.append(np.sum(vecqfi**2))
         return vecqfi
     else:
         qfi = compute_QFI(vals, vecs, obj_params["G"])
@@ -132,7 +133,7 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for dissipation_rate in np.append([0], np.linspace(0.1, 5, 20)):
+    for dissipation_rate in [0.0, 0.1, 0.2]:
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = dissipation_rate
@@ -144,7 +145,7 @@ if __name__ == "__main__":
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
-            for seed in [0, 1]:
+            for seed in [0, 1, 2]:
                 # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
                 np.random.seed(seed)
                 x0 = np.random.uniform(lb, ub, num_params)
