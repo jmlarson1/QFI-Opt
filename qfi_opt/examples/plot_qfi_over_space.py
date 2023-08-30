@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion
+from qfi_opt.examples.calculate_qfi import compute_eigendecompotion, compute_QFI
 
 num_spins = 4
 dissipation = 0
