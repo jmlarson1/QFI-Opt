@@ -29,7 +29,7 @@ except ModuleNotFoundError:
 def get_spin_length_projections(state: STATE_TYPE) -> dict[float, np.ndarray]:
     """Compute the projections of a state onto manifolds of fixed spin length S.
 
-    More specifically, compute the dictionry `{S: state_S for S in spin_length_vals}`, where
+    More specifically, compute the dictionary `{S: state_S for S in spin_length_vals}`, where
     - `state_S` = `P_S state P_S`, and
     - `P_S` is a projector onto the manifold with fixed spin length S.
     """
