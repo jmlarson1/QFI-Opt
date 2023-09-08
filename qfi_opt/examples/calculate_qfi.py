@@ -16,16 +16,22 @@ def compute_eigendecompotion(rho: np.ndarray):
     return eigvals, eigvecs
 
 
-def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
+def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8, etol_scale: float = 10) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
+
+    # There should never be negative eigenvalues, so their magnitude gives an
+    # empirical estimate of the numerical accuracy of the eigendecomposition.
+    # We discard any QFI terms denominators within an order of magnitude of
+    # this value. 
+    tol = max(tol, -etol_scale * np.min(eigvals))
 
     # Compute QFI
     running_sum = 0
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             denom = eigvals[i] + eigvals[j]
-            if not np.isclose(denom, 0, atol=tol):
+            if not np.isclose(denom, 0, atol=tol, rtol=tol):
                 numer = (eigvals[i] - eigvals[j]) ** 2
                 term = eigvecs[i].conj() @ G @ eigvecs[j]
                 running_sum += numer / denom * np.linalg.norm(term) ** 2
@@ -33,10 +39,12 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: fl
     return 4 * running_sum
 
 
-def vec_compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8) -> float:
+def vec_compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8, etol_scale: float = 10) -> float:
     # To be given to pounders, which will maximize sum squares of a vector input
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
+
+    tol = max(tol, -etol_scale * np.min(eigvals))
 
     count = -1
     vecout = np.zeros(num_vals * (num_vals - 1) // 2)
@@ -45,7 +53,7 @@ def vec_compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol
         for j in range(i + 1, num_vals):
             denom = eigvals[i] + eigvals[j]
             count += 1
-            if not np.isclose(denom, 0, atol=tol):
+            if not np.isclose(denom, 0, atol=tol, rtol=tol):
                 numer = eigvals[i] - eigvals[j]
                 term = eigvecs[i].conj() @ G @ eigvecs[j]
                 vecout[count] = numer / np.sqrt(denom) * np.linalg.norm(term)
@@ -76,16 +84,19 @@ if __name__ == "__main__":
             rho = obj(params, num_spins, dissipation_rates=dissipation)
             vals, vecs = compute_eigendecompotion(rho)
             qfi = compute_QFI(vals, vecs, op)
-            print(f"QFI is {qfi} for {params}")
+            qfi2 = vec_compute_QFI(vals, vecs, op)
+            print(f"QFI is {qfi} for {params}, or equivalently {np.sum(qfi2**2)}")
 
             params[-1] = 0.0
             rho = obj(params, num_spins, dissipation_rates=dissipation)
             vals, vecs = compute_eigendecompotion(rho)
             qfi = compute_QFI(vals, vecs, op)
-            print(f"QFI is {qfi} for {params}")
+            qfi2 = vec_compute_QFI(vals, vecs, op)
+            print(f"QFI is {qfi} for {params}, or equivalently {np.sum(qfi2**2)}")
 
             params[-1] = 1.0
             rho = obj(params, num_spins, dissipation_rates=dissipation)
             vals, vecs = compute_eigendecompotion(rho)
             qfi = compute_QFI(vals, vecs, op)
-            print(f"QFI is {qfi} for {params}")
+            qfi2 = vec_compute_QFI(vals, vecs, op)
+            print(f"QFI is {qfi} for {params}, or equivalently {np.sum(qfi2**2)}")
