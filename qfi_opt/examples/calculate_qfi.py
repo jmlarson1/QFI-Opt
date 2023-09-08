@@ -16,7 +16,7 @@ def compute_eigendecompotion(rho: np.ndarray):
     return eigvals, eigvecs
 
 
-def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray) -> float:
+def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8, etol_scale: float = 10) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
 
@@ -24,12 +24,7 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray) -> floa
     # empirical estimate of the numerical accuracy of the eigendecomposition.
     # We discard any QFI terms denominators within an order of magnitude of
     # this value. 
-    low = np.min(eigvals)
-
-    if low < 0:
-        tol = -10 * np.min(eigvals)
-    else: 
-        tol = 1e-8
+    tol = max(tol, -etol_scale * np.min(eigvals))
 
     # Compute QFI
     running_sum = 0
