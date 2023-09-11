@@ -12,8 +12,18 @@ authors = [
 readme = "README.md"
 license = { file = "LICENSE.txt" }
 requires-python = ">=3.10"
-keywords = ["quantum fisher information", "QFI"]
+keywords = ["quantum fisher information", "QFI", "quantum metrology"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Topic :: Scientific/Engineering :: Physics",
+]
 dynamic = ["dependencies", "optional-dependencies"]
+
+[project.urls]
+repository = "https://github.com/jmlarson1/QFI-Opt"
 
 # setuptools and associated options
 
