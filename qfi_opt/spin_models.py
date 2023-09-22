@@ -7,6 +7,7 @@ import sys
 from typing import Callable, Optional, Sequence
 
 import qfi_opt
+from qfi_opt.dissipation import Dissipator
 
 DISABLE_JAX = bool(os.getenv("DISABLE_JAX"))
 
@@ -14,16 +15,11 @@ if not DISABLE_JAX:
     import jax
     import jax.numpy as np
 
-    from qfi_opt.dissipation_jax import Dissipator
-
     jax.config.update("jax_enable_x64", True)
 
 else:
     import numpy as np  # type: ignore[no-redef]
     import scipy
-
-    from qfi_opt.dissipation_numpy import Dissipator  # type: ignore[assignment]
-
 
 COMPLEX_TYPE = np.complex128
 DEFAULT_DISSIPATION_FORMAT = "XYZ"
@@ -375,15 +371,39 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
     ).reshape((2**num_qubits,) * 2)
 
 
-def get_jacobian_func(simulate_func: Callable,) -> Callable:
+def get_jacobian_func(
+    simulate_func: Callable,
+    *,
+    disable_jax: bool = DISABLE_JAX,
+    step_sizes: float | Sequence[float] = 1e-4,
+) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
-    jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
+    if not DISABLE_JAX:
+        jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
 
-    def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
-        return jacobian_func(*args, **kwargs)[0]
+        def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
+            return jacobian_func(*args, **kwargs)[0]
 
-    return get_jacobian
+        return get_jacobian
+
+    def get_jacobian_manually(params: Sequence[float] | np.ndarray, *args: object, **kwargs: object) -> np.ndarray:
+        nonlocal step_sizes
+        if isinstance(step_sizes, float):
+            step_sizes = [step_sizes] * len(params)
+        assert len(step_sizes) == len(params)
+
+        result_at_params = simulate_func(params, *args, **kwargs)
+        shifted_results = []
+        for idx, step_size in enumerate(step_sizes):
+            new_params = list(params)
+            new_params[idx] += step_size
+            result_at_params_with_step = simulate_func(new_params, *args, **kwargs)
+            shifted_results.append((result_at_params_with_step - result_at_params) / step_size)
+
+        return np.stack(shifted_results, axis=-1)
+
+    return get_jacobian_manually
 
 
 if __name__ == "__main__":
@@ -401,9 +421,7 @@ if __name__ == "__main__":
     # convert the parameters into a complex array, which is necessary for autodiff capabilities
     args.params = np.array(args.params, dtype=COMPLEX_TYPE)
 
-    if args.jacobian and DISABLE_JAX:
-        print("Cannot compute Jacobian without JAX (for now).")
-    if args.jacobian and not DISABLE_JAX:
+    if args.jacobian:
         get_jacobian = get_jacobian_func(simulate_OAT)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
         for pp in range(len(args.params)):
