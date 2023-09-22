@@ -20,13 +20,25 @@ if not os.path.isdir(minq5_dir):
     messages = [
         "Please install (or symlink) MINQ in the QFI-Opt project directory.",
         "You can do this with:",
-        f"git clone https://github.com/POptUS/MINQ.git {root_dir}/minq",
+        f"\n  git clone https://github.com/POptUS/MINQ.git {root_dir}/minq\n",
+        "Or, if you already have MINQ somewhere, run:",
+        f"\n  ln -s <minq-path> {root_dir}/minq\n",
     ]
     exit("\n".join(messages))
 sys.path.append(minq5_dir)
 
-# sys.path.append("../orbit/py")
-# from orbit4py import ORBIT2
+orbit_dir = os.path.isdir(os.path.join(root_dir, "orbit", "py"))
+orbit_found = os.path.isdir(orbit_dir)
+if not orbit_found:
+    messages = [
+        "WARNING: 'orbit' not found",
+        "If you already have orbit somewhere, run:",
+        f"\n  ln -s <orbit-path> {root_dir}/minq\n",
+    ]
+    print("\n".join(messages))
+else:
+    sys.path.append(orbit_dir)
+    from orbit4py import ORBIT2
 
 
 def sim_wrapper(x, grad, obj, obj_params):
@@ -186,13 +198,15 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
 
                         best_val = {}
                         best_pt = {}
-                        for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER"]:
+                        for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
                             global all_f, all_X
                             all_f = []
                             all_X = []
                             if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
                                 run_nlopt(obj, obj_params, num_params, x0, solver)
                             elif solver in ["ORBIT"]:
+                                if not orbit_found:
+                                    continue
                                 run_orbit(obj, obj_params, num_params, x0)
                             elif solver in ["POUNDER"]:
                                 run_pounder(obj, obj_params, num_params, x0)
