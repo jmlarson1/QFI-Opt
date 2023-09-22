@@ -40,7 +40,7 @@ isort = { version = ">=5.10.1", optional = true, extras = ["colors"] }
 mypy = { version = ">=0.982", optional = true }
 pytest = { version = ">=7.2.1", optional = true }
 
-# example dependencies
+# example script dependencies
 ibcdfo = { version = "*", optional = true }
 ipdb = { version = "*", optional = true }
 mpi4py = { version = "*", optional = true }
