@@ -37,18 +37,18 @@ class Dissipator:
 
         rates = [0.0, 0.0, 0.0]
         if dissipation_format == "XYZ":
+            terms = (_qubit_term_XYZ_1, _qubit_term_XYZ_2, _qubit_term_XYZ_3)
             rate_sx, rate_sy, rate_sz = dissipation_rates
             rates[0] = (rate_sx + rate_sy) / 4 + rate_sz / 2
             rates[1] = (rate_sx + rate_sy) / 4
             rates[2] = (rate_sx - rate_sy) / 4
-            terms = (_qubit_term_XYZ_1, _qubit_term_XYZ_2, _qubit_term_XYZ_3)
 
         elif dissipation_format == "PMZ":
+            terms = (_qubit_term_PMZ_1, _qubit_term_PMZ_2, _qubit_term_PMZ_3)
             rate_sp, rate_sm, rate_sz = dissipation_rates
             rates[0] = sum(dissipation_rates) / 2
             rates[1] = rate_sp
             rates[2] = rate_sm
-            terms = (_qubit_term_PMZ_1, _qubit_term_PMZ_2, _qubit_term_PMZ_3)
 
         else:
             raise ValueError(f"dissipation format not recognized: {dissipation_format}")
