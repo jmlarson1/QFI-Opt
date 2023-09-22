@@ -1,4 +1,3 @@
-# type: ignore
 # Copyright 2018 The JAX Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# type: ignore
+
 """JAX-based Dormand-Prince ODE integration with adaptive stepsize.
 
 Integrate systems of ordinary differential equations (ODEs) using the JAX
@@ -25,7 +26,6 @@ https://doi.org/10.1090/S0025-5718-1986-0815836-3
 
 Adjoint algorithm based on Appendix C of https://arxiv.org/pdf/1806.07366.pdf
 """
-
 
 import operator as op
 from functools import partial
