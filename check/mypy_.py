@@ -11,7 +11,7 @@ import check_utils
 def run(
     *args: str,
     include: str | Iterable[str] = "*.py",
-    exclude: str | Iterable[str] = "",
+    exclude: str | Iterable[str] = "*ode_jax.py",
 ) -> int:
     parser = check_utils.get_file_parser()
     parser.description = textwrap.dedent(
