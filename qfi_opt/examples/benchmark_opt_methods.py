@@ -41,6 +41,10 @@ else:
     from orbit4py import ORBIT2
 
 
+def identity_fun(arg):
+    return arg
+
+
 def sim_wrapper(x, grad, obj, obj_params):
     """Wrapper for `nlopt` that creates and updates a database of simulation inputs/outputs.
 
@@ -121,9 +125,8 @@ def run_pounder(obj, obj_params, n, x0):
     spsolver = 2
     gtol = 1e-9
     xind = 0
-    hfun = lambda F: F
 
-    [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
+    [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, identity_fun, combinemodels)
 
     # print("optimum at ", X[xkin])
     # print("minimum value = ", F[xkin])
