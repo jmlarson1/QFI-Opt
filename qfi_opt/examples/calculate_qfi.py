@@ -23,7 +23,7 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: fl
     # There should never be negative eigenvalues, so their magnitude gives an
     # empirical estimate of the numerical accuracy of the eigendecomposition.
     # We discard any QFI terms denominators within an order of magnitude of
-    # this value. 
+    # this value.
     tol = max(tol, -etol_scale * np.min(eigvals))
 
     # Compute QFI
