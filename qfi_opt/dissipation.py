@@ -1,10 +1,10 @@
-import typing
+from typing import Callable, Literal, TypeVar
 
 import numpy as np
 import jax.numpy as jnp
 
 
-ARRAY_TYPE = typing.TypeVar("ARRAY_TYPE", np.ndarray, jnp.ndarray)
+ARRAY_TYPE = TypeVar("ARRAY_TYPE", np.ndarray, jnp.ndarray)
 
 
 class Dissipator:
@@ -66,7 +66,7 @@ class Dissipator:
                 self._rates.append(rate)
                 self._terms.append(term)
 
-    def __matmul__(self, density_op: ARRAY_TYPE) -> ARRAY_TYPE | typing.Literal[0]:
+    def __matmul__(self, density_op: ARRAY_TYPE) -> ARRAY_TYPE | Literal[0]:
         return sum(rate * term(density_op) for rate, term in zip(self._rates, self._terms))
 
     def __mul__(self, scalar: float) -> "Dissipator":
@@ -208,13 +208,15 @@ def qubit_term_PMZ_3(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
     return output
 
 
-def sum_qubit_terms(qubit_term: typing.Callable) -> typing.Callable:
+def sum_qubit_terms(
+    qubit_term: Callable[[ARRAY_TYPE], ARRAY_TYPE],
+) -> Callable[[ARRAY_TYPE], ARRAY_TYPE | Literal[0]]:
     """For a given single-qubit transformation, sum over its action on all qubits."""
 
-    def sum_of_qubit_terms(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
+    def sum_of_qubit_terms(density_op: ARRAY_TYPE) -> ARRAY_TYPE | Literal[0]:
         num_qubits = log2_int(density_op.size) // 2
         input_shape = density_op.shape
-        output = 0
+        output: ARRAY_TYPE | Literal[0] = 0
         for qubit in range(num_qubits):
             dim_a = 2**qubit
             dim_b = 2 ** (num_qubits - qubit - 1)
