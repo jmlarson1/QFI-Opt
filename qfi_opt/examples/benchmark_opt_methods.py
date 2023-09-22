@@ -16,6 +16,14 @@ from qfi_opt.examples.calculate_qfi import compute_eigendecompotion, compute_QFI
 
 root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
 minq5_path = os.path.join(root_dir, "MINQ", "py", "minq5")
+if not os.path.isdir(minq5_path):
+    messages = [
+        "Please install (or symlink) MINQ in the QFI-Opt project directory.",
+        "You can do this with:",
+        f"git clone git@github.com:POptUS/MINQ.git {root_dir}/MINQ",
+    ]
+    exit("\n".join(messages))
+sys.path.append(minq5_path)
 
 # sys.path.append("../orbit/py")
 # from orbit4py import ORBIT2
