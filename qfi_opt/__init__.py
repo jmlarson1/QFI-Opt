@@ -1,4 +1,4 @@
-from . import dissipation, dissipation, examples, ode_jax, plot, spin_models
+from . import dissipation, examples, ode_jax, plot, spin_models
 
 __all__ = [
     "__version__",

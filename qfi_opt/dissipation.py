@@ -1,8 +1,7 @@
 from typing import Callable, Literal, TypeVar
 
-import numpy as np
 import jax.numpy as jnp
-
+import numpy as np
 
 ARRAY_TYPE = TypeVar("ARRAY_TYPE", np.ndarray, jnp.ndarray)
 

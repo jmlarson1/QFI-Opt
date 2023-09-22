@@ -1,26 +1,21 @@
+#!/usr/bin/env python3
+# type: ignore[no-untyped-def]
 import os
 import pickle
 import sys
 
-import matplotlib.pyplot as plt
 import nlopt
 import numpy as np
+from ibcdfo.pounders import pounders
+from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
 from mpi4py import MPI
 
+import qfi_opt
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_eigendecompotion, compute_QFI
 
-try:
-    from ibcdfo.pounders import pounders
-    from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
-except:
-    sys.exit("Please 'pip install ibcdfo'")
-
-try:
-    sys.path.append("../../../minq/py/minq5/")  # Needed by pounders, but not pip installable
-    from minqsw import minqsw
-except:
-    sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is installed (or symlinked) in the same directory as your QFI-Opt package")
+root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
+minq5_path = os.path.join(root_dir, "MINQ", "py", "minq5")
 
 # sys.path.append("../orbit/py")
 # from orbit4py import ORBIT2
@@ -63,8 +58,11 @@ def sim_wrapper(x, grad, obj, obj_params):
     return -1 * qfi  # negative because we are maximizing
 
 
+def calfun(x):
+    return sim_wrapper(x, [], obj, obj_params)
+
+
 def run_orbit(obj, obj_params, n, x0):
-    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     gtol = 1e-9  # Gradient tolerance used to stop the local minimization [1e-5]
     rbftype = "cubic"  # Type of RBF (multiquadric, cubic, Gaussian) ['cubic']
     npmax = 2 * n + 1  # Maximum number of interpolation points [2*n+1]
@@ -91,7 +89,6 @@ def run_orbit(obj, obj_params, n, x0):
 
 
 def run_pounder(obj, obj_params, n, x0):
-    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     X = np.array(x0)
     F = np.array(calfun(X))
     Low = -np.inf * np.ones((1, n))
@@ -136,7 +133,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
     return minf, x
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the code below
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
