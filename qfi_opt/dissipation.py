@@ -66,7 +66,7 @@ class Dissipator:
                 self._rates.append(rate)
                 self._terms.append(term)
 
-    def __matmul__(self, density_op: ARRAY_TYPE) -> ARRAY_TYPE:
+    def __matmul__(self, density_op: ARRAY_TYPE) -> ARRAY_TYPE | typing.Literal[0]:
         num_qubits = log2_int(density_op.size) // 2
         return sum((rate * term(density_op, num_qubits, qubit) for rate, term in zip(self._rates, self._terms) for qubit in range(num_qubits)))
 
