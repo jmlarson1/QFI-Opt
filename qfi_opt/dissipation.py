@@ -1,9 +1,9 @@
-from typing import Callable, Literal, TypeVar
+from typing import Callable, Literal, Union
 
 import jax.numpy as jnp
 import numpy as np
 
-ARRAY_TYPE = TypeVar("ARRAY_TYPE", np.ndarray, jnp.ndarray)
+ARRAY_TYPE = Union[np.ndarray, jnp.ndarray]
 
 
 class Dissipator:
