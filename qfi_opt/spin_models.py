@@ -2,16 +2,28 @@
 import argparse
 import functools
 import itertools
+import os
 import sys
-from typing import Any, Callable, Optional, Sequence
-
-import jax
-import jax.numpy as np
+from typing import Callable, Optional, Sequence
 
 import qfi_opt
-from qfi_opt.dissipation import Dissipator
 
-jax.config.update("jax_enable_x64", True)
+DISABLE_JAX = bool(os.getenv("DISABLE_JAX"))
+
+if not DISABLE_JAX:
+    import jax
+    import jax.numpy as np
+
+    from qfi_opt.dissipation_jax import Dissipator
+
+    jax.config.update("jax_enable_x64", True)
+
+else:
+    import numpy as np  # type: ignore[no-redef]
+    import scipy
+
+    from qfi_opt.dissipation_numpy import Dissipator  # type: ignore[assignment]
+
 
 COMPLEX_TYPE = np.complex128
 DEFAULT_DISSIPATION_FORMAT = "XYZ"
@@ -95,7 +107,7 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
     four parameters rather than the usual five.  The method additionally checks that the dissipation rates respect the axial symmetry, if applicable.
     """
 
-    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: Any, axial_symmetry: bool = True, **kwargs: Any) -> np.ndarray:
+    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: object, axial_symmetry: bool = True, **kwargs: object) -> np.ndarray:
         if axial_symmetry:
             # Verify that dissipation satisfies axial symmetry.
             dissipation_rates = kwargs.get("dissipation_rates", 0.0)
@@ -241,8 +253,10 @@ def evolve_state(
     time: float | np.ndarray,
     hamiltonian: np.ndarray,
     dissipator: Optional[Dissipator] = None,
+    *,
     rtol: float = 1e-8,
     atol: float = 1e-8,
+    disable_jax: bool = DISABLE_JAX,
 ) -> np.ndarray:
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
@@ -257,11 +271,39 @@ def evolve_state(
 
     times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
-    result = qfi_opt.ode_jax.odeint(time_deriv, density_op, times, rtol=rtol, atol=atol)
-    return result[-1]
+
+    if not DISABLE_JAX:
+        result = qfi_opt.ode_jax.odeint(
+            time_deriv,
+            density_op,
+            times,
+            rtol=rtol,
+            atol=atol,
+        )
+        return result[-1]
+
+    def scipy_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
+        density_op.shape = (hamiltonian.shape[0],) * 2  # type: ignore[misc]
+        output = time_deriv(density_op, time)
+        density_op.shape = (-1,)  # type: ignore[misc]
+        return output.ravel()
+
+    result = scipy.integrate.solve_ivp(
+        scipy_time_deriv,
+        times.real,
+        density_op.ravel(),
+        rtol=rtol,
+        atol=atol,
+    )
+    return result.y[:, -1].reshape(density_op.shape)
 
 
-def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = None) -> Callable[[np.ndarray, float], np.ndarray]:
+def get_time_deriv(
+    hamiltonian: np.ndarray,
+    dissipator: Optional[Dissipator] = None,
+    *,
+    disable_jax: bool = DISABLE_JAX,
+) -> Callable[[np.ndarray, float], np.ndarray]:
     """Construct a time derivative function that maps (state, time) --> d(state)/d(time)."""
 
     # construct the time derivative from coherent evolution
@@ -280,7 +322,11 @@ def get_time_deriv(hamiltonian: np.ndarray, dissipator: Optional[Dissipator] = N
 
     if not dissipator:
         return coherent_time_deriv
-    return lambda state, time: coherent_time_deriv(state, time) + dissipator @ state
+
+    def dissipative_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
+        return coherent_time_deriv(density_op, time) + dissipator @ density_op
+
+    return dissipative_time_deriv
 
 
 @functools.cache
@@ -329,12 +375,12 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
     ).reshape((2**num_qubits,) * 2)
 
 
-def get_jacobian_func(simulate_func: Callable) -> Callable:
+def get_jacobian_func(simulate_func: Callable,) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
     jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
 
-    def get_jacobian(*args: Any, **kwargs: Any) -> np.ndarray:
+    def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
         return jacobian_func(*args, **kwargs)[0]
 
     return get_jacobian
@@ -355,7 +401,9 @@ if __name__ == "__main__":
     # convert the parameters into a complex array, which is necessary for autodiff capabilities
     args.params = np.array(args.params, dtype=COMPLEX_TYPE)
 
-    if args.jacobian:
+    if args.jacobian and DISABLE_JAX:
+        print("Cannot compute Jacobian without JAX (for now).")
+    if args.jacobian and not DISABLE_JAX:
         get_jacobian = get_jacobian_func(simulate_OAT)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
         for pp in range(len(args.params)):
