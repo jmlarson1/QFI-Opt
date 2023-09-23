@@ -32,7 +32,7 @@ if not orbit_found:
     messages = [
         "WARNING: 'orbit' not found",
         "If you already have orbit somewhere, run:",
-        f"\n  ln -s <orbit-path> {root_dir}/minq\n",
+        f"\n  ln -s <orbit-path> {root_dir}/orbit\n",
     ]
     print("\n".join(messages))
 else:
