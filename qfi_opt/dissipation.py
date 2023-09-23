@@ -1,9 +1,9 @@
-from typing import Callable, Literal, Union
+from typing import Callable, Literal
 
 import jax.numpy as jnp
 import numpy as np
 
-ARRAY_TYPE = Union[np.ndarray, jnp.ndarray]
+ARRAY_TYPE = np.ndarray | jnp.ndarray
 
 
 class Dissipator:
