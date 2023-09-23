@@ -66,7 +66,7 @@ class Dissipator:
                 self._terms.append(term)
 
     def __matmul__(self, density_op: ARRAY_TYPE) -> ARRAY_TYPE | Literal[0]:
-        return sum(rate * term(density_op) * rate for rate, term in zip(self._rates, self._terms))  # type: ignore[return-value,misc]
+        return sum(rate * term(density_op) for rate, term in zip(self._rates, self._terms))  # type: ignore[return-value,misc]
 
     def __mul__(self, scalar: float) -> "Dissipator":
         bare_rates = (
