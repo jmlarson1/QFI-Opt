@@ -59,8 +59,8 @@ def axis_spin_op(theta: float, phi: float, num_qubits: int) -> np.ndarray:
 
 
 def get_polarization(state_projections: dict[float, np.ndarray], theta: float, phi: float, cutoff: float = 1e-3) -> float:
-    """
-    Compute the polarization of a given state in the given direction.
+    """Compute the polarization of a given state in the given direction.
+
     The polarization is defined by the average over all Husimi probability distribution functions (averaged over manifolds with fixed spin length S).
 
     The input state is a dictionary of the full state's projections onto manifolds of fixed spin length S.

@@ -105,9 +105,8 @@ To reduce boilerplate comments, these methods below will only specify how the bl
 
 
 def qubit_term_XYZ_1(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
-    """
-    Starting with the matrix [[a, b]]  return the matrix [[ 0, -b]
-                              [c, d]],                   [[-c,  0]].
+    """Starting with the matrix [[a, b]]  return the matrix [[ 0, -b]
+    ...                          [c, d]],                   [[-c,  0]].
     """
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
@@ -125,9 +124,8 @@ def qubit_term_XYZ_1(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
 
 
 def qubit_term_XYZ_2(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
-    """
-    Starting with the matrix [[a, b]]  return the matrix [[d-a,  0 ]
-                              [c, d]],                   [[ 0,  a-d]].
+    """Starting with the matrix [[a, b]]  return the matrix [[d-a,  0 ]
+    ...                          [c, d]],                   [[ 0,  a-d]].
     """
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
@@ -145,9 +143,8 @@ def qubit_term_XYZ_2(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
 
 
 def qubit_term_XYZ_3(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
-    """
-    Starting with the matrix [[a, b]]  return the matrix [[0, c]
-                              [c, d]],                   [[b, 0]].
+    """Starting with the matrix [[a, b]]  return the matrix [[0, c]
+    ...                          [c, d]],                   [[b, 0]].
     """
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
@@ -168,9 +165,8 @@ qubit_term_PMZ_1 = qubit_term_XYZ_1
 
 
 def qubit_term_PMZ_2(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
-    """
-    Starting with the matrix [[a, b]]  return the matrix [[ d,  0]
-                              [c, d]],                   [[ 0, -d]].
+    """Starting with the matrix [[a, b]]  return the matrix [[ d,  0]
+    ...                          [c, d]],                   [[ 0, -d]].
     """
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
@@ -188,9 +184,8 @@ def qubit_term_PMZ_2(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
 
 
 def qubit_term_PMZ_3(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
-    """
-    Starting with the matrix [[a, b]]  return the matrix [[-a,  0]
-                              [c, d]],                   [[ 0,  a]].
+    """Starting with the matrix [[a, b]]  return the matrix [[-a,  0]
+    ...                          [c, d]],                   [[ 0,  a]].
     """
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)

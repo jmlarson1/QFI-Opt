@@ -101,9 +101,7 @@ def run_orbit(obj, obj_params, n, x0):
     X = np.array(x0)
     F = np.array(calfun(X))
 
-    [X, F, xkin, nf, exitflag, xkin_mat, xkin_val] = ORBIT2(
-        calfun, rbftype, gamma_m, n, max_evals, npmax, delta, maxdelta, trnorm, gtol, Low, Upp, nfs, X, F, xkin
-    )
+    X, F, xkin, *_ = ORBIT2(calfun, rbftype, gamma_m, n, max_evals, npmax, delta, maxdelta, trnorm, gtol, Low, Upp, nfs, X, F, xkin)
 
     # print("optimum at ", X[xkin])
     # print("minimum value = ", F[xkin])
@@ -125,7 +123,7 @@ def run_pounder(obj, obj_params, n, x0):
     gtol = 1e-9
     xind = 0
 
-    [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, identity_fun, combinemodels)
+    X, F, _, xkin = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, identity_fun, combinemodels)
 
     # print("optimum at ", X[xkin])
     # print("minimum value = ", F[xkin])
