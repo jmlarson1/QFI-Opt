@@ -53,8 +53,8 @@ def simulate_sensing_protocol(
     2. Evolve under a given entangling Hamiltonian.
     3. "Un-rotate" about an axis in the XY plane.
 
-    Step 1 rotates by an angle '+np.pi * params[0]', about the axis '2 * np.pi * params[1]'.
-    Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * num_qubits * np.pi'.
+    Step 1 rotates by an angle '+np.pi * params[1]', about the axis '2 * np.pi * params[2]'.
+    Step 2 evolves under the given entangling Hamiltonian for time 'params[0] * num_qubits * np.pi'.
     Step 3 rotates by an angle '-np.pi * params[3]', about the axis '2 * np.pi * params[4]'.
 
     If dissipation_rates is nonzero, qubits experience dissipation during the entangling step (2).
@@ -65,7 +65,7 @@ def simulate_sensing_protocol(
     factor of 'np.pi * num_qubits' in order to "normalize" dissipation time scales, and make them
     comparable to the time scales of coherent evolution.  Dividing a Dissipator with homogeneous
     dissipation rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes
-    with probability 'e^(-params[2] * r)' by the end of the OAT protocol.
+    with probability 'e^(-params[0] * r)' by the end of the OAT protocol.
     """
     assert len(params) == 5, "Spin sensing protocols accept five parameters."
 
@@ -75,14 +75,14 @@ def simulate_sensing_protocol(
     collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
 
     # rotate the all-|1> state about a chosen axis
-    time_1 = params[0] * np.pi
-    axis_angle_1 = params[1] * 2 * np.pi
+    time_1 = params[1] * np.pi
+    axis_angle_1 = params[2] * 2 * np.pi
     qubit_ket = np.sin(time_1 / 2) * KET_0 + 1j * np.exp(1j * axis_angle_1) * np.cos(time_1 / 2) * KET_1
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
     # entangle!
-    time_2 = params[2] * np.pi * num_qubits
+    time_2 = params[0] * np.pi * num_qubits
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
     state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
 
@@ -119,7 +119,7 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
             # If there are only four parameters, (initial_rotation_angle, entangling_time, final_rotation_angle, final_rotation_axis),
             # inject an initial_rotation_axis of 0 into the first location of the parameter array (at index 1).
             if len(params) == 4:
-                params = np.insert(np.array(params), 1, 0.0)
+                params = np.append(np.array(params), 0.0)
 
         return simulate_func(params, *args, **kwargs)
 
