@@ -116,8 +116,8 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
                         "\nTry passing the argument `axial_symmetry=False` to the simulation method."
                     )
 
-            # If there are only four parameters, (initial_rotation_angle, entangling_time, final_rotation_angle, final_rotation_axis),
-            # inject an initial_rotation_axis of 0 into the first location of the parameter array (at index 1).
+            # If there are only four parameters, (entangling_time, initial_rotation_angle, initial_rotation_axis, final_rotation_angle),
+            # append a final_rotation_axis of 0.
             if len(params) == 4:
                 params = np.append(np.array(params), 0.0)
 
