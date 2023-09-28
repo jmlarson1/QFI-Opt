@@ -53,9 +53,9 @@ def simulate_sensing_protocol(
     2. Evolve under a given entangling Hamiltonian.
     3. "Un-rotate" about an axis in the XY plane.
 
-    Step 1 rotates by an angle '+np.pi * params[1]', about the axis '2 * np.pi * params[2]'.
+    Step 1 rotates by an angle '+np.pi * params[1]', about the axis 'np.pi * params[2]'.
     Step 2 evolves under the given entangling Hamiltonian for time 'params[0] * num_qubits * np.pi'.
-    Step 3 rotates by an angle '-np.pi * params[3]', about the axis '2 * np.pi * params[4]'.
+    Step 3 rotates by an angle '-np.pi * params[3]', about the axis 'np.pi * params[4]'.
 
     If dissipation_rates is nonzero, qubits experience dissipation during the entangling step (2).
     See the documentation for the Dissipator class for a general explanation of the
@@ -76,7 +76,7 @@ def simulate_sensing_protocol(
 
     # rotate the all-|1> state about a chosen axis
     time_1 = params[1] * np.pi
-    axis_angle_1 = params[2] * 2 * np.pi
+    axis_angle_1 = params[2] * np.pi
     qubit_ket = np.sin(time_1 / 2) * KET_0 + 1j * np.exp(1j * axis_angle_1) * np.cos(time_1 / 2) * KET_1
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
@@ -88,7 +88,7 @@ def simulate_sensing_protocol(
 
     # un-rotate about a chosen axis
     time_3 = -params[3] * np.pi
-    axis_angle_3 = params[4] * 2 * np.pi
+    axis_angle_3 = params[4] * np.pi
     final_hamiltonian = np.cos(axis_angle_3) * collective_Sx + np.sin(axis_angle_3) * collective_Sy
     state_3 = evolve_state(state_2, time_3, final_hamiltonian)
 
