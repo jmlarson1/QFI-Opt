@@ -2,7 +2,7 @@
 import sys
 import textwrap
 
-from general_superstaq.check import check_utils, configs, flake8_, format_, mypy_, pylint_
+from checks_superstaq import check_utils, configs, flake8_, format_, mypy_, pylint_
 
 
 def run(*args: str) -> int:
