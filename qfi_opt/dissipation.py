@@ -108,6 +108,7 @@ def qubit_term_XYZ_1(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
     """Starting with the matrix ⌈ a, b ⌉  return the matrix ⌈  0, -b ⌉
     ...                         ⌊ c, d ⌋,                   ⌊ -c,  0 ⌋.
     """
+    output: ARRAY_TYPE
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
         output = output.at[:, 0, :, 0, :].set(0)
@@ -127,6 +128,7 @@ def qubit_term_XYZ_2(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
     """Starting with the matrix ⌈ a, b ⌉  return the matrix ⌈ d-a,  0  ⌉
     ...                         ⌊ c, d ⌋,                   ⌊  0,  a-d ⌋.
     """
+    output: ARRAY_TYPE
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
         output = output.at[:, 0, :, 0, :].set(density_op[:, 1, :, 1, :] - density_op[:, 0, :, 0, :])
@@ -146,6 +148,7 @@ def qubit_term_XYZ_3(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
     """Starting with the matrix ⌈ a, b ⌉  return the matrix ⌈ 0, c ⌉
     ...                         ⌊ c, d ⌋,                   ⌊ b, 0 ⌋.
     """
+    output: ARRAY_TYPE
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
         output = output.at[:, 0, :, 0, :].set(0)
@@ -168,6 +171,7 @@ def qubit_term_PMZ_2(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
     """Starting with the matrix ⌈ a, b ⌉  return the matrix ⌈ d,  0 ⌉
     ...                         ⌊ c, d ⌋,                   ⌊ 0, -d ⌋.
     """
+    output: ARRAY_TYPE
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
         output = output.at[:, 0, :, 0, :].set(density_op[:, 1, :, 1, :])
@@ -187,6 +191,7 @@ def qubit_term_PMZ_3(density_op: ARRAY_TYPE) -> ARRAY_TYPE:
     """Starting with the matrix ⌈ a, b ⌉  return the matrix ⌈ -a,  0 ⌉
     ...                         ⌊ c, d ⌋,                   ⌊  0,  a ⌋.
     """
+    output: ARRAY_TYPE
     if isinstance(density_op, jnp.ndarray):
         output = jnp.empty_like(density_op)
         output = output.at[:, 0, :, 0, :].set(-density_op[:, 0, :, 0, :])
