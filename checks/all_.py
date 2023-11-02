@@ -2,14 +2,11 @@
 import sys
 import textwrap
 
-import check_utils
-import flake8_
-import format_
-import mypy_
+from checks_superstaq import check_utils, configs, flake8_, format_, mypy_, pylint_
 
 
 def run(*args: str) -> int:
-    parser = check_utils.get_file_parser()
+    parser = check_utils.get_check_parser()
     parser.description = textwrap.dedent(
         """
         Runs all checks on the repository.
@@ -24,9 +21,11 @@ def run(*args: str) -> int:
     exit_on_failure = not parsed_args.force
 
     checks_failed = 0
-    checks_failed |= format_.run(*parsed_args.files, exit_on_failure=exit_on_failure)
-    checks_failed |= flake8_.run(*parsed_args.files, exit_on_failure=exit_on_failure)
-    checks_failed |= mypy_.run(*parsed_args.files, exit_on_failure=exit_on_failure)
+    checks_failed |= configs.run(exit_on_failure=exit_on_failure)
+    checks_failed |= format_.run(exit_on_failure=exit_on_failure)
+    checks_failed |= flake8_.run(exit_on_failure=exit_on_failure)
+    checks_failed |= pylint_.run(exit_on_failure=exit_on_failure)
+    checks_failed |= mypy_.run(exit_on_failure=exit_on_failure, exclude="qfi_opt/examples/*")
 
     return checks_failed
 

@@ -25,6 +25,8 @@ https://doi.org/10.1090/S0025-5718-1986-0815836-3
 Adjoint algorithm based on Appendix C of https://arxiv.org/pdf/1806.07366.pdf
 """
 
+# mypy: ignore-errors
+# pylint: skip-file
 
 import operator as op
 from functools import partial

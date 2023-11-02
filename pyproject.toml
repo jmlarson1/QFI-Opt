@@ -1,17 +1,20 @@
-# general package info
-[project]
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
 name = "QFI-Opt"
-version = "0.0.1"
+version = "0.0.2"
 description = "This repository contains codes for optimizing the quantum fisher information (QFI) of quantum systems."
 authors = [
-  { name = "Jeffrey Larson", email = "jmlarson@anl.gov" },
-  { name = "Robert J. Lewis-Swan", email = "lewisswan@ou.edu" },
-  { name = "Sri Hari Krishna Narayanan", email = "snarayan@anl.gov" },
-  { name = "Michael A. Perlin", email = "mika.perlin@gmail.com" },
+  "Jeffrey Larson <jmlarson@anl.gov>",
+  "Robert J. Lewis-Swan <lewisswan@ou.edu>",
+  "Sri Hari Krishna Narayanan <snarayan@anl.gov>",
+  "Michael A. Perlin <mika.perlin@gmail.com>",
 ]
 readme = "README.md"
-license = { file = "LICENSE.txt" }
-requires-python = ">=3.10"
+license = "Apache-2.0"
+repository = "https://github.com/jmlarson1/QFI-Opt"
 keywords = ["quantum fisher information", "QFI", "quantum metrology"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -20,57 +23,139 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Mathematics",
   "Topic :: Scientific/Engineering :: Physics",
 ]
-dynamic = ["dependencies", "optional-dependencies"]
 
-[project.urls]
-repository = "https://github.com/jmlarson1/QFI-Opt"
+[tool.poetry.dependencies]
+python = "^3.10"
+jax = ">=0.4.8"
+jaxlib = ">=0.4.7"
+matplotlib = ">=3.6.2"
+numpy = ">=1.23.4"
+scipy = ">=1.9.2"
 
-# setuptools and associated options
+checks_superstaq = { version = ">=0.4.29", optional = true }
+ibcdfo = { version = "*", optional = true }
+ipdb = { version = "*", optional = true }
+mpi4py = { version = "*", optional = true }
+nlopt = { version = "*", optional = true }
 
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+[tool.poetry.extras]
+dev = ["checks_superstaq", "ibcdfo", "ipdb", "mpi4py", "nlopt"]
 
-[tool.setuptools.packages.find]
-include = ["qfi_opt*"]
-
-[tool.setuptools.dynamic.dependencies]
-file = ["requirements.txt"]
-
-[tool.setuptools.dynamic.optional-dependencies.dev]
-file = ["dev-requirements.txt"]
-
-# miscellaneous package configuration options
+# Check script configuration:
 
 [tool.black]
 color = true
-line_length = 160
+line_length = 160 # REPO-SPECIFIC CONFIG
 
 [tool.isort]
 profile = "black"
-line_length = 160
+line_length = 160             # REPO-SPECIFIC CONFIG
 color_output = true
-
-[tool.mypy]
-ignore_missing_imports = true
-show_error_codes = true
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-warn_unused_ignores = true
-install_types = true
-non_interactive = true
-no_implicit_optional = true
+known_first_party = "qfi-opt" # REPO-SPECIFIC CONFIG
 
 [tool.flake8]
-max-line-length = 160
+max-line-length = 160 # REPO-SPECIFIC CONFIG
 max-complexity = 10
 show_source = true
 statistics = true
 count = true
+enable-extensions = ["TC", "TC1"]
 extend-ignore = [
   "E203",
   "I100",
   "I101",
   "I201",
   "I202",
+  "E731", # allow in-line lambda expressions # REPO-SPECIFIC CONFIG
 ] # these errors conflict with black and/or isort
+
+[tool.mypy]
+ignore_missing_imports = true
+show_error_codes = true
+# disallow_any_generics = true # REPO-SPECIFIC CONFIG
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+install_types = true
+non_interactive = true
+no_implicit_optional = true
+plugins = ["numpy.typing.mypy_plugin"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "@overload"]
+
+[tool.coverage.run]
+include = ["./*"]
+
+[tool.pylint.main]
+max-line-length = 160 # REPO-SPECIFIC CONFIG
+disable = "all"
+load-plugins = ["pylint.extensions.docparams", "pylint.extensions.docstyle"]
+output-format = "colorized"
+score = false
+reports = false
+enable = [
+  "anomalous-backslash-in-string",
+  "assert-on-tuple",
+  "bad-indentation",
+  "bad-option-value",
+  "bad-reversed-sequence",
+  "bad-super-call",
+  "consider-merging-isinstance",
+  "continue-in-finally",
+  "dangerous-default-value",
+  "docstyle",
+  "duplicate-argument-name",
+  "expression-not-assigned",
+  "function-redefined",
+  "inconsistent-mro",
+  "init-is-generator",
+  "line-too-long",
+  "lost-exception",
+  # "missing-class-docstring", # REPO-SPECIFIC CONFIG
+  # "missing-function-docstring", # REPO-SPECIFIC CONFIG
+  "missing-kwoa",
+  "mixed-line-endings",
+  "not-callable",
+  "no-value-for-parameter",
+  "nonexistent-operator",
+  "not-in-loop",
+  "parameter_documentation",
+  "pointless-statement",
+  "redefined-builtin",
+  "relative-beyond-top-level",
+  "return-arg-in-generator",
+  "return-in-init",
+  "return-outside-function",
+  "simplifiable-if-statement",
+  "syntax-error",
+  "too-many-function-args",
+  "trailing-whitespace",
+  "undefined-variable",
+  "unexpected-keyword-arg",
+  "unhashable-dict-key",
+  "unnecessary-pass",
+  "unreachable",
+  "unrecognized-inline-option",
+  "unused-import",
+  "unnecessary-semicolon",
+  "unused-variable",
+  "unused-wildcard-import",
+  "wildcard-import",
+  "wrong-import-order",
+  "wrong-import-position",
+  "yield-outside-function",
+]
+
+# Ignore long lines containing urls or pylint directives.
+[tool.pylint.format]
+ignore-long-lines = '^(.*#\w*pylint: disable.*|\s*(# )?<?https?://\S+>?)$'
+
+# List of members which are set dynamically and missed by pylint inference
+# system, and so shouldn't trigger E1101 when accessed. Python regular
+# expressions are accepted.
+[tool.pylint.typecheck]
+generated-members = "numpy.*"

@@ -1,29 +1,43 @@
+#!/usr/bin/env python3
 import os
 import pickle
 import sys
 
-import matplotlib.pyplot as plt
 import nlopt
 import numpy as np
+from ibcdfo.pounders import pounders
+from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
 from mpi4py import MPI
 
+import qfi_opt
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_eigendecompotion, compute_QFI
 
-try:
-    from ibcdfo.pounders import pounders
-    from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
-except:
-    sys.exit("Please 'pip install ibcdfo'")
+root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
+minq5_dir = os.path.join(root_dir, "minq", "py", "minq5")
+if not os.path.isdir(minq5_dir):
+    messages = [
+        "Please install (or symlink) MINQ in the QFI-Opt project directory.",
+        "You can do this with:",
+        f"\n  git clone https://github.com/POptUS/MINQ.git {root_dir}/minq\n",
+        "Or, if you already have MINQ somewhere, run:",
+        f"\n  ln -s <minq-path> {root_dir}/minq\n",
+    ]
+    exit("\n".join(messages))
+sys.path.append(minq5_dir)
 
-try:
-    sys.path.append("../../../minq/py/minq5/")  # Needed by pounders, but not pip installable
-    from minqsw import minqsw
-except:
-    sys.exit("Make sure the MINQ [https://github.com/POptUS/minq] is installed (or symlinked) in the same directory as your QFI-Opt package")
-
-# sys.path.append("../orbit/py")
-# from orbit4py import ORBIT2
+orbit_dir = os.path.isdir(os.path.join(root_dir, "orbit", "py"))
+orbit_found = os.path.isdir(orbit_dir)
+if not orbit_found:
+    messages = [
+        "WARNING: 'orbit' not found",
+        "If you already have orbit somewhere, run:",
+        f"\n  ln -s <orbit-path> {root_dir}/orbit\n",
+    ]
+    print("\n".join(messages))
+else:
+    sys.path.append(orbit_dir)
+    from orbit4py import ORBIT2
 
 
 def sim_wrapper(x, grad, obj, obj_params):
@@ -80,9 +94,7 @@ def run_orbit(obj, obj_params, n, x0):
     X = np.array(x0)
     F = np.array(calfun(X))
 
-    [X, F, xkin, nf, exitflag, xkin_mat, xkin_val] = ORBIT2(
-        calfun, rbftype, gamma_m, n, max_evals, npmax, delta, maxdelta, trnorm, gtol, Low, Upp, nfs, X, F, xkin
-    )
+    X, F, xkin, *_ = ORBIT2(calfun, rbftype, gamma_m, n, max_evals, npmax, delta, maxdelta, trnorm, gtol, Low, Upp, nfs, X, F, xkin)
 
     # print("optimum at ", X[xkin])
     # print("minimum value = ", F[xkin])
@@ -106,7 +118,7 @@ def run_pounder(obj, obj_params, n, x0):
     xind = 0
     hfun = lambda F: F
 
-    [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
+    X, F, _, xkin = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
 
     # print("optimum at ", X[xkin])
     # print("minimum value = ", F[xkin])
@@ -136,7 +148,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
     return minf, x
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the code below
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -181,13 +193,15 @@ if __name__ == "__main__":
 
                         best_val = {}
                         best_pt = {}
-                        for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER"]:
+                        for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "ORBIT", "POUNDER"]:
                             global all_f, all_X
                             all_f = []
                             all_X = []
                             if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
                                 run_nlopt(obj, obj_params, num_params, x0, solver)
                             elif solver in ["ORBIT"]:
+                                if not orbit_found:
+                                    continue
                                 run_orbit(obj, obj_params, num_params, x0)
                             elif solver in ["POUNDER"]:
                                 run_pounder(obj, obj_params, num_params, x0)

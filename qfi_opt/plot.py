@@ -11,8 +11,9 @@ from qfi_opt import spin_models
 
 if typing.TYPE_CHECKING:
     import jax.numpy as jnp
+    from mpl_toolkits import mplot3d
 
-STATE_TYPE = Union[np.ndarray, "jnp.ndarray"]
+ARRAY_TYPE = Union[np.ndarray, "jnp.ndarray"]
 
 try:
     import cmocean
@@ -26,7 +27,7 @@ except ModuleNotFoundError:
         return plt.get_cmap("inferno")(color_vals)
 
 
-def get_spin_length_projections(state: STATE_TYPE) -> dict[float, np.ndarray]:
+def get_spin_length_projections(state: ARRAY_TYPE) -> dict[float, np.ndarray]:
     """Compute the projections of a state onto manifolds of fixed spin length S.
 
     More specifically, compute the dictionary `{S: state_S for S in spin_length_vals}`, where
@@ -58,8 +59,8 @@ def axis_spin_op(theta: float, phi: float, num_qubits: int) -> np.ndarray:
 
 
 def get_polarization(state_projections: dict[float, np.ndarray], theta: float, phi: float, cutoff: float = 1e-3) -> float:
-    """
-    Compute the polarization of a given state in the given direction.
+    """Compute the polarization of a given state in the given direction.
+
     The polarization is defined by the average over all Husimi probability distribution functions (averaged over manifolds with fixed spin length S).
 
     The input state is a dictionary of the full state's projections onto manifolds of fixed spin length S.
@@ -81,16 +82,16 @@ def get_polarization(state_projections: dict[float, np.ndarray], theta: float, p
     return polarization
 
 
-def husimi(  # type: ignore[no-untyped-def]
-    state: STATE_TYPE,
+def husimi(
+    state: ARRAY_TYPE,
     grid_size: int = 101,
     single_sphere: bool = True,
-    figsize: Optional[tuple[int, int]] = None,
+    figsize: Optional[tuple[float, float]] = None,
     rasterized: bool = True,
     view_angles: tuple[float, float] = (0, 0),
     shade: bool = False,
     color_max: Optional[float] = None,
-):
+) -> tuple[mpl.figure.Figure, list["mplot3d.axes3d.Axes3D"]]:
     if figsize is None:
         figsize = plt.figaspect(1 if single_sphere else 0.5)
 
@@ -110,6 +111,7 @@ def husimi(  # type: ignore[no-untyped-def]
     # plot sphere
 
     figure = plt.figure(figsize=figsize)
+    axes: list["mplot3d.axes3d.Axes3D"]
     if single_sphere:
         axes = [figure.add_subplot(111, projection="3d")]
     else:
@@ -121,11 +123,10 @@ def husimi(  # type: ignore[no-untyped-def]
     # clean up figure
 
     elev, azim = view_angles
-    ax_lims = np.array([-1, 1]) * 0.7
     for axis in axes:
-        axis.set_xlim(ax_lims)
-        axis.set_ylim(ax_lims)
-        axis.set_zlim(ax_lims * 0.8)
+        axis.set_xlim((-0.7, 0.7))
+        axis.set_ylim((-0.7, 0.7))
+        axis.set_zlim((-0.8, 0.8))
         axis.view_init(elev=elev, azim=azim)
         axis.set_axis_off()
 
@@ -133,15 +134,15 @@ def husimi(  # type: ignore[no-untyped-def]
     right = 1
     bottom = -0.03
     top = 1
-    rect = [left, bottom, right, top]
+    rect = (left, bottom, right, top)
     figure.tight_layout(pad=0, w_pad=0, h_pad=0, rect=rect)
     return figure, axes
 
 
-def histogram(  # type: ignore[no-untyped-def]
-    state: STATE_TYPE,
+def histogram(
+    state: ARRAY_TYPE,
     figsize: tuple[int, int] = (4, 3),
-):
+) -> tuple[mpl.figure.Figure, mpl.axes._axes.Axes]:
     """Plot the distribution function over collective-Sz measurement outcomes."""
     num_spins = spin_models.log2_int(state.shape[0])
     state_tensor = np.reshape(state, (2,) * num_spins * 2)
