@@ -40,10 +40,6 @@ else:
     from orbit4py import ORBIT2
 
 
-def identity_fun(arg):
-    return arg
-
-
 def sim_wrapper(x, grad, obj, obj_params):
     """Wrapper for `nlopt` that creates and updates a database of simulation inputs/outputs.
 
@@ -81,11 +77,8 @@ def sim_wrapper(x, grad, obj, obj_params):
     return -1 * qfi  # negative because we are maximizing
 
 
-def calfun(x):
-    return sim_wrapper(x, [], obj, obj_params)
-
-
 def run_orbit(obj, obj_params, n, x0):
+    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     gtol = 1e-9  # Gradient tolerance used to stop the local minimization [1e-5]
     rbftype = "cubic"  # Type of RBF (multiquadric, cubic, Gaussian) ['cubic']
     npmax = 2 * n + 1  # Maximum number of interpolation points [2*n+1]
@@ -110,6 +103,7 @@ def run_orbit(obj, obj_params, n, x0):
 
 
 def run_pounder(obj, obj_params, n, x0):
+    calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
     X = np.array(x0)
     F = np.array(calfun(X))
     Low = -np.inf * np.ones((1, n))
@@ -122,8 +116,9 @@ def run_pounder(obj, obj_params, n, x0):
     spsolver = 2
     gtol = 1e-9
     xind = 0
+    hfun = lambda F: F
 
-    X, F, _, xkin = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, identity_fun, combinemodels)
+    X, F, _, xkin = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
 
     # print("optimum at ", X[xkin])
     # print("minimum value = ", F[xkin])

@@ -66,6 +66,7 @@ extend-ignore = [
   "I101",
   "I201",
   "I202",
+  "E731", # allow in-line lambda expressions # REPO-SPECIFIC CONFIG
 ] # these errors conflict with black and/or isort
 
 [tool.mypy]
