@@ -129,8 +129,7 @@ def h_more_struct_1_combine(Cres, Gres, Hres):
 
                 T1 = (C_lam[i] - C_lam[j]) ** 2 / (C_lam[i] + C_lam[j])
 
-                N = 2 * (C_lam[i] ** 2 - C_lam[j] ** 2) * (G_lam[:, i] - G_lam[:, j]) \
-                    - (C_lam[i] - C_lam[j]) ** 2 * (G_lam[:, i] + G_lam[:, j])
+                N = 2 * (C_lam[i] ** 2 - C_lam[j] ** 2) * (G_lam[:, i] - G_lam[:, j]) - (C_lam[i] - C_lam[j]) ** 2 * (G_lam[:, i] + G_lam[:, j])
 
                 N_g = (
                     2 * (C_lam[i] ** 2 - C_lam[j] ** 2) * (H_lam[:, :, i] - H_lam[:, :, j])
