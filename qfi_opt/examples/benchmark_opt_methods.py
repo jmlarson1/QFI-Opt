@@ -6,7 +6,14 @@ import nlopt
 import numpy as np
 
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion, vec_compute_QFI_max_sum_squares, h_more_struct_1, h_more_struct_1_combine, vec_compute_QFI_more_struct_1
+from qfi_opt.examples.calculate_qfi import (
+    compute_eigendecompotion,
+    compute_QFI,
+    h_more_struct_1,
+    h_more_struct_1_combine,
+    vec_compute_QFI_max_sum_squares,
+    vec_compute_QFI_more_struct_1,
+)
 
 try:
     from ibcdfo.pounders import pounders
@@ -47,21 +54,21 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
         rho = obj(x, obj_params["N"], dissipation_rates=obj_params["dissipation"])
 
         if use_DB:
-        to_save = {"rho": rho, "var_vals": x}
-        DB = np.append(DB, to_save)
-        np.save(database, DB)
+            to_save = {"rho": rho, "var_vals": x}
+            DB = np.append(DB, to_save)
+            np.save(database, DB)
 
     vals, vecs = compute_eigendecompotion(rho)
-    if out_type==1:
+    if out_type == 1:
         vecqfi = vec_compute_QFI_max_sum_squares(vals, vecs, obj_params["G"])
         all_f.append(np.sum(vecqfi**2))
         return vecqfi
-    elif out_type==0:
+    elif out_type == 0:
         qfi = compute_QFI(vals, vecs, obj_params["G"])
         print(x, qfi, flush=True)
         all_f.append(qfi)
         return -1 * qfi  # negative because we are maximizing
-    elif out_type==2:
+    elif out_type == 2:
         vecqfi = vec_compute_QFI_more_struct_1(vals, vecs, obj_params["G"])
         # all_f.append(qfi)
         return vecqfi  # negative because we are maximizing
@@ -90,21 +97,21 @@ def run_orbit(obj, obj_params, n, x0):
 
 
 def run_pounder(obj, obj_params, n, x0, out_type=0):
-    if out_type==0:
+    if out_type == 0:
         Ffun = lambda x: sim_wrapper(x, [], obj, obj_params)
         hfun = lambda F: F
         combinemodels = identity_combine
         m = 1
-    elif out_type==1:
+    elif out_type == 1:
         Ffun = lambda x: sim_wrapper(x, [], obj, obj_params, out_type=1)
         hfun = lambda F: -1 * np.sum(F**2)
         combinemodels = neg_leastsquares
         m = 120
-    elif out_type==2:
+    elif out_type == 2:
         Ffun = lambda x: sim_wrapper(x, [], obj, obj_params, out_type=2)
         hfun = h_more_struct_1
         combinemodels = h_more_struct_1_combine
-        m = 16 + 16*15 # 16 for the eigenvalues, 16*15/2 for the eigenvector pair real part and 16*15/2 for the imag part
+        m = 16 + 16 * 15  # 16 for the eigenvalues, 16*15/2 for the eigenvector pair real part and 16*15/2 for the imag part
 
     X = np.array(x0)
     F = np.array(Ffun(X))
@@ -173,7 +180,7 @@ if __name__ == "__main__":
                     obj = getattr(spin_models, model)
 
                     # for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER", "POUNDERS"]:
-                    for solver in ["POUNDERS",]:
+                    for solver in ["POUNDERS"]:
                         global all_f
                         all_f = []
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
