@@ -90,10 +90,6 @@ def h_more_struct_1(z):
 
 
 def h_more_struct_1_combine(Cres, Gres, Hres):
-    import ipdb
-
-    ipdb.set_trace(context=21)
-
     n, _, m = Hres.shape
     h1_g = np.zeros(n)
     h1_H = np.zeros((n, n))

@@ -40,7 +40,7 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
     database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
     match = 0
-    use_DB = False
+    use_DB = True
     if use_DB and os.path.exists(database):
         DB = np.load(database, allow_pickle=True)
         for db_entry in DB:
@@ -59,18 +59,18 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
             np.save(database, DB)
 
     vals, vecs = compute_eigendecompotion(rho)
-    if out_type == 1:
-        vecqfi = vec_compute_QFI_max_sum_squares(vals, vecs, obj_params["G"])
-        all_f.append(np.sum(vecqfi**2))
-        return vecqfi
-    elif out_type == 0:
+    if out_type == 0:
         qfi = compute_QFI(vals, vecs, obj_params["G"])
         print(x, qfi, flush=True)
         all_f.append(qfi)
         return -1 * qfi  # negative because we are maximizing
+    elif out_type == 1:
+        vecqfi = vec_compute_QFI_max_sum_squares(vals, vecs, obj_params["G"])
+        all_f.append(np.sum(vecqfi**2))
+        return vecqfi
     elif out_type == 2:
         vecqfi = vec_compute_QFI_more_struct_1(vals, vecs, obj_params["G"])
-        # all_f.append(qfi)
+        all_f.append(qfi)
         return vecqfi  # negative because we are maximizing
 
 
@@ -113,6 +113,12 @@ def run_pounder(obj, obj_params, n, x0, out_type=0):
         combinemodels = h_more_struct_1_combine
         m = 16 + 16 * 15  # 16 for the eigenvalues, 16*15/2 for the eigenvector pair real part and 16*15/2 for the imag part
 
+    # Let's make sure all the ways of calculating QFI produce the same result:
+    import ipdb; ipdb.set_trace(context=21)
+    truth = sim_wrapper(x0, [], obj, obj_params, out_type = 0)
+    test_1 = -1*np.sum(sim_wrapper(x0, [], obj, obj_params, out_type = 1)**2)
+    test_2 = h_more_struct_1(sim_wrapper(x0, [], obj, obj_params, out_type = 2))
+
     X = np.array(x0)
     F = np.array(Ffun(X))
     Low = -np.inf * np.ones((1, n))
@@ -122,7 +128,7 @@ def run_pounder(obj, obj_params, n, x0, out_type=0):
 
     Options = {"hfun": hfun, "combinemodels": combinemodels, "printf": True}
     Prior = {"X_init": X, "F_init": F, "nfs": 1, "xk_in": 0}
-    [X, F, flag, xkin] = pounders(Ffun, X, n, max_evals, g_tol, delta_0, m, Low, Upp, Prior=Prior, Options=Options)
+    [X, F, hF, flag, xkin] = pounders(Ffun, X, n, max_evals, g_tol, delta_0, m, Low, Upp, Prior=Prior, Options=Options)
 
 
 def run_nlopt(obj, obj_params, num_params, x0, solver):
@@ -180,7 +186,7 @@ if __name__ == "__main__":
                     obj = getattr(spin_models, model)
 
                     # for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER", "POUNDERS"]:
-                    for solver in ["POUNDERS"]:
+                    for solver in ["POUNDER", "POUNDERS1", "POUNDERS2"]:
                         global all_f
                         all_f = []
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
@@ -189,7 +195,9 @@ if __name__ == "__main__":
                             run_orbit(obj, obj_params, num_params, x0)
                         elif solver in ["POUNDER"]:
                             run_pounder(obj, obj_params, num_params, x0)
-                        elif solver in ["POUNDERS"]:
+                        elif solver in ["POUNDERS1"]:
+                            run_pounder(obj, obj_params, num_params, x0, 1)
+                        elif solver in ["POUNDERS2"]:
                             run_pounder(obj, obj_params, num_params, x0, 2)
 
                         plt.figure(fig_filename)
