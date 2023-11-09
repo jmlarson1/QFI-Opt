@@ -63,24 +63,25 @@ def vec_compute_QFI_max_sum_squares(eigvals: np.ndarray, eigvecs: np.ndarray, G:
 
 def h_more_struct_1(z):
     num_vals = 16
-    eigvals = z[:num_vals]
-    eigvec_product_R = np.zeros((16, 16))
-    eigvec_product_I = np.zeros((16, 16))
+    b = num_vals * (num_vals - 1) // 2
 
-    count = 0
+    eigvals = z[:num_vals]
+    eigvec_product_R = np.zeros((num_vals, num_vals))
+    eigvec_product_I = np.zeros((num_vals, num_vals))
+
+    count = -1
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
+            count += 1
             eigvec_product_R[i, j] = z[num_vals + count]
-            eigvec_product_I[i, j] = z[num_vals + 16 * 15 // 2 + count]
+            eigvec_product_I[i, j] = z[num_vals + b + count]
 
     tol = max(1e-8, -10 * np.min(eigvals))
 
     running_sum = 0
-    count = -1
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             denom = eigvals[i] + eigvals[j]
-            count += 1
             if not np.isclose(denom, 0, atol=tol, rtol=tol):
                 numer = (eigvals[i] - eigvals[j]) ** 2
                 term = eigvec_product_R[i, j] ** 2 + eigvec_product_I[i, j] ** 2
@@ -98,27 +99,43 @@ def h_more_struct_1_combine(Cres, Gres, Hres):
     h1_H = np.zeros((n, n))
 
     num_vals = 16
+    b = num_vals * (num_vals - 1) // 2
 
     C_lam = Cres[:num_vals]
     G_lam = Gres[:, :num_vals]
     H_lam = Hres[:, :, :num_vals]
 
-    C_vec_R = Cres[num_vals:]
-    G_vec_R = Gres[:, num_vals:]
-    H_vec_R = Hres[:, :, num_vals:]
+    C_vec_R = np.zeros((num_vals, num_vals))
+    G_vec_R = np.zeros((n, num_vals, num_vals))
+    H_vec_R = np.zeros((n, n, num_vals, num_vals))
+    C_vec_I = np.zeros((num_vals, num_vals))
+    G_vec_I = np.zeros((n, num_vals, num_vals))
+    H_vec_I = np.zeros((n, n, num_vals, num_vals))
 
-    C_vec_I = Cres[num_vals:]
-    G_vec_I = Gres[:, num_vals:]
-    H_vec_I = Hres[:, :, num_vals:]
+    count = -1
+    for i in range(num_vals):
+        for j in range(i + 1, num_vals):
+            count += 1
+
+            C_vec_R[i, j] = Cres[num_vals + count]
+            G_vec_R[:, i, j] = Gres[:, num_vals + count]
+            H_vec_R[:, :, i, j] = Hres[:, :, num_vals + count]
+
+            C_vec_R[i, j] = Cres[num_vals + b + count]
+            G_vec_R[:, i, j] = Gres[:, num_vals + b + count]
+            H_vec_R[:, :, i, j] = Hres[:, :, num_vals + b + count]
+
+    assert np.array_equal(C_vec_R.shape, C_vec_I.shape), "Should be the same size"
+    assert np.array_equal(G_vec_R.shape, G_vec_I.shape), "Should be the same size"
+    assert np.array_equal(H_vec_R.shape, H_vec_I.shape), "Should be the same size"
 
     tol = max(1e-8, -10 * np.min(C_lam))
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
-            denom = eigvals[i] + eigvals[j]
-            count += 1
+            denom = C_lam[i] + C_lam[j]
 
             if not np.isclose(denom, 0, atol=tol, rtol=tol):
-                T2 = C_vec_R[i, j] ** 2 + C_vec_I[1] ** 2
+                T2 = C_vec_R[i, j] ** 2 + C_vec_I[i, j] ** 2
                 T2_g = 2 * (C_vec_R[i, j] * G_vec_R[:, i, j] + C_vec_I[i, j] * G_vec_I[:, i, j])
                 T2_H = 2 * (
                     C_vec_R[i, j] * H_vec_R[:, :, i, j]
@@ -155,15 +172,15 @@ def vec_compute_QFI_more_struct_1(eigvals: np.ndarray, eigvecs: np.ndarray, G: n
     num_products = num_vals * (num_vals - 1) // 2
     eigvec_product_R = np.zeros(num_products)
     eigvec_product_I = np.zeros(num_products)
-    count = 0
+    count = -1
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
+            count += 1
             val = eigvecs[i].conj() @ G @ eigvecs[j]
             eigvec_product_R[count] = np.real(val)
             eigvec_product_I[count] = np.imag(val)
-            count += 1
 
-    assert count == num_products
+    assert count + 1 == num_products
 
     return np.hstack((eigvals, eigvec_product_R, eigvec_product_I))
 
