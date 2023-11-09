@@ -6,7 +6,7 @@ import nlopt
 import numpy as np
 
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion, vec_compute_QFI
+from qfi_opt.examples.calculate_qfi import compute_QFI, compute_eigendecompotion, vec_compute_QFI_max_sum_squares, h_more_struct_1, h_more_struct_1_combine, vec_compute_QFI_more_struct_1
 
 try:
     from ibcdfo.pounders import pounders
@@ -24,7 +24,7 @@ except:
 # from orbit4py import ORBIT2
 
 
-def sim_wrapper(x, grad, obj, obj_params, vecout=False):
+def sim_wrapper(x, grad, obj, obj_params, out_type=0):
     """Wrapper for `nlopt` that creates and updates a database of simulation inputs/outputs.
 
     Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
@@ -33,7 +33,8 @@ def sim_wrapper(x, grad, obj, obj_params, vecout=False):
     database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
     match = 0
-    if os.path.exists(database):
+    use_DB = False
+    if use_DB and os.path.exists(database):
         DB = np.load(database, allow_pickle=True)
         for db_entry in DB:
             if np.allclose(db_entry["var_vals"], x, rtol=1e-12, atol=1e-12):
@@ -45,20 +46,25 @@ def sim_wrapper(x, grad, obj, obj_params, vecout=False):
         # Do the sim
         rho = obj(x, obj_params["N"], dissipation_rates=obj_params["dissipation"])
 
+        if use_DB:
         to_save = {"rho": rho, "var_vals": x}
         DB = np.append(DB, to_save)
         np.save(database, DB)
 
     vals, vecs = compute_eigendecompotion(rho)
-    if vecout:
-        vecqfi = vec_compute_QFI(vals, vecs, obj_params["G"])
+    if out_type==1:
+        vecqfi = vec_compute_QFI_max_sum_squares(vals, vecs, obj_params["G"])
         all_f.append(np.sum(vecqfi**2))
         return vecqfi
-    else:
+    elif out_type==0:
         qfi = compute_QFI(vals, vecs, obj_params["G"])
         print(x, qfi, flush=True)
         all_f.append(qfi)
         return -1 * qfi  # negative because we are maximizing
+    elif out_type==2:
+        vecqfi = vec_compute_QFI_more_struct_1(vals, vecs, obj_params["G"])
+        # all_f.append(qfi)
+        return vecqfi  # negative because we are maximizing
 
 
 def run_orbit(obj, obj_params, n, x0):
@@ -83,30 +89,33 @@ def run_orbit(obj, obj_params, n, x0):
     )
 
 
-def run_pounder(obj, obj_params, n, x0, use_struct=False):
-    if use_struct:
-        calfun = lambda x: sim_wrapper(x, [], obj, obj_params, vecout=True)
-        hfun = lambda F: -1 * np.sum(F**2)
-        combinemodels = neg_leastsquares
-    else:
-        calfun = lambda x: sim_wrapper(x, [], obj, obj_params)
+def run_pounder(obj, obj_params, n, x0, out_type=0):
+    if out_type==0:
+        Ffun = lambda x: sim_wrapper(x, [], obj, obj_params)
         hfun = lambda F: F
         combinemodels = identity_combine
+        m = 1
+    elif out_type==1:
+        Ffun = lambda x: sim_wrapper(x, [], obj, obj_params, out_type=1)
+        hfun = lambda F: -1 * np.sum(F**2)
+        combinemodels = neg_leastsquares
+        m = 120
+    elif out_type==2:
+        Ffun = lambda x: sim_wrapper(x, [], obj, obj_params, out_type=2)
+        hfun = h_more_struct_1
+        combinemodels = h_more_struct_1_combine
+        m = 16 + 16*15 # 16 for the eigenvalues, 16*15/2 for the eigenvector pair real part and 16*15/2 for the imag part
 
     X = np.array(x0)
-    F = np.array(calfun(X))
+    F = np.array(Ffun(X))
     Low = -np.inf * np.ones((1, n))
     Upp = np.inf * np.ones((1, n))
-    mpmax = 2 * n + 1
-    delta = 0.1
-    m = 1
-    nfs = 1
-    printf = True
-    spsolver = 2
-    gtol = 1e-9
-    xind = 0
+    delta_0 = 0.1
+    g_tol = 1e-9
 
-    [X, F, flag, xkin] = pounders(calfun, X, n, mpmax, max_evals, gtol, delta, nfs, m, F, xind, Low, Upp, printf, spsolver, hfun, combinemodels)
+    Options = {"hfun": hfun, "combinemodels": combinemodels, "printf": True}
+    Prior = {"X_init": X, "F_init": F, "nfs": 1, "xk_in": 0}
+    [X, F, flag, xkin] = pounders(Ffun, X, n, max_evals, g_tol, delta_0, m, Low, Upp, Prior=Prior, Options=Options)
 
 
 def run_nlopt(obj, obj_params, num_params, x0, solver):
@@ -163,7 +172,8 @@ if __name__ == "__main__":
                         continue
                     obj = getattr(spin_models, model)
 
-                    for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER", "POUNDERS"]:
+                    # for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER", "POUNDERS"]:
+                    for solver in ["POUNDERS",]:
                         global all_f
                         all_f = []
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
@@ -173,7 +183,7 @@ if __name__ == "__main__":
                         elif solver in ["POUNDER"]:
                             run_pounder(obj, obj_params, num_params, x0)
                         elif solver in ["POUNDERS"]:
-                            run_pounder(obj, obj_params, num_params, x0, True)
+                            run_pounder(obj, obj_params, num_params, x0, 2)
 
                         plt.figure(fig_filename)
                         plt.plot(all_f, label=solver)
