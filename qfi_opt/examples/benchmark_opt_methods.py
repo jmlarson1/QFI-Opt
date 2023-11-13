@@ -9,11 +9,13 @@ from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import (
     compute_eigendecompotion,
     compute_QFI,
+    minimize_norm_diff,
     h_more_struct_1,
     h_more_struct_1_combine,
     vec_compute_QFI_max_sum_squares,
     vec_compute_QFI_more_struct_1,
 )
+
 
 try:
     from ibcdfo.pounders import pounders
@@ -36,7 +38,7 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
 
     Note that for large databases (or fast simulations), the database lookup can be more expensive than performing the simulation.
     """
-    global all_f
+    global all_f, all_X, all_eigvals, all_eigvecs, all_rho
     database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
     DB = []
     match = 0
@@ -70,8 +72,49 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
         return vecqfi
     elif out_type == 2:
         vecqfi = vec_compute_QFI_more_struct_1(vals, vecs, obj_params["G"])
-        all_f.append(qfi)
-        return vecqfi  # negative because we are maximizing
+        all_f.append(h_more_struct_1(vecqfi))
+        return vecqfi
+    elif out_type == 3:
+        if len(all_X):
+            closest = np.inf
+            for i,x1 in enumerate(all_X):
+                norm_val = np.linalg.norm(x1-x) 
+                if norm_val < closest:
+                    best_ind = i
+
+            perm = minimize_norm_diff(vecs,all_eigvecs[best_ind])
+            assert np.linalg.norm(vecs-all_eigvecs[best_ind],'fro') >= np.linalg.norm(vecs@perm - all_eigvecs[best_ind],'fro'), "Things got worse!"
+            vecs = vecs @ perm
+            vals = vals @ perm 
+
+        vecqfi = vec_compute_QFI_more_struct_1(vals, vecs, obj_params["G"])
+
+        all_X.append(x)
+        all_rho.append(rho)
+        all_eigvals.append(vals)
+        all_eigvecs.append(vecs)
+        all_f.append(h_more_struct_1(vecqfi))
+        return vecqfi
+    elif out_type == 4:
+        if len(all_X):
+            closest = np.inf
+            for i,x1 in enumerate(all_X):
+                norm_val = np.linalg.norm(x1-x) 
+                if norm_val < closest:
+                    best_ind = i
+
+            perm = minimize_norm_diff(vecs,all_eigvecs[best_ind])
+            assert np.linalg.norm(vecs-all_eigvecs[best_ind],'fro') >= np.linalg.norm(vecs@perm - all_eigvecs[best_ind],'fro'), "Things got worse!"
+            vecs = vecs @ perm
+            vals = vals @ perm 
+
+        vecqfi = vec_compute_QFI_max_sum_squares(vals, vecs, obj_params["G"])
+        all_f.append(np.sum(vecqfi**2))
+        all_X.append(x)
+        all_rho.append(rho)
+        all_eigvals.append(vals)
+        all_eigvecs.append(vecs)
+        return vecqfi
 
 
 def run_orbit(obj, obj_params, n, x0):
@@ -97,33 +140,32 @@ def run_orbit(obj, obj_params, n, x0):
 
 
 def run_pounder(obj, obj_params, n, x0, out_type=0):
+    Ffun = lambda x: sim_wrapper(x, [], obj, obj_params, out_type=out_type)
     if out_type == 0:
-        Ffun = lambda x: sim_wrapper(x, [], obj, obj_params)
         hfun = lambda F: F
         combinemodels = identity_combine
         m = 1
-    elif out_type == 1:
-        Ffun = lambda x: sim_wrapper(x, [], obj, obj_params, out_type=1)
+    elif out_type == 1 or out_type==4:
         hfun = lambda F: -1 * np.sum(F**2)
         combinemodels = neg_leastsquares
         m = 120
-    elif out_type == 2:
-        Ffun = lambda x: sim_wrapper(x, [], obj, obj_params, out_type=2)
-        hfun = h_more_struct_1
+    elif out_type == 2 or out_type == 3:
+        hfun = lambda F: -1 * h_more_struct_1(F)
         combinemodels = h_more_struct_1_combine
         m = 16 + 16 * 15  # 16 for the eigenvalues, 16*15/2 for the eigenvector pair real part and 16*15/2 for the imag part
 
-    # Let's make sure all the ways of calculating QFI produce the same result:
-    import ipdb; ipdb.set_trace(context=21)
-    truth = sim_wrapper(x0, [], obj, obj_params, out_type = 0)
-    test_1 = -1*np.sum(sim_wrapper(x0, [], obj, obj_params, out_type = 1)**2)
-    test_2 = h_more_struct_1(sim_wrapper(x0, [], obj, obj_params, out_type = 2))
+    # # Let's make sure all the ways of calculating QFI produce the same result:
+    # truth = sim_wrapper(x0, [], obj, obj_params, out_type = 0)
+    # test_1 = -1*np.sum(sim_wrapper(x0, [], obj, obj_params, out_type = 1)**2)
+    # test_2 = h_more_struct_1(sim_wrapper(x0, [], obj, obj_params, out_type = 2))
+    # test_3 = h_more_struct_1(sim_wrapper(x0, [], obj, obj_params, out_type = 3))
+    # import ipdb; ipdb.set_trace(context=21)
 
     X = np.array(x0)
     F = np.array(Ffun(X))
     Low = -np.inf * np.ones((1, n))
     Upp = np.inf * np.ones((1, n))
-    delta_0 = 0.1
+    delta_0 = 0.001
     g_tol = 1e-9
 
     Options = {"hfun": hfun, "combinemodels": combinemodels, "printf": True}
@@ -161,7 +203,7 @@ if __name__ == "__main__":
         obj_params["dissipation"] = dissipation_rate
         obj_params["G"] = G
 
-        max_evals = 100
+        max_evals = 25
 
         for num_params in [4, 5]:
             lb = np.zeros(num_params)
@@ -186,9 +228,10 @@ if __name__ == "__main__":
                     obj = getattr(spin_models, model)
 
                     # for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER", "POUNDERS"]:
-                    for solver in ["POUNDER", "POUNDERS1", "POUNDERS2"]:
-                        global all_f
-                        all_f = []
+                    # for solver in ["POUNDERS3", "POUNDERS2", "POUNDERS1", "POUNDER"]:
+                    for number, solver in enumerate(["POUNDER", "POUNDERS1", "POUNDERS2", "POUNDERS3", "POUNDERS4"]):
+                        global all_f, all_X, all_eigvals, all_eigvecs, all_rho
+                        all_f = []; all_X = []; all_eigvals = []; all_eigvecs = []; all_rho =[];
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
                             run_nlopt(obj, obj_params, num_params, x0, solver)
                         elif solver in ["ORBIT"]:
@@ -199,9 +242,19 @@ if __name__ == "__main__":
                             run_pounder(obj, obj_params, num_params, x0, 1)
                         elif solver in ["POUNDERS2"]:
                             run_pounder(obj, obj_params, num_params, x0, 2)
+                        elif solver in ["POUNDERS3"]:
+                            run_pounder(obj, obj_params, num_params, x0, 3)
+                        elif solver in ["POUNDERS4"]:
+                            run_pounder(obj, obj_params, num_params, x0, 4)
+                        else:
+                            raise ValueError(f'Unknown solver: {solver}')
+                            
 
                         plt.figure(fig_filename)
-                        plt.plot(all_f, label=solver)
+                        if number % 2 == 0:
+                            plt.plot(all_f, label=solver, linestyle='solid')
+                        else:
+                            plt.plot(all_f, label=solver, linestyle='dashed')
 
                         for i in range(1, len(all_f)):
                             all_f[i] = max(all_f[i - 1], all_f[i])
@@ -218,3 +271,4 @@ if __name__ == "__main__":
                     plt.legend()
                     plt.title(fig_filename)
                     plt.savefig(fig_filename + "best" + ".png", dpi=300)
+                    sys.exit('a')
