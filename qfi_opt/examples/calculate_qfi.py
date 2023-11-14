@@ -27,14 +27,6 @@ def minimize_norm_diff(A, B):
         m.addConstr(gp.quicksum(P[i, j] for j in range(n)) == 1)
         m.addConstr(gp.quicksum(P[j, i] for j in range(n)) == 1)
 
-    # AP_R = m.addVars(n, n, lb=-GRB.INFINITY, ub=GRB.INFINITY, name="AP_R")
-    # AP_I = m.addVars(n, n, lb=-GRB.INFINITY, ub=GRB.INFINITY, name="AP_I")
-    # for i in range(n):
-    #     for j in range(n):
-    #         m.addConstr(AP_R[i, j] == gp.quicksum(A[i, k].real * P[k, j] for k in range(n)))
-    #         m.addConstr(AP_I[i, j] == gp.quicksum(A[i, k].imag * P[k, j] for k in range(n)))
-    # obj = gp.quicksum((AP_R[i, j] - B[i, j].real)**2 + (AP_I[i, j] - B[i, j].imag)**2 for i in range(n) for j in range(n))
-
     obj = gp.quicksum(
         (gp.quicksum(A[i, k].real * P[k, j] for k in range(n)) - B[i, j].real) ** 2
         + (gp.quicksum(A[i, k].imag * P[k, j] for k in range(n)) - B[i, j].imag) ** 2
@@ -55,43 +47,8 @@ def minimize_norm_diff(A, B):
             for j in range(n):
                 solution[i, j] = int(P[i, j].x > 0.5)
 
-    # Apply the permutation to A
-    # permuted_A = A[:, np.nonzero(solution)[1]]
-
     return solution
 
-    # n, m = A.shape
-    # if B.shape != (n, m):
-    #     raise ValueError("Matrices A and B must have the same shape.")
-    # # Create a new model
-    # model = gp.Model("matrix_permutation")
-
-    # # Create variables
-    # # x[i, j] = 1 if column i of A is assigned to column j of B
-    # x = model.addVars(m, m, vtype=GRB.BINARY, name="x")
-
-    # # Each column in A is assigned to exactly one column in B
-    # model.addConstrs((x.sum(i, '*') == 1 for i in range(m)), "row")
-    # # Each column in B receives exactly one column from A
-    # model.addConstrs((x.sum('*', j) == 1 for j in range(m)), "col")
-
-    # # Objective: minimize the Frobenius norm of (A - B)
-    # objective = gp.quicksum(x[i, j] * np.linalg.norm(A[:, i] - B[:, j])**2 for i in range(m) for j in range(m))
-    # model.setObjective(objective, GRB.MINIMIZE)
-
-    # # Solve the model
-    # model.optimize()
-
-    # # Retrieve the solution
-    # perm = np.zeros(m, dtype=int)
-    # for i in range(m):
-    #     for j in range(m):
-    #         if x[i, j].X > 0.5:  # select the assigned columns
-    #             perm[i] = j
-
-    # assert np.linalg.norm(A-B,'fro') >= np.linalg.norm(A[:,perm] - B,'fro'), "Things got worse!"
-
-    # return perm
 
 
 def compute_eigendecompotion(rho: np.ndarray):
@@ -206,15 +163,16 @@ def h_more_struct_1_combine(Cres, Gres, Hres):
             G_vec_R[:, i, j] = Gres[:, num_vals + count]
             H_vec_R[:, :, i, j] = Hres[:, :, num_vals + count]
 
-            C_vec_R[i, j] = Cres[num_vals + b + count]
-            G_vec_R[:, i, j] = Gres[:, num_vals + b + count]
-            H_vec_R[:, :, i, j] = Hres[:, :, num_vals + b + count]
+            C_vec_I[i, j] = Cres[num_vals + b + count]
+            G_vec_I[:, i, j] = Gres[:, num_vals + b + count]
+            H_vec_I[:, :, i, j] = Hres[:, :, num_vals + b + count]
 
     assert np.array_equal(C_vec_R.shape, C_vec_I.shape), "Should be the same size"
     assert np.array_equal(G_vec_R.shape, G_vec_I.shape), "Should be the same size"
     assert np.array_equal(H_vec_R.shape, H_vec_I.shape), "Should be the same size"
 
     tol = max(1e-8, -10 * np.min(C_lam))
+    running_sum = 0
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             denom = C_lam[i] + C_lam[j]
@@ -245,8 +203,8 @@ def h_more_struct_1_combine(Cres, Gres, Hres):
 
                 h1_g += T1 * T2_g + T2 * T1_g
                 h1_H += T1 * T2_H + np.outer(T1_g, T2_g) + np.outer(T2_g, T1_g) + T2 * T1_H
-
-    return 4 * h1_g, 4 * h1_H
+                running_sum += T1 * T2
+    return -4 * h1_g, -4 * h1_H
 
 
 def vec_compute_QFI_more_struct_1(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float = 1e-8, etol_scale: float = 10) -> float:
