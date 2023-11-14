@@ -9,13 +9,12 @@ from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import (
     compute_eigendecompotion,
     compute_QFI,
-    minimize_norm_diff,
     h_more_struct_1,
     h_more_struct_1_combine,
+    minimize_norm_diff,
     vec_compute_QFI_max_sum_squares,
     vec_compute_QFI_more_struct_1,
 )
-
 
 try:
     from ibcdfo.pounders import pounders
@@ -77,15 +76,15 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
     elif out_type == 3:
         if len(all_X):
             closest = np.inf
-            for i,x1 in enumerate(all_X):
-                norm_val = np.linalg.norm(x1-x) 
+            for i, x1 in enumerate(all_X):
+                norm_val = np.linalg.norm(x1 - x)
                 if norm_val < closest:
                     best_ind = i
 
-            perm = minimize_norm_diff(vecs,all_eigvecs[best_ind])
-            assert np.linalg.norm(vecs-all_eigvecs[best_ind],'fro') >= np.linalg.norm(vecs@perm - all_eigvecs[best_ind],'fro'), "Things got worse!"
+            perm = minimize_norm_diff(vecs, all_eigvecs[best_ind])
+            assert np.linalg.norm(vecs - all_eigvecs[best_ind], "fro") >= np.linalg.norm(vecs @ perm - all_eigvecs[best_ind], "fro"), "Things got worse!"
             vecs = vecs @ perm
-            vals = vals @ perm 
+            vals = vals @ perm
 
         vecqfi = vec_compute_QFI_more_struct_1(vals, vecs, obj_params["G"])
 
@@ -98,15 +97,15 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
     elif out_type == 4:
         if len(all_X):
             closest = np.inf
-            for i,x1 in enumerate(all_X):
-                norm_val = np.linalg.norm(x1-x) 
+            for i, x1 in enumerate(all_X):
+                norm_val = np.linalg.norm(x1 - x)
                 if norm_val < closest:
                     best_ind = i
 
-            perm = minimize_norm_diff(vecs,all_eigvecs[best_ind])
-            assert np.linalg.norm(vecs-all_eigvecs[best_ind],'fro') >= np.linalg.norm(vecs@perm - all_eigvecs[best_ind],'fro'), "Things got worse!"
+            perm = minimize_norm_diff(vecs, all_eigvecs[best_ind])
+            assert np.linalg.norm(vecs - all_eigvecs[best_ind], "fro") >= np.linalg.norm(vecs @ perm - all_eigvecs[best_ind], "fro"), "Things got worse!"
             vecs = vecs @ perm
-            vals = vals @ perm 
+            vals = vals @ perm
 
         vecqfi = vec_compute_QFI_max_sum_squares(vals, vecs, obj_params["G"])
         all_f.append(np.sum(vecqfi**2))
@@ -145,7 +144,7 @@ def run_pounder(obj, obj_params, n, x0, out_type=0):
         hfun = lambda F: F
         combinemodels = identity_combine
         m = 1
-    elif out_type == 1 or out_type==4:
+    elif out_type == 1 or out_type == 4:
         hfun = lambda F: -1 * np.sum(F**2)
         combinemodels = neg_leastsquares
         m = 120
@@ -231,7 +230,11 @@ if __name__ == "__main__":
                     # for solver in ["POUNDERS3", "POUNDERS2", "POUNDERS1", "POUNDER"]:
                     for number, solver in enumerate(["POUNDER", "POUNDERS1", "POUNDERS2", "POUNDERS3", "POUNDERS4"]):
                         global all_f, all_X, all_eigvals, all_eigvecs, all_rho
-                        all_f = []; all_X = []; all_eigvals = []; all_eigvecs = []; all_rho =[];
+                        all_f = []
+                        all_X = []
+                        all_eigvals = []
+                        all_eigvecs = []
+                        all_rho = []
                         if solver in ["LN_NELDERMEAD", "LN_BOBYQA"]:
                             run_nlopt(obj, obj_params, num_params, x0, solver)
                         elif solver in ["ORBIT"]:
@@ -247,14 +250,13 @@ if __name__ == "__main__":
                         elif solver in ["POUNDERS4"]:
                             run_pounder(obj, obj_params, num_params, x0, 4)
                         else:
-                            raise ValueError(f'Unknown solver: {solver}')
-                            
+                            raise ValueError(f"Unknown solver: {solver}")
 
                         plt.figure(fig_filename)
                         if number % 2 == 0:
-                            plt.plot(all_f, label=solver, linestyle='solid')
+                            plt.plot(all_f, label=solver, linestyle="solid")
                         else:
-                            plt.plot(all_f, label=solver, linestyle='dashed')
+                            plt.plot(all_f, label=solver, linestyle="dashed")
 
                         for i in range(1, len(all_f)):
                             all_f[i] = max(all_f[i - 1], all_f[i])
@@ -271,4 +273,4 @@ if __name__ == "__main__":
                     plt.legend()
                     plt.title(fig_filename)
                     plt.savefig(fig_filename + "best" + ".png", dpi=300)
-                    sys.exit('a')
+                    sys.exit("a")

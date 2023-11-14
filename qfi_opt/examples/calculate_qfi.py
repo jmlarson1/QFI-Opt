@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import numpy as np
 import gurobipy as gp
+import numpy as np
 from gurobipy import GRB
 
 from qfi_opt import spin_models
@@ -9,6 +9,7 @@ from qfi_opt import spin_models
 def variance(rho: np.ndarray, G: np.ndarray) -> float:
     """Variance of self-adjoint operator (observable) G in the state rho."""
     return (G @ G @ rho).trace().real - (G @ rho).trace().real ** 2
+
 
 def minimize_norm_diff(A, B):
     np.set_printoptions(precision=6, linewidth=400)
@@ -20,7 +21,6 @@ def minimize_norm_diff(A, B):
 
     # Create variables
     P = m.addVars(n, n, vtype=GRB.BINARY, name="P")
-
 
     # Add constraints for the permutation matrix
     for i in range(n):
@@ -35,7 +35,12 @@ def minimize_norm_diff(A, B):
     #         m.addConstr(AP_I[i, j] == gp.quicksum(A[i, k].imag * P[k, j] for k in range(n)))
     # obj = gp.quicksum((AP_R[i, j] - B[i, j].real)**2 + (AP_I[i, j] - B[i, j].imag)**2 for i in range(n) for j in range(n))
 
-    obj = gp.quicksum((gp.quicksum(A[i, k].real * P[k, j] for k in range(n)) - B[i, j].real)**2 + (gp.quicksum(A[i, k].imag * P[k, j] for k in range(n)) - B[i, j].imag)**2 for i in range(n) for j in range(n))
+    obj = gp.quicksum(
+        (gp.quicksum(A[i, k].real * P[k, j] for k in range(n)) - B[i, j].real) ** 2
+        + (gp.quicksum(A[i, k].imag * P[k, j] for k in range(n)) - B[i, j].imag) ** 2
+        for i in range(n)
+        for j in range(n)
+    )
 
     # Set the objective
     m.setObjective(obj, GRB.MINIMIZE)
@@ -48,7 +53,7 @@ def minimize_norm_diff(A, B):
     if m.status == GRB.OPTIMAL:
         for i in range(n):
             for j in range(n):
-                solution[i,j] = int(P[i,j].x > 0.5)
+                solution[i, j] = int(P[i, j].x > 0.5)
 
     # Apply the permutation to A
     # permuted_A = A[:, np.nonzero(solution)[1]]
@@ -70,7 +75,7 @@ def minimize_norm_diff(A, B):
     # # Each column in B receives exactly one column from A
     # model.addConstrs((x.sum('*', j) == 1 for j in range(m)), "col")
 
-    # # Objective: minimize the Frobenius norm of (A - B) 
+    # # Objective: minimize the Frobenius norm of (A - B)
     # objective = gp.quicksum(x[i, j] * np.linalg.norm(A[:, i] - B[:, j])**2 for i in range(m) for j in range(m))
     # model.setObjective(objective, GRB.MINIMIZE)
 
@@ -88,13 +93,14 @@ def minimize_norm_diff(A, B):
 
     # return perm
 
+
 def compute_eigendecompotion(rho: np.ndarray):
     # Compute eigendecomposition for rho
     eigvals, eigvecs = np.linalg.eigh(rho)
-    
+
     reg_term = min(eigvals)
     if reg_term < 0:
-        eigvals, eigvecs = np.linalg.eigh(rho + -2*reg_term*np.eye(len(eigvals))) 
+        eigvals, eigvecs = np.linalg.eigh(rho + -2 * reg_term * np.eye(len(eigvals)))
 
     assert min(eigvals) > 0
 
@@ -117,7 +123,7 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: fl
             denom = eigvals[i] + eigvals[j]
             if not np.isclose(denom, 0, atol=tol, rtol=tol):
                 numer = (eigvals[i] - eigvals[j]) ** 2
-                term = eigvecs[:,i].conj() @ G @ eigvecs[:,j]
+                term = eigvecs[:, i].conj() @ G @ eigvecs[:, j]
                 running_sum += numer / denom * np.linalg.norm(term) ** 2
 
     return 4 * running_sum
@@ -138,7 +144,7 @@ def vec_compute_QFI_max_sum_squares(eigvals: np.ndarray, eigvecs: np.ndarray, G:
             count += 1
             if not np.isclose(denom, 0, atol=tol, rtol=tol):
                 numer = eigvals[i] - eigvals[j]
-                term = eigvecs[:,i].conj() @ G @ eigvecs[:,j]
+                term = eigvecs[:, i].conj() @ G @ eigvecs[:, j]
                 vecout[count] = numer / np.sqrt(denom) * np.linalg.norm(term)
 
     return 2 * vecout
@@ -256,7 +262,7 @@ def vec_compute_QFI_more_struct_1(eigvals: np.ndarray, eigvecs: np.ndarray, G: n
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             count += 1
-            val = eigvecs[:,i].conj() @ G @ eigvecs[:,j]
+            val = eigvecs[:, i].conj() @ G @ eigvecs[:, j]
             eigvec_product_R[count] = np.real(val)
             eigvec_product_I[count] = np.imag(val)
 
