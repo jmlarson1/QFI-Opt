@@ -13,6 +13,7 @@ from qfi_opt.examples.calculate_qfi import (
     h_more_struct_1_combine,
     minimize_norm_diff,
     vec_compute_QFI_max_sum_squares,
+    vec_compute_QFI_max_sum_squares_all,
     vec_compute_QFI_more_struct_1,
 )
 
@@ -64,6 +65,7 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
         qfi = compute_QFI(vals, vecs, obj_params["G"])
         print(x, qfi, flush=True)
         all_f.append(qfi)
+        all_X.append(x)
         return -1 * qfi  # negative because we are maximizing
     elif out_type == 1:
         vecqfi = vec_compute_QFI_max_sum_squares(vals, vecs, obj_params["G"])
@@ -114,6 +116,10 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
         all_eigvals.append(vals)
         all_eigvecs.append(vecs)
         return vecqfi
+    elif out_type == 5:
+        vecqfi = vec_compute_QFI_max_sum_squares_all(vals, vecs, obj_params["G"])
+        all_f.append(np.sum(vecqfi**2))
+        return vecqfi
 
 
 def run_orbit(obj, obj_params, n, x0):
@@ -144,14 +150,16 @@ def run_pounder(obj, obj_params, n, x0, out_type=0):
         hfun = lambda F: F
         combinemodels = identity_combine
         m = 1
-    elif out_type == 1 or out_type == 4:
+    elif out_type == 1 or out_type == 4 or out_type == 5:
         hfun = lambda F: -1 * np.sum(F**2)
         combinemodels = neg_leastsquares
         m = 120
+        # m = 6
     elif out_type == 2 or out_type == 3:
         hfun = lambda F: -1 * h_more_struct_1(F)
         combinemodels = h_more_struct_1_combine
         m = 16 + 16 * 15  # 16 for the eigenvalues, 16*15/2 for the eigenvector pair real part and 16*15/2 for the imag part
+        # m = 4 + 4 * 3  # 4 for the eigenvalues, 4*3/2 for the eigenvector pair real part and 4*3/2 for the imag part
 
     # # Let's make sure all the ways of calculating QFI produce the same result:
     # truth = sim_wrapper(x0, [], obj, obj_params, out_type = 0)
@@ -196,7 +204,7 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for dissipation_rate in [0.0, 0.1, 0.2]:
+    for dissipation_rate in [0.0]:
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = dissipation_rate
@@ -204,7 +212,7 @@ if __name__ == "__main__":
 
         max_evals = 25
 
-        for num_params in [4, 5]:
+        for num_params in [2, 4, 5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
@@ -214,6 +222,8 @@ if __name__ == "__main__":
                 x0 = np.random.uniform(lb, ub, num_params)
 
                 match num_params:
+                    case 2:
+                        models = ["simulate_OAT"]
                     case 4:
                         models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
                     case 5:
@@ -227,8 +237,8 @@ if __name__ == "__main__":
                     obj = getattr(spin_models, model)
 
                     # for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER", "POUNDERS"]:
-                    # for solver in ["POUNDERS3", "POUNDERS2", "POUNDERS1", "POUNDER"]:
-                    for number, solver in enumerate(["POUNDER", "POUNDERS1", "POUNDERS2", "POUNDERS3", "POUNDERS4"]):
+                    for number, solver in enumerate(["POUNDER", "POUNDERS1", "POUNDERS2"]):
+                    # for number, solver in enumerate(["POUNDERS2"]):
                         global all_f, all_X, all_eigvals, all_eigvecs, all_rho
                         all_f = []
                         all_X = []
@@ -249,8 +259,41 @@ if __name__ == "__main__":
                             run_pounder(obj, obj_params, num_params, x0, 3)
                         elif solver in ["POUNDERS4"]:
                             run_pounder(obj, obj_params, num_params, x0, 4)
+                        elif solver in ["POUNDERS5"]:
+                            run_pounder(obj, obj_params, num_params, x0, 5)
                         else:
                             raise ValueError(f"Unknown solver: {solver}")
+
+                        # print(all_X[0], all_X[-1])
+
+                        # center = all_X[0]
+                        # endpoint = all_X[-1]
+                        # v = np.linspace(0,1,50)
+                        # X = np.array([center*(1-i) + i*endpoint for i in v])
+                        # fvals = np.zeros(len(X))
+
+                        # rho = obj(center, obj_params["N"], dissipation_rates=obj_params["dissipation"])
+                        # vals, vecs = compute_eigendecompotion(rho)
+                        # qfi = compute_QFI(vals, vecs, obj_params["G"])
+                        # print(qfi,"start")
+
+                        # rho = obj(endpoint, obj_params["N"], dissipation_rates=obj_params["dissipation"])
+                        # vals, vecs = compute_eigendecompotion(rho)
+                        # qfi = compute_QFI(vals, vecs, obj_params["G"])
+                        # print(qfi,"end")
+
+                        # for i,x in enumerate(X):
+                        #     rho = obj(x, obj_params["N"], dissipation_rates=obj_params["dissipation"])
+                        #     vals, vecs = compute_eigendecompotion(rho)
+                        #     qfi = compute_QFI(vals, vecs, obj_params["G"])
+                        #     fvals[i] = qfi
+                        #     print(x,fvals)
+
+                        # import matplotlib.pyplot as plt
+                        # plt.plot(fvals)
+                        # plt.savefig('fvals.png',dpi=300)
+                        # plt.close()
+                        # sys.exit("a")
 
                         plt.figure(fig_filename)
                         if number % 2 == 0:
