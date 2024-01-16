@@ -212,7 +212,7 @@ if __name__ == "__main__":
 
         max_evals = 25
 
-        for num_params in [2, 4, 5]:
+        for num_params in [5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
@@ -232,8 +232,8 @@ if __name__ == "__main__":
                 for model in models:
                     print(model)
                     fig_filename = "Results_" + model + "_" + str(dissipation_rate) + "_" + str(seed)
-                    if os.path.exists(fig_filename + ".png"):
-                        continue
+                    # if os.path.exists(fig_filename + ".png"):
+                    #     continue
                     obj = getattr(spin_models, model)
 
                     # for solver in ["LN_NELDERMEAD", "LN_BOBYQA", "POUNDER", "POUNDERS"]:

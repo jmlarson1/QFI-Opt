@@ -75,6 +75,7 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: fl
 
     # Compute QFI
     running_sum = 0
+    number_of_times = 0 
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             denom = eigvals[i] + eigvals[j]
@@ -82,6 +83,9 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: fl
                 numer = (eigvals[i] - eigvals[j]) ** 2
                 term = eigvecs[:, i].conj() @ G @ eigvecs[:, j]
                 running_sum += numer / denom * np.linalg.norm(term) ** 2
+                number_of_times += 1
+
+    print("number of times:", number_of_times)
 
     return 4 * running_sum
 
@@ -155,7 +159,7 @@ def h_more_struct_1(z):
                 numer = (eigvals[i] - eigvals[j]) ** 2
                 term = eigvec_product_R[i, j] ** 2 + eigvec_product_I[i, j] ** 2
                 running_sum += numer / denom * term
-    return -4 * running_sum
+    return 4 * running_sum
 
 
 def h_more_struct_1_combine(Cres, Gres, Hres):
