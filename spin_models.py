@@ -81,12 +81,9 @@ def simulate_sensing_protocol(
     dissipation rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes
     with probability 'e^(-params[2] * r)' by the end of the OAT protocol.
     """
-    #print("params", params)
     if axial_symmetry:
         params = np.insert(np.array(params), 1, 0.0)
     assert len(params) == 5
-    print("PARAMS", params)
-    print("entangling_hamiltonian", entangling_hamiltonian)
     num_qubits = log2_int(entangling_hamiltonian.shape[0])
 
     # construct collective spin operators
@@ -98,48 +95,18 @@ def simulate_sensing_protocol(
     qubit_ket = np.sin(time_1 / 2) * KET_0 + 1j * np.exp(1j * axis_angle_1) * np.cos(time_1 / 2) * KET_1
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
-    
-    """
-    # rotate the all-|1> state about a chosen axis
-    #return np.array(([[params[0], params[0]],[params[0], params[0]]]))
-    print("params[0]", params[0])
-    time_1 = params[0] #* np.pi
-    axis_angle_1 = params[1] #* 2.0 * np.pi
-    qubit_ket =  1j * np.exp(1j * params[0] ) * np.cos( params[0] / 2.0) #* KET_1
-    #return np.array([[qubit_ket,qubit_ket],[qubit_ket,qubit_ket]])
-    return np.outer(qubit_ket, qubit_ket.conj())
-    #qubit_state = np.outer(qubit_ket, qubit_ket.conj())
-    #state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
-    return state_1
-    """
+
     # entangle!
     time_2 = params[2] * np.pi * num_qubits #   0.0001*3.14*4 = 0.001256
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    print("state_1", state_1)
-    print("time_2", time_2)
-    print("entangling_hamiltonian", entangling_hamiltonian)
-    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
-   
+    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)    
     
     # un-rotate about a chosen axis
 
     time_3 = -params[3] * np.pi
     axis_angle_3 = params[4] * 2 * np.pi
     final_hamiltonian = np.cos(axis_angle_3) * collective_Sx + np.sin(axis_angle_3) * collective_Sy
-    """
-    #time_3 = -1.0*params[3] * np.pi
-    #time_3 = params[3] #* np.pi
-    time_3 = np.pi
-    #axis_angle_3 = params[4] * 2.0 * np.pi
-    axis_angle_3 =  2.0 * np.pi
-   # final_hamiltonian = np.cos(axis_angle_3) * collective_Sx #+ np.sin(axis_angle_3) * collective_Sy
-    final_hamiltonian = collective_Sx #+ np.sin(axis_angle_3) * collective_Sy
-    print("state_2", state_2)
-    print("time_3", time_3)
-    print("final_hamiltonian", final_hamiltonian)
-    """
     state_3 = evolve_state(state_2, time_3, final_hamiltonian)
-    print("final_state =", state_3)
     return state_3
 
 
@@ -152,8 +119,6 @@ def simulate_OAT(
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
     hamiltonian = collective_Sz.diagonal() ** 2 / num_qubits
-    print("params", params)
-    print("hamiltonian ", hamiltonian)
     return simulate_sensing_protocol(params, hamiltonian, dissipation_rates, dissipation_format, axial_symmetry=True)
 
 
@@ -235,8 +200,6 @@ def evolve_state(
 
     # treat negative times as evolving under the negative of the Hamiltonian
     # NOTE: this is required for autodiff to work
-    #print("time.real ", time.real)
-    #print("time ", time)
     if time.real < 0:
         time, hamiltonian = -time, -hamiltonian
 
@@ -246,7 +209,7 @@ def evolve_state(
             return time_deriv(time, density_op, hamiltonian, dissipator)
         times = np.linspace(0.0, time, 2)
         result = ode_jax.odeint(_time_deriv, density_op, times, rtol=rtol, atol=atol)
-        print("result[-1]", result[-1])
+        #print("result[-1]", result[-1])
         return result[-1]
     elif USE_DIFFRAX:
         print("USING DIFFRAX")
@@ -279,11 +242,7 @@ def evolve_state(
             atol=atol,
             method="DOP853",
         )
-        #print("solution.y", solution.y)
-        #print("solution.y[:,-1]", solution.y[:,-1])
-        #print("solution.y[-1]", solution.y[-1])
         final_vec = solution.y[:, -1]
-        #print("final_vec.reshape(matrix_shape)", final_vec.reshape(matrix_shape))
         return final_vec.reshape(matrix_shape)
 
 
@@ -417,35 +376,15 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     # convert the parameters into a complex array, which is necessary for autodiff capabilities
-    args.params = np.array(args.params, dtype=COMPLEX_TYPE)
-    """
     if USE_JAX:
-        get_jacobian = get_jacobian_func(simulate_OAT)
-        jacobian = get_jacobian(args.params, args.num_qubits, args.dissipation)
-        for pp in range(len(args.params)):
-            print(f"d(final_state/d(params[{pp}]):")
-            print(jacobian[:, :, pp])
-
-    # simulate the OAT potocol
-    """
-    
-
-    
+        args.params = np.array(args.params, dtype=COMPLEX_TYPE)    
     #check_grads(simulate_OAT, (args.params,), order=1,modes=("rev"))
     
     if args.jacobian:
-        
         get_jacobian = get_jacobian_func(simulate_OAT, args.manual)
-        #get_jacobian = get_jacobian_func(simulate_OAT)
-        print("args.params", args.params)
-        print("args.num_qubits", args.num_qubits)
-        #params = np.array([1.76405235 + 0j, 0.40015721+ 0j,0.97873798+ 0j, 2.2408932+ 0j])
-        #jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
-        # for pp in range(len(args.params)):
         for pp in range(len(args.params)):
             print(f"d(final_state/d(params[{pp}]):")
-            # print(jacobian[:, :, pp])
             print("real:")
             print(jacobian[:, :, pp].real)
             print("imag:")
