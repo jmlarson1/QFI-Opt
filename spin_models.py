@@ -99,7 +99,7 @@ def simulate_sensing_protocol(
     # entangle!
     time_2 = params[2] * np.pi * num_qubits #   0.0001*3.14*4 = 0.001256
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)    
+    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
     
     # un-rotate about a chosen axis
 
