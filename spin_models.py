@@ -328,13 +328,12 @@ def get_jacobian_func(
         return get_jacobian
     elif not manual and USE_DIFFRAX:
         def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
-            _ , vjp_func =  jax.vjp(simulate_func, *args)
+            primals , vjp_func =  jax.vjp(simulate_func, *args)
             params = args[0]
-            num_qubits = args[1]
-            result=np.zeros((num_qubits*num_qubits,num_qubits*num_qubits,len(params)), dtype=COMPLEX_TYPE)
-            for i in range(num_qubits*num_qubits):
-                for j in range(num_qubits*num_qubits):
-                    seed = np.zeros((num_qubits*num_qubits,num_qubits*num_qubits), dtype=COMPLEX_TYPE)
+            result=np.zeros((primals.shape[1],primals.shape[0],len(params)), dtype=COMPLEX_TYPE)
+            for i in range(primals.shape[1]):
+                for j in range(primals.shape[0]):
+                    seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
                     seed=seed.at[i,j].set(1.0)
                     res=np.array(vjp_func(seed)[0]).flatten()
                     seed=seed.at[i,j].set(1.0j)
