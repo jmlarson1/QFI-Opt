@@ -194,9 +194,8 @@ def evolve_state(
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
     """
-    #if time == 0 & USE_JAX:
-    #    return density_op
-    #    time += atol/10
+    if time == 0 & USE_JAX:
+        return density_op
 
     # treat negative times as evolving under the negative of the Hamiltonian
     # NOTE: this is required for autodiff to work
