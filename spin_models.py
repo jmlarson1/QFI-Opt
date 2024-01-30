@@ -319,7 +319,6 @@ def get_jacobian_func(
     
 ) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
-    #params1 = np.array([1.76405235, 0.40015721,0.97873798, 2.2408932])
     if not manual and (USE_JAX or USE_DIFFRAX):
         def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
             _ , vjp_func =  jax.vjp(simulate_func, *args)
