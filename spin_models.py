@@ -380,6 +380,7 @@ if __name__ == "__main__":
     #check_grads(simulate_OAT, (args.params,), order=1,modes=("rev"))
     
     if args.jacobian:
+        np.set_printoptions(precision=8, suppress=True)
         get_jacobian = get_jacobian_func(simulate_OAT, args.manual)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
         for pp in range(len(args.params)):
