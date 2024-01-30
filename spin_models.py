@@ -218,7 +218,6 @@ def evolve_state(
         term = ODETerm(_time_deriv)
         ODEsolver = Tsit5() # Dopri5()
         solution = diffeqsolve(term, ODEsolver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
-        #print("solution.ys", solution.ys)
         return solution.ys[-1]
     else:
         #if np.isclose(time, 0.0, atol=1e-04):
@@ -226,7 +225,7 @@ def evolve_state(
         if time == 0 & USE_JAX:
             return density_op
         matrix_shape = density_op.shape
-        print("USING SCIPY: ", time)
+        print("USING SCIPY: ")
         def _time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
             density_op.shape = matrix_shape
             output = time_deriv(time, density_op, hamiltonian, dissipator)
@@ -314,18 +313,6 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
         range(num_qubits),
     ).reshape((2**num_qubits,) * 2)
 
-'''
-def get_jacobian_func(simulate_func: Callable) -> Callable:
-    #Convert a simulation method into a function that returns its Jacobian.
-    assert USE_JAX
-
-    jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
-
-    def get_jacobian(*args: Any, **kwargs: Any) -> np.ndarray:
-        return jacobian_func(*args, **kwargs)[0]
-
-    return get_jacobian
-'''
 
 def get_jacobian_func(
     simulate_func: Callable,
@@ -337,8 +324,6 @@ def get_jacobian_func(
     """Convert a simulation method into a function that returns its Jacobian."""
     #params1 = np.array([1.76405235, 0.40015721,0.97873798, 2.2408932])
     if not manual and (USE_JAX or USE_DIFFRAX):
-        jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
-
         def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
             return jacobian_func(*args, **kwargs)[0]
 
@@ -352,9 +337,9 @@ def get_jacobian_func(
             result_at_params = simulate_func(params, *args, **kwargs)
             shifted_results = []
             for idx, step_size in enumerate(step_sizes):
-                step_size =  step_size # *1j
+                step_size =  step_size
                 new_params = list(params)
-                new_params[idx] += step_size #+ step_size*1j
+                new_params[idx] += step_size
                 result_at_params_with_step = simulate_func(new_params, *args, **kwargs)
                 shifted_results.append((result_at_params_with_step - result_at_params) / step_size)
 
