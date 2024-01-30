@@ -219,10 +219,8 @@ def evolve_state(
         solution = diffeqsolve(term, ODEsolver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
         return solution.ys[-1]
     else:
-        #if np.isclose(time, 0.0, atol=1e-04):
-        #  return density_op
-        if time == 0 & USE_JAX:
-            return density_op
+        if np.isclose(time, 0.0, atol=1e-04):
+          return density_op
         matrix_shape = density_op.shape
         print("USING SCIPY: ")
         def _time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
