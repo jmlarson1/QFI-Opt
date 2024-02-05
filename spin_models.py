@@ -7,7 +7,7 @@ import sys
 from typing import Any, Callable, Optional, Sequence
 
 from dissipation import Dissipator
-from public_test_util import check_grads
+# from public_test_util import check_grads
 
 USE_JAX = bool(os.getenv("USE_JAX"))
 USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
