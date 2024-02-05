@@ -11,8 +11,42 @@ def variance(rho: np.ndarray, G: np.ndarray) -> float:
     return (G @ G @ rho).trace().real - (G @ rho).trace().real ** 2
 
 
-def minimize_norm_diff(A, B):
-    np.set_printoptions(precision=6, linewidth=400)
+def minimize_norm_diff_permutation(A, B):
+    n = A.shape[0]
+
+    # Create a model
+    m = gp.Model("matrix_permutation")
+
+    # Create variables
+    P = m.addVars(n, n, vtype=GRB.BINARY, name="P")
+
+    # Add constraints for the permutation matrix
+    for i in range(n):
+        m.addConstr(gp.quicksum(P[i, j] for j in range(n)) == 1)
+        m.addConstr(gp.quicksum(P[j, i] for j in range(n)) == 1)
+
+    obj = gp.quicksum(
+        (gp.quicksum(A[i, k].real * P[k, j] for k in range(n)) - B[i, j].real) ** 2
+        + (gp.quicksum(A[i, k].imag * P[k, j] for k in range(n)) - B[i, j].imag) ** 2
+        for i in range(n)
+        for j in range(n)
+    )
+
+    # Set the objective
+    m.setObjective(obj, GRB.MINIMIZE)
+
+    # Optimize the model
+    m.optimize()
+
+    # Extract the solution
+    solution = np.zeros((n, n), dtype=int)
+    if m.status == GRB.OPTIMAL:
+        for i in range(n):
+            for j in range(n):
+                solution[i, j] = int(P[i, j].x > 0.5)
+
+    return solution
+
 
     n = A.shape[0]
 
