@@ -422,6 +422,7 @@ if __name__ == "__main__":
     args.params = np.array(args.params, dtype=COMPLEX_TYPE)
 
     if args.jacobian:
+        np.set_printoptions(precision=8, suppress=True)
         get_jacobian = get_jacobian_func(simulate_OAT)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
         for pp in range(len(args.params)):
