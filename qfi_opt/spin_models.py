@@ -16,6 +16,7 @@ if not DISABLE_DIFFRAX:
     import jax.numpy as np
 
     jax.config.update("jax_enable_x64", True)
+    from diffrax import diffeqsolve, ODETerm, Dopri5, Tsit5
 
 else:
     import numpy as np  # type: ignore[no-redef]
@@ -257,8 +258,6 @@ def evolve_state(
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
     """
-    if time.real == 0:
-        return density_op
 
     # treat negative times as evolving under the negative of the Hamiltonian
     # NOTE: this is required for autodiff to work
@@ -375,17 +374,28 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
 def get_jacobian_func(
     simulate_func: Callable,
     *,
-    disable_jax: bool = DISABLE_JAX,
+    disable_diffrax: bool = DISABLE_DIFFRAX,
     step_sizes: float | Sequence[float] = 1e-4,
 ) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
-    if not DISABLE_JAX:
+    if not DISABLE_DIFFRAX:
         jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
 
         def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
-            return jacobian_func(*args, **kwargs)[0]
-
+            primals , vjp_func =  jax.vjp(simulate_func, *args)
+            params = args[0]
+            result=np.zeros((primals.shape[1],primals.shape[0],len(params)), dtype=COMPLEX_TYPE)
+            for i in range(primals.shape[1]):
+                for j in range(primals.shape[0]):
+                    seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
+                    seed=seed.at[i,j].set(1.0)
+                    res=np.array(vjp_func(seed)[0]).flatten()
+                    seed=seed.at[i,j].set(1.0j)
+                    res=res+np.array(vjp_func(seed)[0]).flatten() *1.0j
+                    for p in range(len(params)):
+                        result=result.at[i,j,p].set(res[p])
+            return result
         return get_jacobian
 
     def get_jacobian_manually(params: Sequence[float] | np.ndarray, *args: object, **kwargs: object) -> np.ndarray:
@@ -418,9 +428,6 @@ if __name__ == "__main__":
     parser.add_argument("--params", type=float, nargs=4, default=[0.5, 0.5, 0.5, 0])
     parser.add_argument("--jacobian", action="store_true", default=False)
     args = parser.parse_args(sys.argv[1:])
-
-    # convert the parameters into a complex array, which is necessary for autodiff capabilities
-    args.params = np.array(args.params, dtype=COMPLEX_TYPE)
 
     if args.jacobian:
         np.set_printoptions(precision=8, suppress=True)
