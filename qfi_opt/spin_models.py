@@ -9,9 +9,9 @@ from typing import Callable, Optional, Sequence
 import qfi_opt
 from qfi_opt.dissipation import Dissipator
 
-DISABLE_JAX = bool(os.getenv("DISABLE_JAX"))
+DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
 
-if not DISABLE_JAX:
+if not DISABLE_DIFFRAX:
     import jax
     import jax.numpy as np
 
@@ -252,7 +252,7 @@ def evolve_state(
     *,
     rtol: float = 1e-8,
     atol: float = 1e-8,
-    disable_jax: bool = DISABLE_JAX,
+    disable_diffrax: bool = DISABLE_DIFFRAX,
 ) -> np.ndarray:
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
@@ -268,37 +268,38 @@ def evolve_state(
     times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
-    if not DISABLE_JAX:
-        result = qfi_opt.ode_jax.odeint(
-            time_deriv,
-            density_op,
-            times,
+    if not DISABLE_DIFFRAX:
+        def _time_deriv(time: float, density_op: np.ndarray, hamiltonian) -> np.ndarray:
+            #return time_deriv(time, density_op, hamiltonian[0], dissipator)
+            return time_deriv(density_op, time)
+        term = ODETerm(_time_deriv)
+        ODEsolver = Tsit5() # Dopri5()
+        solution = diffeqsolve(term, ODEsolver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
+        return solution.ys[-1]
+    else:
+        if np.isclose(time, 0.0, atol=1e-04):
+            return density_op
+        def scipy_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
+            density_op.shape = (hamiltonian.shape[0],) * 2  # type: ignore[misc]
+            output = time_deriv(density_op, time)
+            density_op.shape = (-1,)  # type: ignore[misc]
+            return output.ravel()
+
+        result = scipy.integrate.solve_ivp(
+            scipy_time_deriv,
+            times.real,
+            density_op.ravel(),
             rtol=rtol,
             atol=atol,
         )
-        return result[-1]
-
-    def scipy_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
-        density_op.shape = (hamiltonian.shape[0],) * 2  # type: ignore[misc]
-        output = time_deriv(density_op, time)
-        density_op.shape = (-1,)  # type: ignore[misc]
-        return output.ravel()
-
-    result = scipy.integrate.solve_ivp(
-        scipy_time_deriv,
-        times.real,
-        density_op.ravel(),
-        rtol=rtol,
-        atol=atol,
-    )
-    return result.y[:, -1].reshape(density_op.shape)
+        return result.y[:, -1].reshape(density_op.shape)
 
 
 def get_time_deriv(
     hamiltonian: np.ndarray,
     dissipator: Optional[Dissipator] = None,
     *,
-    disable_jax: bool = DISABLE_JAX,
+    disable_diffrax: bool = DISABLE_DIFFRAX,
 ) -> Callable[[np.ndarray, float], np.ndarray]:
     """Construct a time derivative function that maps (state, time) --> d(state)/d(time)."""
 
