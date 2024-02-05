@@ -7,7 +7,7 @@ import sys
 from typing import Any, Callable, Optional, Sequence
 
 from dissipation import Dissipator
-# from public_test_util import check_grads
+from public_test_util import check_grads
 
 USE_JAX = bool(os.getenv("USE_JAX"))
 USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
@@ -17,7 +17,9 @@ if USE_JAX:
     import ode_jax
     #from jax._src.public_test_util.py import  check_grads
     #from jax._src.public_test_util import  check_grads
-    from public_test_util import  check_grads
+    from public_test_util import check_grads
+
+    import ode_jax
 
     jax.config.update("jax_enable_x64", True)
     import jax.numpy as np
