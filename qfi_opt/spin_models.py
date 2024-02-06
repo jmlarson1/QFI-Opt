@@ -391,7 +391,8 @@ def get_jacobian_func(
                     res=np.array(vjp_func(seed)[0]).flatten()
                     seed=seed.at[i,j].set(1.0j)
                     res=res+np.array(vjp_func(seed)[0]).flatten() *1.0j
-                    #Take the conjugate to account for Jax convention
+                    # Take the conjugate to account for Jax convention. See discussion:
+                    # https://github.com/google/jax/issues/4891
                     res=np.conj(res)
                     for p in range(len(params)):
                         result=result.at[i,j,p].set(res[p])
