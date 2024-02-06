@@ -431,7 +431,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num_qubits", type=int, default=4)
     parser.add_argument("--dissipation", type=float, default=0.0)
-    parser.add_argument("--params", type=float, nargs=4, default=[0.5, 0.5, 0.5, 0])
+    parser.add_argument("--params", type=float, nargs=4, default=np.array([0.5, 0.5, 0.5, 0]))
     parser.add_argument("--jacobian", action="store_true", default=False)
     args = parser.parse_args(sys.argv[1:])
 
