@@ -380,8 +380,6 @@ def get_jacobian_func(
     """Convert a simulation method into a function that returns its Jacobian."""
 
     if not DISABLE_DIFFRAX:
-        jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
-
         def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
             primals , vjp_func =  jax.vjp(simulate_func, *args)
             params = args[0]
