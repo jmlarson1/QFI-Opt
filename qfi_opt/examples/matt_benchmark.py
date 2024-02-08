@@ -3,16 +3,19 @@ import os
 import pickle
 import sys
 
+import ipdb
+
+import nlopt
 import numpy as np
 from ibcdfo.pounders import pounders
 from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
-from mpi4py import MPI
+#from mpi4py import MPI
 
 sys.path.append('../../')
 
 import qfi_opt
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_eigendecompotion, compute_QFI
+from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI
 
 root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
 minq5_dir = os.path.join(root_dir, "minq", "py", "minq5")
@@ -28,7 +31,7 @@ if not os.path.isdir(minq5_dir):
 sys.path.append(minq5_dir)
 
 
-def sim_wrapper(x, h, grad, obj, obj_params):
+def sim_wrapper(x, h, qfi_grad, obj, obj_params):
 
     use_DB = False
     match = 0
@@ -54,34 +57,57 @@ def sim_wrapper(x, h, grad, obj, obj_params):
             DB = np.append(DB, to_save)
             np.save(database, DB)
 
-    # Approximate the gradient
-    d = len(x)
-    I = np.eye(d)
-    dA = np.zeros((d, N ** 2, N ** 2))
-    d2A = dA
+    num_parameters = len(x)
+    dA = np.zeros((num_parameters, N ** 2, N ** 2), dtype="cdouble")
+    d2A = np.zeros((num_parameters, N ** 2, N ** 2), dtype="cdouble")
+    if qfi_grad.size > 0:
+        # Approximate the gradient
+        I = np.eye(num_parameters)
 
-    for parameter in range(d):
-        # compute dA with respect to parameter
-        rho_p = obj(x + h * I[parameter], obj_params["N"], dissipation_rates=obj_params["dissipation"])
-        rho_m = obj(x - h * I[parameter], obj_params["N"], dissipation_rates=obj_params["dissipation"])
-        dA[parameter] = (rho_p - rho_m) / (2 * h)
-        print("dA = ", dA[parameter])
-        # compute d2A with respect to parameter
-        d2A[parameter] = (rho_p - 2 * rho + rho_m) / (h ** 2)
-        print("d2A = ", d2A[parameter])
+        for parameter in range(num_parameters):
+            # compute dA with respect to parameter
+            rho_p = obj(x + h * I[parameter], obj_params["N"], dissipation_rates=obj_params["dissipation"])
+            rho_m = obj(x - h * I[parameter], obj_params["N"], dissipation_rates=obj_params["dissipation"])
+            dA[parameter] = (rho_p - rho_m) / (2 * h)
+            # compute d2A with respect to parameter
+            d2A[parameter] = (rho_p - 2 * rho + rho_m) / (h ** 2)
 
-    vals, vecs = compute_eigendecompotion(rho)
-    qfi = compute_QFI(vals, vecs, obj_params["G"])
-    print(x, qfi, flush=True)
-    all_f.append(qfi)
-    all_X.append(x)
-    return -1 * qfi  # negative because we are maximizing
+    # Compute eigendecomposition
+    vals, vecs = compute_eigendecomposition(rho)
+
+    qfi, new_grad = compute_QFI(vals, vecs, obj_params["G"], rho, dA, d2A, qfi_grad)
+    print(x, qfi, new_grad, flush=True)
+
+    try:
+        if qfi_grad.size > 0:
+            qfi_grad[:] = -1.0 * new_grad
+    except:
+        qfi_grad[:] = []
+
+    return -1.0 * qfi #, -qfi_grad  # negative because we are maximizing
+    #else:
+    #    return -1 * qfi
+
+def quick_test_gradient(obj, obj_params, x):
+    h = 1e-8
+    calfun = lambda x: sim_wrapper(x, h, True, obj, obj_params)
+    calfun_f = lambda x: sim_wrapper(x, h, False, obj, obj_params)
+    f0, g = calfun(x)
+    print("f0: ", f0)
+
+    # check for descent in gradient direction
+    for j in range(4, 18, 2):
+        stepsize = 10 ** (-j)
+        xp = x - stepsize * g
+        fp = calfun_f(xp)
+        print("fp: ", fp, "stepsize: ", stepsize)
+
+
 
 
 def run_pounder(obj, obj_params, n, x0):
     h = 1e-6
-    calfun = lambda x: sim_wrapper(x, h, [], obj, obj_params)
-    calfun(x0)
+    calfun = lambda x: sim_wrapper(x, h, False, obj, obj_params)
     X = np.array(x0)
     F = np.array(calfun(X))
     Low = -np.inf * np.ones((1, n))
@@ -103,11 +129,38 @@ def run_pounder(obj, obj_params, n, x0):
 
     return F[xkin], X[xkin]
 
+def run_nlopt(obj, obj_params, num_params, x0, solver):
+    opt = nlopt.opt(getattr(nlopt, solver), num_params)
+    # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
+    # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
+
+    h = 1e-5
+    opt.set_min_objective(lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params))
+    opt.set_xtol_rel(1e-4)
+    opt.set_maxeval(300)
+    opt.set_lower_bounds(-10.0 * np.ones(num_params))
+    opt.set_upper_bounds(10.0 * np.ones(num_params))
+    opt.set_vector_storage(0)
+
+
+    # # Because the objective is periodic, don't set bounds (but don't need to sample so much)
+    # opt.set_lower_bounds(lb)
+    # opt.set_upper_bounds(ub)
+
+    x = opt.optimize(x0)
+    minf = opt.last_optimum_value()
+    # print("optimum at ", x)
+    # print("minimum value = ", minf)
+    # print("result code = ", opt.last_optimize_result())
+
+    return minf, x
+
 
 if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the code below
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+    #comm = MPI.COMM_WORLD
+    #rank = comm.Get_rank()
+    #size = comm.Get_size()
+    size = 1
 
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
@@ -120,73 +173,29 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
 
         max_evals = 300
 
+        seed = 88
+        np.random.seed(seed)
+
         for num_params in [4, 5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
-            for seed in range(size):
-                if seed % size == rank:
-                    # x0 = 0.5 * np.ones(num_params)  # This is an optimum for the num_params==4 problems
-                    np.random.seed(seed)
-                    x0 = np.random.uniform(lb, ub, num_params)
+            #x0 = 0.5 * np.ones(num_params)
+            x0 = np.random.uniform(lb, ub, num_params)
 
-                    match num_params:
-                        case 4:
-                            models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
-                            # models = ["simulate_OAT"]
-                        case 5:
-                            models = ["simulate_TAT", "simulate_local_TAT_chain"]
-                            # models = ["simulate_TAT"]
+            match num_params:
+                case 4:
+                    models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
+                    # models = ["simulate_OAT"]
+                case 5:
+                    models = ["simulate_TAT", "simulate_local_TAT_chain"]
+                    # models = ["simulate_TAT"]
 
-                    for model in models:
-                        filename = model + "_" + str(dissipation_rate) + "_" + str(seed) + ".pkl"
-                        fig_filename = "Results_" + model + "_" + str(dissipation_rate) + "_" + str(seed)
-                        if os.path.exists(filename):
-                            continue
-                        if os.path.exists(fig_filename + ".png"):
-                            continue
-                        obj = getattr(spin_models, model)
-
-                        best_val = {}
-                        best_pt = {}
-                        for solver in ["POUNDER"]:
-                            global all_f, all_X
-                            all_f = []
-                            all_X = []
-                            run_pounder(obj, obj_params, num_params, x0)
-
-                            print(all_f, all_X, flush=True)
-
-                            ind = np.argmax(all_f)
-                            best_val[solver] = all_f[ind]
-                            best_pt[solver] = all_X[ind]
-
-                        best_method = max(best_val, key=best_val.get)
-                        # print(model, d, seed, best_val[best_method], best_pt[best_method], flush=True)
-                        dic = {}
-                        dic["best_method"] = best_method
-                        dic["best_val"] = best_val[best_method]
-                        dic["best_pt"] = best_pt[best_method]
-
-                        with open(filename, "wb") as f:
-                            pickle.dump(dic, f)
-
-
-                        #     plt.figure(fig_filename)
-                        #     plt.plot(all_f, label=solver)
-
-                        #     for i in range(1, len(all_f)):
-                        #         all_f[i] = max(all_f[i - 1], all_f[i])
-
-                        #     plt.figure(fig_filename + "best")
-                        #     plt.plot(all_f, label=solver)
-
-                        # plt.figure(fig_filename)
-                        # plt.legend()
-                        # plt.title(fig_filename)
-                        # plt.savefig(fig_filename + ".png", dpi=300)
-
-                        # plt.figure(fig_filename + "best")
-                        # plt.legend()
-                        # plt.title(fig_filename)
-                        # plt.savefig(fig_filename + "best" + ".png", dpi=300)
+            for model in models:
+                obj = getattr(spin_models, model)
+                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS")
+                # h = 1e-6
+                # calfun = lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params)
+                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
+                #grad = np.zeros(num_params)
+                #calfun(xfinal, grad)
