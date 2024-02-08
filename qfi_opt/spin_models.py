@@ -378,7 +378,7 @@ def get_jacobian_func(
     simulate_func: Callable,
     *,
     disable_diffrax: bool = DISABLE_DIFFRAX,
-    step_sizes: float | Sequence[float] = 1e-4,
+    step_sizes: float | Sequence[float] = 1e-6,
 ) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
