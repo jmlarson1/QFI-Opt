@@ -422,6 +422,12 @@ def get_jacobian_func(
 
     return get_jacobian_manually
 
+def print_jacobian(jacobian, precision=3):
+    np.set_printoptions(precision=precision, suppress=True, linewidth=10000000)
+    params = jacobian.shape[2]
+    for pp in range(params):
+        print(f"d(final_state/d(params[{pp}]):")
+        print(jacobian[:, :, pp])
 
 if __name__ == "__main__":
     # parse arguments
