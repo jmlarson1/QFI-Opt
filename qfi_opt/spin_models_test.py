@@ -170,3 +170,46 @@ def test_symmetries() -> None:
                 lambda params: spin_models.simulate_OAT(params, num_qubits),
                 get_symmetries_OAT(num_qubits % 2 == 0),
             )
+
+def run_derivatives_tests(simulate_method: Callable[[Sequence[float]], np.ndarray], symmetries: Sequence[Symmetry], atol: float = 1e-6) -> None:
+    """Test that the given simulation method obeys the given symmetries."""
+    params = tuple(numpy.random.random(5))
+    state = simulate_method(params)
+    for symmetry in symmetries:
+        new_params, transformation = symmetry(*params)
+        new_state = simulate_method(new_params)
+        assert np.allclose(state, transformation.transform(new_state), atol=atol)
+
+
+def test_derivatives() -> None:
+    """Test the symmetry transformations that we use to cut down the parameter domain of sensing protocols."""
+    for _ in range(5):  # test several random instances
+        coupling_op = get_random_hamiltonian(4)
+        coupling_exponent = numpy.random.random() * 3
+
+        for num_qubits in [2, 3]:  # test both even and odd qubit numbers
+            # test derivatives of common symmetries
+            run_derivatives_tests(
+                lambda params: spin_models.simulate_spin_chain(params, num_qubits, coupling_op, coupling_exponent),
+                get_symmetries_common(),
+            )
+
+            # test derivatives of U(1) x Z_2 symmetries
+            for simulate_method in [
+                lambda params: spin_models.simulate_ising_chain(params, num_qubits, coupling_exponent),
+                lambda params: spin_models.simulate_XX_chain(params, num_qubits, coupling_exponent),
+            ]:
+                run_derivatives_tests(simulate_method, get_symmetries_U1_Z2())
+
+            # test derivatives of Z_2 x Z_2 symmetries
+            run_derivatives_tests(
+                lambda params: spin_models.simulate_local_TAT_chain(params, num_qubits, coupling_exponent),
+                get_symmetries_Z2_Z2(),
+            )
+
+            # test derivatives of OAT symmetries
+            run_derivatives_tests(
+                lambda params: spin_models.simulate_OAT(params, num_qubits),
+                get_symmetries_OAT(num_qubits % 2 == 0),
+            )
+

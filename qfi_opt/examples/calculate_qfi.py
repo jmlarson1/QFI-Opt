@@ -216,6 +216,7 @@ if __name__ == "__main__":
     op = spin_models.collective_op(spin_models.PAULI_Z, num_spins) / (2 * num_spins)
 
     num_rand_pts = 2
+    print_precision = 6
     # Calculate QFI for models at random points in the domain.
     for num_params in [4, 5]:
         match num_params:
@@ -228,21 +229,34 @@ if __name__ == "__main__":
             print(model)
             np.random.seed(0)
             obj = getattr(spin_models, model)
+            get_jacobian = spin_models.get_jacobian_func(obj)
 
             params = 0.5 * np.ones(num_params)
             rho = obj(params, num_spins, dissipation_rates=dissipation)
+
+            grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
+            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)
+
             qfi = compute_QFI(vals, vecs, op)
             print(f"QFI is {qfi} for {params}")
 
             params[-1] = 0.0
             rho = obj(params, num_spins, dissipation_rates=dissipation)
+            
+            grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
+            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)
+
             qfi = compute_QFI(vals, vecs, op)
             print(f"QFI is {qfi} for {params}")
 
             params[-1] = 1.0
             rho = obj(params, num_spins, dissipation_rates=dissipation)
+
+            grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
+            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)
+
             qfi = compute_QFI(vals, vecs, op)
             print(f"QFI is {qfi} for {params}")

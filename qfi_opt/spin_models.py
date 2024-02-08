@@ -9,13 +9,14 @@ from typing import Callable, Optional, Sequence
 import qfi_opt
 from qfi_opt.dissipation import Dissipator
 
-DISABLE_JAX = bool(os.getenv("DISABLE_JAX"))
+DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
 
-if not DISABLE_JAX:
+if not DISABLE_DIFFRAX:
     import jax
     import jax.numpy as np
 
     jax.config.update("jax_enable_x64", True)
+    from diffrax import Dopri5, ODETerm, Tsit5, diffeqsolve
 
 else:
     import numpy as np  # type: ignore[no-redef]
@@ -252,13 +253,11 @@ def evolve_state(
     *,
     rtol: float = 1e-8,
     atol: float = 1e-8,
-    disable_jax: bool = DISABLE_JAX,
+    disable_diffrax: bool = DISABLE_DIFFRAX,
 ) -> np.ndarray:
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
     """
-    if time.real == 0:
-        return density_op
 
     # treat negative times as evolving under the negative of the Hamiltonian
     # NOTE: this is required for autodiff to work
@@ -268,37 +267,41 @@ def evolve_state(
     times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
-    if not DISABLE_JAX:
-        result = qfi_opt.ode_jax.odeint(
-            time_deriv,
-            density_op,
-            times,
+    if not DISABLE_DIFFRAX:
+
+        def _time_deriv(time: float, density_op: np.ndarray, hamiltonian) -> np.ndarray:
+            # return time_deriv(time, density_op, hamiltonian[0], dissipator)
+            return time_deriv(density_op, time)
+
+        term = ODETerm(_time_deriv)
+        ODEsolver = Tsit5()  # Dopri5()
+        solution = diffeqsolve(term, ODEsolver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
+        return solution.ys[-1]
+    else:
+        if np.isclose(time, 0.0, atol=1e-04):
+            return density_op
+
+        def scipy_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
+            density_op.shape = (hamiltonian.shape[0],) * 2  # type: ignore[misc]
+            output = time_deriv(density_op, time)
+            density_op.shape = (-1,)  # type: ignore[misc]
+            return output.ravel()
+
+        result = scipy.integrate.solve_ivp(
+            scipy_time_deriv,
+            times.real,
+            density_op.ravel(),
             rtol=rtol,
             atol=atol,
         )
-        return result[-1]
-
-    def scipy_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
-        density_op.shape = (hamiltonian.shape[0],) * 2  # type: ignore[misc]
-        output = time_deriv(density_op, time)
-        density_op.shape = (-1,)  # type: ignore[misc]
-        return output.ravel()
-
-    result = scipy.integrate.solve_ivp(
-        scipy_time_deriv,
-        times.real,
-        density_op.ravel(),
-        rtol=rtol,
-        atol=atol,
-    )
-    return result.y[:, -1].reshape(density_op.shape)
+        return result.y[:, -1].reshape(density_op.shape)
 
 
 def get_time_deriv(
     hamiltonian: np.ndarray,
     dissipator: Optional[Dissipator] = None,
     *,
-    disable_jax: bool = DISABLE_JAX,
+    disable_diffrax: bool = DISABLE_DIFFRAX,
 ) -> Callable[[np.ndarray, float], np.ndarray]:
     """Construct a time derivative function that maps (state, time) --> d(state)/d(time)."""
 
@@ -374,16 +377,30 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
 def get_jacobian_func(
     simulate_func: Callable,
     *,
-    disable_jax: bool = DISABLE_JAX,
-    step_sizes: float | Sequence[float] = 1e-4,
+    disable_diffrax: bool = DISABLE_DIFFRAX,
+    step_sizes: float | Sequence[float] = 1e-6,
 ) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
-    if not DISABLE_JAX:
-        jacobian_func = jax.jacrev(simulate_func, argnums=(0,), holomorphic=True)
+    if not DISABLE_DIFFRAX:
 
         def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
-            return jacobian_func(*args, **kwargs)[0]
+            primals, vjp_func = jax.vjp(simulate_func, *args)
+            params = args[0]
+            result = np.zeros((primals.shape[1], primals.shape[0], len(params)), dtype=COMPLEX_TYPE)
+            for i in range(primals.shape[1]):
+                for j in range(primals.shape[0]):
+                    seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
+                    seed = seed.at[i, j].set(1.0)
+                    res = np.array(vjp_func(seed)[0]).flatten()
+                    seed = seed.at[i, j].set(1.0j)
+                    res = res + np.array(vjp_func(seed)[0]).flatten() * 1.0j
+                    # Take the conjugate to account for Jax convention. See discussion:
+                    # https://github.com/google/jax/issues/4891
+                    res = np.conj(res)
+                    for p in range(len(params)):
+                        result = result.at[i, j, p].set(res[p])
+            return result
 
         return get_jacobian
 
@@ -405,6 +422,12 @@ def get_jacobian_func(
 
     return get_jacobian_manually
 
+def print_jacobian(jacobian, precision=3):
+    np.set_printoptions(precision=precision, suppress=True, linewidth=10000000)
+    params = jacobian.shape[2]
+    for pp in range(params):
+        print(f"d(final_state/d(params[{pp}]):")
+        print(jacobian[:, :, pp])
 
 if __name__ == "__main__":
     # parse arguments
@@ -414,14 +437,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num_qubits", type=int, default=4)
     parser.add_argument("--dissipation", type=float, default=0.0)
-    parser.add_argument("--params", type=float, nargs=4, default=[0.5, 0.5, 0.5, 0])
+    parser.add_argument("--params", type=float, nargs=4, default=np.array([0.5, 0.5, 0.5, 0]))
     parser.add_argument("--jacobian", action="store_true", default=False)
     args = parser.parse_args(sys.argv[1:])
 
-    # convert the parameters into a complex array, which is necessary for autodiff capabilities
-    args.params = np.array(args.params, dtype=COMPLEX_TYPE)
-
     if args.jacobian:
+        np.set_printoptions(precision=8, suppress=True)
         get_jacobian = get_jacobian_func(simulate_OAT)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
         for pp in range(len(args.params)):
