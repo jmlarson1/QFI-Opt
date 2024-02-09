@@ -15,7 +15,7 @@ sys.path.append('../../')
 
 import qfi_opt
 from qfi_opt import spin_models
-from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI
+from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI_diffrax, compute_QFI
 
 root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
 minq5_dir = os.path.join(root_dir, "minq", "py", "minq5")
@@ -88,6 +88,49 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
     #else:
     #    return -1 * qfi
 
+
+def sim_wrapper_diffrax(x, qfi_grad, obj, obj_params, get_jacobian):
+
+    use_DB = False
+    match = 0
+    if use_DB:
+        # Look through the database to see if there is a match
+        database = obj.__name__ + "_" + str(obj_params["N"]) + "_" + str(obj_params["dissipation"]) + "_database.npy"
+        DB = []
+        if os.path.exists(database):
+            DB = np.load(database, allow_pickle=True)
+            for db_entry in DB:
+                if np.allclose(db_entry["var_vals"], x, rtol=1e-12, atol=1e-12):
+                    rho = db_entry["rho"]
+                    match = 1
+                    break
+
+    if match == 0:
+        # Do the sim
+        rho = obj(x, obj_params["N"], dissipation_rates=obj_params["dissipation"])
+
+        if use_DB:
+            # Update database
+            to_save = {"rho": rho, "var_vals": x}
+            DB = np.append(DB, to_save)
+            np.save(database, DB)
+
+    # Compute eigendecomposition
+    vals, vecs = compute_eigendecomposition(rho)
+
+    qfi, new_grad = compute_QFI_diffrax(vals, vecs, rho, x, qfi_grad, get_jacobian, obj_params)
+    print(x, qfi, new_grad, flush=True)
+
+    try:
+        if qfi_grad.size > 0:
+            qfi_grad[:] = -1.0 * new_grad
+    except:
+        qfi_grad[:] = []
+
+    return -1.0 * qfi #, -qfi_grad  # negative because we are maximizing
+    #else:
+    #    return -1 * qfi
+
 def quick_test_gradient(obj, obj_params, x):
     h = 1e-8
     calfun = lambda x: sim_wrapper(x, h, True, obj, obj_params)
@@ -129,13 +172,14 @@ def run_pounder(obj, obj_params, n, x0):
 
     return F[xkin], X[xkin]
 
-def run_nlopt(obj, obj_params, num_params, x0, solver):
+def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
     # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
     # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
 
-    h = 1e-5
-    opt.set_min_objective(lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params))
+    #h = 1e-5
+    #opt.set_min_objective(lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params))
+    opt.set_min_objective(lambda x, grad: sim_wrapper_diffrax(x, grad, obj, obj_params, get_jacobian))
     opt.set_xtol_rel(1e-4)
     opt.set_maxeval(300)
     opt.set_lower_bounds(-10.0 * np.ones(num_params))
@@ -162,7 +206,7 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
     #size = comm.Get_size()
     size = 1
 
-    N = 4
+    N = 1 # 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
     for dissipation_rate in np.append([0], np.linspace(0.1, 5, 20)):
@@ -173,7 +217,7 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
 
         max_evals = 300
 
-        seed = 88
+        seed = 888
         np.random.seed(seed)
 
         for num_params in [4, 5]:
@@ -193,7 +237,8 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
 
             for model in models:
                 obj = getattr(spin_models, model)
-                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS")
+                get_jacobian = spin_models.get_jacobian_func(obj)
+                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
                 # h = 1e-6
                 # calfun = lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params)
                 #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")

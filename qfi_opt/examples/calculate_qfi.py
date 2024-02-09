@@ -2,6 +2,10 @@
 import numpy as np
 import ipdb
 
+import sys
+
+sys.path.append('../../')
+
 from qfi_opt import spin_models
 
 
@@ -33,6 +37,56 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A: np.n
     running_sum = 0
 
     if grad.size > 0:
+
+        grad[:] = np.zeros(num_params)
+        # compute gradients of each eigenvalue
+        #lambda_grads, psi_grads, eigvecs = get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol)
+        lambda_grads, psi_grads = get_matrix_grads_lazy(A, dA, eigvals, eigvecs)
+
+
+    for i in range(num_vals):
+        for j in range(i + 1, num_vals):
+            denom = eigvals[i] + eigvals[j]
+            if not np.isclose(denom, 0, atol=tol, rtol=tol):
+                numer = (eigvals[i] - eigvals[j]) ** 2
+                term = eigvecs[i].conj() @ G @ eigvecs[j]
+                quotient = numer / denom
+                squared_modulus = np.absolute(term) ** 2
+                running_sum += quotient * squared_modulus
+                if grad.size > 0:
+                    for k in range(num_params):
+                        # fill in gradient
+                        grad[k] += kth_partial_derivative(quotient, squared_modulus, eigvals[i], eigvals[j],
+                                                        lambda_grads[k, i], lambda_grads[k, j], eigvecs[i], eigvecs[j],
+                                                        psi_grads[k, i], psi_grads[k, j], G)
+
+    if grad.size > 0:
+        return 4 * running_sum, 4 * grad
+    else:
+        return 4 * running_sum, []
+
+
+def compute_QFI_diffrax(eigvals: np.ndarray, eigvecs: np.ndarray, A: np.ndarray, params: np.ndarray, grad,
+                get_jacobian, obj_params, tol: float = 1e-8, etol_scale: float = 10) -> float:
+    # Note: The eigenvectors must be rows of eigvecs
+    num_vals = len(eigvals)
+    num_params = len(params)
+
+    G = obj_params["G"]
+
+    # There should never be negative eigenvalues, so their magnitude gives an
+    # empirical estimate of the numerical accuracy of the eigendecomposition.
+    # We discard any QFI terms denominators within an order of magnitude of
+    # this value.
+    tol = max(tol, -etol_scale * np.min(eigvals))
+
+    # Compute QFI and grad
+    running_sum = 0
+
+    if grad.size > 0:
+
+        dA = get_jacobian(params, obj_params["N"], dissipation_rates=obj_params["dissipation"])
+        dA = np.transpose(dA, (2, 0, 1))
 
         grad[:] = np.zeros(num_params)
         # compute gradients of each eigenvalue
