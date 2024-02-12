@@ -399,14 +399,13 @@ def get_jacobian_func(
         return get_jacobian
 
     def get_jacobian_manually(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
-        nonlocal step_sizes
         if isinstance(step_sizes, float):
-            step_sizes = [step_sizes] * len(params)
-        assert len(step_sizes) == len(params)
+            param_step_sizes = [step_sizes] * len(params)
+        assert len(param_step_sizes) == len(params)
 
         result_at_params = simulate_func(params, *args, **kwargs)
         shifted_results = []
-        for idx, step_size in enumerate(step_sizes):
+        for idx, step_size in enumerate(param_step_sizes):
             new_params = list(params)
             new_params[idx] += step_size
             result_at_params_with_step = simulate_func(new_params, *args, **kwargs)
