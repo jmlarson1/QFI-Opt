@@ -416,8 +416,8 @@ def get_jacobian_func(
     return get_jacobian_manually
 
 
-def print_jacobian(jacobian: np.ndarray, precision: int = 3) -> None:
-    np.set_printoptions(precision=precision, suppress=True, linewidth=10000000)
+def print_jacobian(jacobian: np.ndarray, precision: int = 3, linewidth: int = 200) -> None:
+    np.set_printoptions(precision=precision, suppress=True, linewidth=linewidth)
     params = jacobian.shape[2]
     for pp in range(params):
         print(f"d(final_state/d(params[{pp}]):")
@@ -437,12 +437,9 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     if args.jacobian:
-        np.set_printoptions(precision=8, suppress=True)
         get_jacobian = get_jacobian_func(simulate_OAT)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
-        for pp in range(len(args.params)):
-            print(f"d(final_state/d(params[{pp}]):")
-            print(jacobian[:, :, pp])
+        print_jacobian(jacobian)
 
     # simulate the OAT protocol
     final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
