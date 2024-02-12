@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import numpy as np
 import ipdb
+import numpy as np
 
 from qfi_opt import spin_models
 
@@ -17,8 +17,9 @@ def compute_eigendecomposition(rho: np.ndarray):
     return eigvals, eigvecs
 
 
-def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A: np.ndarray, dA: np.ndarray, d2A: np.ndarray, grad,
-                tol: float = 1e-8, etol_scale: float = 10) -> float:
+def compute_QFI(
+    eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A: np.ndarray, dA: np.ndarray, d2A: np.ndarray, grad, tol: float = 1e-8, etol_scale: float = 10
+) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
     num_params = dA.shape[0]
@@ -33,12 +34,10 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A: np.n
     running_sum = 0
 
     if grad.size > 0:
-
         grad[:] = np.zeros(num_params)
         # compute gradients of each eigenvalue
-        #lambda_grads, psi_grads, eigvecs = get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol)
+        # lambda_grads, psi_grads, eigvecs = get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol)
         lambda_grads, psi_grads = get_matrix_grads_lazy(A, dA, eigvals, eigvecs)
-
 
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
@@ -52,17 +51,27 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A: np.n
                 if grad.size > 0:
                     for k in range(num_params):
                         # fill in gradient
-                        grad[k] += kth_partial_derivative(quotient, squared_modulus, eigvals[i], eigvals[j],
-                                                        lambda_grads[k, i], lambda_grads[k, j], eigvecs[i], eigvecs[j],
-                                                        psi_grads[k, i], psi_grads[k, j], G)
+                        grad[k] += kth_partial_derivative(
+                            quotient,
+                            squared_modulus,
+                            eigvals[i],
+                            eigvals[j],
+                            lambda_grads[k, i],
+                            lambda_grads[k, j],
+                            eigvecs[i],
+                            eigvecs[j],
+                            psi_grads[k, i],
+                            psi_grads[k, j],
+                            G,
+                        )
 
     if grad.size > 0:
         return 4 * running_sum, 4 * grad
     else:
         return 4 * running_sum, []
 
-def get_matrix_grads_lazy(A, dA, eigvals, eigvecs):
 
+def get_matrix_grads_lazy(A, dA, eigvals, eigvecs):
     num_vals = len(eigvals)
     num_params = dA.shape[0]
     lambda_grads = np.zeros((num_params, num_vals))
@@ -70,7 +79,6 @@ def get_matrix_grads_lazy(A, dA, eigvals, eigvecs):
 
     for k in range(num_params):
         for index in range(num_vals):
-
             dlambda, dpsi = matrixder_lazy(A, dA[k], eigvals[index], eigvecs[index])
 
             lambda_grads[k, index] = np.real(dlambda)
@@ -80,7 +88,6 @@ def get_matrix_grads_lazy(A, dA, eigvals, eigvecs):
 
 
 def get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol):
-
     num_vals = len(eigvals)
     num_params = dA.shape[0]
     lambda_grads = np.zeros((num_params, num_vals))
@@ -104,8 +111,8 @@ def get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol):
 
     return lambda_grads, psi_grads, updated_eigvecs
 
-def matrixder_lazy(A, dA, eigval, eigvec):
 
+def matrixder_lazy(A, dA, eigval, eigvec):
     # build the big matrix
     num_vals = A.shape[0]
     Eye = np.eye(num_vals)
@@ -176,7 +183,6 @@ def matrixder(A, dA, ddA, lam, arbV):
 
 
 def quotient_partial_derivative(lambda_i, lambda_j, d_lambda_i, d_lambda_j):
-
     squared_diff = (lambda_i - lambda_j) ** 2
     fprimeg = 2 * squared_diff * (d_lambda_i - d_lambda_j)
     gprimef = squared_diff * (d_lambda_i + d_lambda_j)
@@ -186,7 +192,6 @@ def quotient_partial_derivative(lambda_i, lambda_j, d_lambda_i, d_lambda_j):
 
 
 def modulus_partial_derivative(psi_i, psi_j, d_psi_i, d_psi_j, G):
-
     inner_product = psi_i.conj() @ G @ psi_j
     left_derivative = d_psi_i.conj() @ G @ psi_j
     right_derivative = psi_i.conj() @ G @ d_psi_j
@@ -199,9 +204,7 @@ def modulus_partial_derivative(psi_i, psi_j, d_psi_i, d_psi_j, G):
     return der
 
 
-def kth_partial_derivative(quotient, modulus, lambda_i, lambda_j, d_lambda_i, d_lambda_j,
-                           psi_i, psi_j, d_psi_i, d_psi_j, G):
-
+def kth_partial_derivative(quotient, modulus, lambda_i, lambda_j, d_lambda_i, d_lambda_j, psi_i, psi_j, d_psi_i, d_psi_j, G):
     quotient_der = quotient_partial_derivative(lambda_i, lambda_j, d_lambda_i, d_lambda_j)
     modulus_der = modulus_partial_derivative(psi_i, psi_j, d_psi_i, d_psi_j, G)
 
@@ -243,7 +246,7 @@ if __name__ == "__main__":
 
             params[-1] = 0.0
             rho = obj(params, num_spins, dissipation_rates=dissipation)
-            
+
             grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
             spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)

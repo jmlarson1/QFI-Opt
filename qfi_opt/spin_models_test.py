@@ -171,6 +171,7 @@ def test_symmetries() -> None:
                 get_symmetries_OAT(num_qubits % 2 == 0),
             )
 
+
 def run_derivatives_tests(simulate_method: Callable[[Sequence[float]], np.ndarray], symmetries: Sequence[Symmetry], atol: float = 1e-6) -> None:
     """Test that the given simulation method obeys the given symmetries."""
     params = tuple(numpy.random.random(5))
@@ -212,4 +213,3 @@ def test_derivatives() -> None:
                 lambda params: spin_models.simulate_OAT(params, num_qubits),
                 get_symmetries_OAT(num_qubits % 2 == 0),
             )
-

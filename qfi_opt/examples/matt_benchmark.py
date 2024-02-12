@@ -4,14 +4,14 @@ import pickle
 import sys
 
 import ipdb
-
 import nlopt
 import numpy as np
 from ibcdfo.pounders import pounders
 from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
-#from mpi4py import MPI
 
-sys.path.append('../../')
+# from mpi4py import MPI
+
+sys.path.append("../../")
 
 import qfi_opt
 from qfi_opt import spin_models
@@ -32,7 +32,6 @@ sys.path.append(minq5_dir)
 
 
 def sim_wrapper(x, h, qfi_grad, obj, obj_params):
-
     use_DB = False
     match = 0
     if use_DB:
@@ -58,8 +57,8 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
             np.save(database, DB)
 
     num_parameters = len(x)
-    dA = np.zeros((num_parameters, N ** 2, N ** 2), dtype="cdouble")
-    d2A = np.zeros((num_parameters, N ** 2, N ** 2), dtype="cdouble")
+    dA = np.zeros((num_parameters, N**2, N**2), dtype="cdouble")
+    d2A = np.zeros((num_parameters, N**2, N**2), dtype="cdouble")
     if qfi_grad.size > 0:
         # Approximate the gradient
         I = np.eye(num_parameters)
@@ -70,7 +69,7 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
             rho_m = obj(x - h * I[parameter], obj_params["N"], dissipation_rates=obj_params["dissipation"])
             dA[parameter] = (rho_p - rho_m) / (2 * h)
             # compute d2A with respect to parameter
-            d2A[parameter] = (rho_p - 2 * rho + rho_m) / (h ** 2)
+            d2A[parameter] = (rho_p - 2 * rho + rho_m) / (h**2)
 
     # Compute eigendecomposition
     vals, vecs = compute_eigendecomposition(rho)
@@ -84,9 +83,10 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
     except:
         qfi_grad[:] = []
 
-    return -1.0 * qfi #, -qfi_grad  # negative because we are maximizing
-    #else:
+    return -1.0 * qfi  # , -qfi_grad  # negative because we are maximizing
+    # else:
     #    return -1 * qfi
+
 
 def quick_test_gradient(obj, obj_params, x):
     h = 1e-8
@@ -101,8 +101,6 @@ def quick_test_gradient(obj, obj_params, x):
         xp = x - stepsize * g
         fp = calfun_f(xp)
         print("fp: ", fp, "stepsize: ", stepsize)
-
-
 
 
 def run_pounder(obj, obj_params, n, x0):
@@ -129,6 +127,7 @@ def run_pounder(obj, obj_params, n, x0):
 
     return F[xkin], X[xkin]
 
+
 def run_nlopt(obj, obj_params, num_params, x0, solver):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
     # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
@@ -141,7 +140,6 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
     opt.set_lower_bounds(-10.0 * np.ones(num_params))
     opt.set_upper_bounds(10.0 * np.ones(num_params))
     opt.set_vector_storage(0)
-
 
     # # Because the objective is periodic, don't set bounds (but don't need to sample so much)
     # opt.set_lower_bounds(lb)
@@ -157,9 +155,9 @@ def run_nlopt(obj, obj_params, num_params, x0, solver):
 
 
 if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the code below
-    #comm = MPI.COMM_WORLD
-    #rank = comm.Get_rank()
-    #size = comm.Get_size()
+    # comm = MPI.COMM_WORLD
+    # rank = comm.Get_rank()
+    # size = comm.Get_size()
     size = 1
 
     N = 4
@@ -180,7 +178,7 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
-            #x0 = 0.5 * np.ones(num_params)
+            # x0 = 0.5 * np.ones(num_params)
             x0 = np.random.uniform(lb, ub, num_params)
 
             match num_params:
@@ -196,6 +194,6 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
                 minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS")
                 # h = 1e-6
                 # calfun = lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params)
-                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
-                #grad = np.zeros(num_params)
-                #calfun(xfinal, grad)
+                # minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
+                # grad = np.zeros(num_params)
+                # calfun(xfinal, grad)
