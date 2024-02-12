@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
 import os
-import pickle
 import sys
 
-import ipdb
 import nlopt
 import numpy as np
 from ibcdfo.pounders import pounders
 from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
 
-# from mpi4py import MPI
-
-sys.path.append("../../")
-
 import qfi_opt
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI
+
+
+sys.path.append("../../")
 
 root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
 minq5_dir = os.path.join(root_dir, "minq", "py", "minq5")

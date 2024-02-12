@@ -6,17 +6,16 @@ import os
 import sys
 from typing import Callable, Optional, Sequence
 
-import qfi_opt
 from qfi_opt.dissipation import Dissipator
 
 DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
 
 if not DISABLE_DIFFRAX:
+    import diffrax
     import jax
     import jax.numpy as np
 
     jax.config.update("jax_enable_x64", True)
-    from diffrax import Dopri5, ODETerm, Tsit5, diffeqsolve
 
 else:
     import numpy as np  # type: ignore[no-redef]
@@ -268,22 +267,18 @@ def evolve_state(
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
     if not DISABLE_DIFFRAX:
-
-        def _time_deriv(time: float, density_op: np.ndarray, hamiltonian) -> np.ndarray:
-            # return time_deriv(time, density_op, hamiltonian[0], dissipator)
-            return time_deriv(density_op, time)
-
-        term = ODETerm(_time_deriv)
-        ODEsolver = Tsit5()  # Dopri5()
-        solution = diffeqsolve(term, ODEsolver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
+        term = diffrax.ODETerm(time_deriv)
+        solver = diffrax.Tsit5()  # Dopri5()
+        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, dt0=0.002, y0=density_op)
         return solution.ys[-1]
+
     else:
         if np.isclose(time, 0.0, atol=1e-04):
             return density_op
 
         def scipy_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
             density_op.shape = (hamiltonian.shape[0],) * 2  # type: ignore[misc]
-            output = time_deriv(density_op, time)
+            output = time_deriv(time, density_op)
             density_op.shape = (-1,)  # type: ignore[misc]
             return output.ravel()
 
@@ -302,13 +297,13 @@ def get_time_deriv(
     dissipator: Optional[Dissipator] = None,
     *,
     disable_diffrax: bool = DISABLE_DIFFRAX,
-) -> Callable[[np.ndarray, float], np.ndarray]:
+) -> Callable[[float, np.ndarray], np.ndarray]:
     """Construct a time derivative function that maps (state, time) --> d(state)/d(time)."""
 
     # construct the time derivative from coherent evolution
     if hamiltonian.ndim == 2:
         # ... with ordinary matrix multiplication
-        def coherent_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
+        def coherent_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
             return -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
 
     else:
@@ -316,14 +311,14 @@ def get_time_deriv(
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
         expanded_hamiltonian = np.expand_dims(hamiltonian, 1)
 
-        def coherent_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
+        def coherent_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
             return -1j * (expanded_hamiltonian * density_op - density_op * hamiltonian)
 
     if not dissipator:
         return coherent_time_deriv
 
-    def dissipative_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
-        return coherent_time_deriv(density_op, time) + dissipator @ density_op
+    def dissipative_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
+        return coherent_time_deriv(time, density_op) + dissipator @ density_op
 
     return dissipative_time_deriv
 
