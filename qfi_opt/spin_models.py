@@ -267,7 +267,7 @@ def evolve_state(
 
     if not DISABLE_DIFFRAX:
         term = diffrax.ODETerm(time_deriv)
-        solver = diffrax.Tsit5()  # Dopri5()
+        solver = diffrax.Tsit5()  # alterative: diffrax.Dopri5()
         solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, dt0=0.002, y0=density_op)
         return solution.ys[-1]
 

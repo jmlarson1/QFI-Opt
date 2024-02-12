@@ -11,7 +11,6 @@ import qfi_opt
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI
 
-
 sys.path.append("../../")
 
 root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
