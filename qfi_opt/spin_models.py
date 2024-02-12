@@ -272,7 +272,7 @@ def evolve_state(
         return solution.ys[-1]
 
     else:
-        if np.isclose(time, 0):
+        if np.isclose(time, 0, atol=atol):
             return density_op
 
         def scipy_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
