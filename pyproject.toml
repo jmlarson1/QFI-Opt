@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "QFI-Opt"
-version = "0.0.2"
+version = "0.0.3"
 description = "This repository contains codes for optimizing the quantum fisher information (QFI) of quantum systems."
 authors = [
   "Jeffrey Larson <jmlarson@anl.gov>",
