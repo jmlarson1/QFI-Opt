@@ -26,6 +26,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
+diffrax = ">=0.5.0"
 jax = ">=0.4.8"
 jaxlib = ">=0.4.7"
 matplotlib = ">=3.6.2"

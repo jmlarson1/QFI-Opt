@@ -263,7 +263,6 @@ def evolve_state(
     if time.real < 0:
         time, hamiltonian = -time, -hamiltonian
 
-    times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
     if not DISABLE_DIFFRAX:
@@ -284,8 +283,9 @@ def evolve_state(
 
         result = scipy.integrate.solve_ivp(
             scipy_time_deriv,
-            times.real,
+            [0, time],
             density_op.ravel(),
+            t_eval=[time],
             rtol=rtol,
             atol=atol,
         )
@@ -379,9 +379,8 @@ def get_jacobian_func(
 
     if not DISABLE_DIFFRAX:
 
-        def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
-            primals, vjp_func = jax.vjp(simulate_func, *args)
-            params = args[0]
+        def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+            primals, vjp_func = jax.vjp(simulate_func, params, *args)
             result = np.zeros((primals.shape[1], primals.shape[0], len(params)), dtype=COMPLEX_TYPE)
             for i in range(primals.shape[1]):
                 for j in range(primals.shape[0]):
@@ -399,7 +398,7 @@ def get_jacobian_func(
 
         return get_jacobian
 
-    def get_jacobian_manually(params: Sequence[float] | np.ndarray, *args: object, **kwargs: object) -> np.ndarray:
+    def get_jacobian_manually(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
         nonlocal step_sizes
         if isinstance(step_sizes, float):
             step_sizes = [step_sizes] * len(params)
@@ -418,7 +417,7 @@ def get_jacobian_func(
     return get_jacobian_manually
 
 
-def print_jacobian(jacobian, precision=3):
+def print_jacobian(jacobian: np.ndarray, precision: int = 3) -> None:
     np.set_printoptions(precision=precision, suppress=True, linewidth=10000000)
     params = jacobian.shape[2]
     for pp in range(params):
