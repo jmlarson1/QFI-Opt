@@ -266,9 +266,13 @@ def evolve_state(
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
     if not DISABLE_DIFFRAX:
-        term = diffrax.ODETerm(time_deriv)
+
+        def _time_deriv(time: float, density_op: np.ndarray, hamiltonian: np.ndarray):
+            return time_deriv(time, density_op)
+
+        term = diffrax.ODETerm(_time_deriv)
         solver = diffrax.Tsit5()  # alterative: diffrax.Dopri5()
-        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, dt0=0.002, y0=density_op)
+        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
         return solution.ys[-1]
 
     else:
@@ -373,7 +377,7 @@ def get_jacobian_func(
     simulate_func: Callable,
     *,
     disable_diffrax: bool = DISABLE_DIFFRAX,
-    step_sizes: float | Sequence[float] = 1e-6,
+    step_sizes: float | Sequence[float] = 1e-10,
 ) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
