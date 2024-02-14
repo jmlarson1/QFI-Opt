@@ -6,6 +6,7 @@ import os
 import sys
 from typing import Callable, Optional, Sequence
 
+import numpy
 from qfi_opt.dissipation import Dissipator
 
 DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
@@ -271,7 +272,7 @@ def evolve_state(
             return time_deriv(time, density_op)
 
         term = diffrax.ODETerm(_time_deriv)
-        solver = diffrax.Tsit5()  # alterative: diffrax.Dopri5()
+        solver = diffrax.Tsit5()  # alterative: diffrax.Dopri8()
         solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
         return solution.ys[-1]
 
@@ -386,18 +387,15 @@ def get_jacobian_func(
         def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
             primals, vjp_func = jax.vjp(simulate_func, params, *args)
             result = np.zeros((primals.shape[1], primals.shape[0], len(params)), dtype=COMPLEX_TYPE)
-            for i in range(primals.shape[1]):
-                for j in range(primals.shape[0]):
-                    seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
-                    seed = seed.at[i, j].set(1.0)
-                    res = np.array(vjp_func(seed)[0]).flatten()
-                    seed = seed.at[i, j].set(1.0j)
-                    res = res + np.array(vjp_func(seed)[0]).flatten() * 1.0j
-                    # Take the conjugate to account for Jax convention. See discussion:
-                    # https://github.com/google/jax/issues/4891
-                    res = np.conj(res)
-                    for p in range(len(params)):
-                        result = result.at[i, j, p].set(res[p])
+            for ii, jj in numpy.ndindex(primals.shape):
+                seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
+                seed = seed.at[ii, jj].set(1.0)
+                res = np.array(vjp_func(seed)[0]).flatten()
+                seed = seed.at[ii, jj].set(1.0j)
+                res = res + np.array(vjp_func(seed)[0]).flatten() * 1.0j
+                # Take the conjugate to account for Jax convention. See discussion:
+                # https://github.com/google/jax/issues/4891
+                result = result.at[ii, jj, :].set(np.conj(res))
             return result
 
         return get_jacobian
