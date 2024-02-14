@@ -7,6 +7,7 @@ import sys
 from typing import Callable, Optional, Sequence
 
 import numpy
+
 from qfi_opt.dissipation import Dissipator
 
 DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
@@ -268,7 +269,7 @@ def evolve_state(
 
     if not DISABLE_DIFFRAX:
 
-        def _time_deriv(time: float, density_op: np.ndarray, hamiltonian: np.ndarray):
+        def _time_deriv(time: float, density_op: np.ndarray, hamiltonian: np.ndarray) -> np.ndarray:
             return time_deriv(time, density_op)
 
         term = diffrax.ODETerm(_time_deriv)
