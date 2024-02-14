@@ -255,6 +255,8 @@ def evolve_state(
     rtol: float = 1e-8,
     atol: float = 1e-8,
     disable_diffrax: bool = DISABLE_DIFFRAX,
+    solver: diffrax.AbstractSolver = diffrax.Tsit5(),  # try also diffrax.Dopri8()
+    **diffrax_kwargs: object,
 ) -> np.ndarray:
     """
     Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
@@ -269,12 +271,15 @@ def evolve_state(
 
     if not DISABLE_DIFFRAX:
 
+        # set initial time step size, if necessary
+        if "dt0" not in diffrax_kwargs:
+            diffrax_kwargs["dt0"] = 0.002
+
         def _time_deriv(time: float, density_op: np.ndarray, hamiltonian: np.ndarray) -> np.ndarray:
             return time_deriv(time, density_op)
 
         term = diffrax.ODETerm(_time_deriv)
-        solver = diffrax.Tsit5()  # alterative: diffrax.Dopri8()
-        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
+        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, y0=density_op, args=(hamiltonian,), **diffrax_kwargs)
         return solution.ys[-1]
 
     else:
