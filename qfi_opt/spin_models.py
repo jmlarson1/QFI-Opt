@@ -60,7 +60,7 @@ def simulate_sensing_protocol(
     Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * num_qubits * np.pi'.
     Step 3 rotates by an angle '-np.pi * params[-2]', about the axis 'np.pi * params[-1]'.
 
-    If axial_symmetry is set to True, a 0 is appended to the parameter list.
+    If axial_symmetry is set to True, 0 is appended to the parameter list.
     Afterwards, if there are more than 5 parameters, step (2) is replaced by alternating steps of
     entanglement and global rotations about the X axis: ENT - ROT - ENT - ROT - ... - ENT.
 
@@ -75,9 +75,9 @@ def simulate_sensing_protocol(
     with probability 'e^(-params[0] * r)' by the end of the OAT protocol.
     """
     if axial_symmetry:
-        params = check_and_modify_for_axial_symmetry(params, dissipation_rates, dissipation_format)
+        params = verify_and_modify_for_axial_symmetry(params, dissipation_rates, dissipation_format)
     if len(params) < 5 or not len(params) % 2:
-        raise ValueError(f"There should at this point be an odd number of parameters greater than 5, not {len(params)}.")
+        raise ValueError(f"The number of parameters should be an odd number >=5, not {len(params)}.")
 
     num_qubits = log2_int(entangling_hamiltonian.shape[0])
 
@@ -114,7 +114,7 @@ def simulate_sensing_protocol(
     return state
 
 
-def check_and_modify_for_axial_symmetry(
+def verify_and_modify_for_axial_symmetry(
     params: Sequence[float] | np.ndarray,
     dissipation_rates: float | tuple[float, float, float],
     dissipation_format: str,
@@ -129,7 +129,7 @@ def check_and_modify_for_axial_symmetry(
         if not rate_sx == rate_sy:
             raise ValueError(
                 f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
-                "\nTry passing the argument `axial_symmetry=False` to the simulation method."
+                "\nCannot simulate with `axial_symmetry=True`."
             )
     if len(params) > 4:
         raise ValueError(f"Simulations with axial symmetry should only have four parameters, not {len(params)}.")
@@ -142,7 +142,7 @@ def simulate_OAT(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = True,
+    axial_symmetry: bool = False,
 ) -> np.ndarray:
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
@@ -205,7 +205,7 @@ def simulate_ising_chain(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = True,
+    axial_symmetry: bool = False,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
     return simulate_spin_chain(
@@ -226,7 +226,7 @@ def simulate_XX_chain(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = True,
+    axial_symmetry: bool = False,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
     return simulate_spin_chain(
@@ -268,7 +268,7 @@ def evolve_state(
     rtol: float = 1e-8,
     atol: float = 1e-8,
     disable_diffrax: bool = DISABLE_DIFFRAX,
-    solver: diffrax.AbstractSolver = diffrax.Tsit5(),  # try also diffrax.Dopri8()
+    solver: Optional["diffrax.AbstractSolver"] = None,
     **diffrax_kwargs: object,
 ) -> np.ndarray:
     """Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator."""
@@ -290,6 +290,7 @@ def evolve_state(
             return time_deriv(time, density_op)
 
         term = diffrax.ODETerm(_time_deriv)
+        solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
         solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, y0=density_op, args=(hamiltonian,), **diffrax_kwargs)
         return solution.ys[-1]
 
