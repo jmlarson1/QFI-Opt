@@ -22,7 +22,8 @@ def compute_QFI(
 ) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
-    num_params = dA.shape[0]
+    if len(grad) > 0:
+        num_params = dA.shape[0]
 
     # There should never be negative eigenvalues, so their magnitude gives an
     # empirical estimate of the numerical accuracy of the eigendecomposition.
@@ -33,7 +34,7 @@ def compute_QFI(
     # Compute QFI and grad
     running_sum = 0
 
-    if grad.size > 0:
+    if len(grad) > 0:
         grad[:] = np.zeros(num_params)
         # compute gradients of each eigenvalue
         # lambda_grads, psi_grads, eigvecs = get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol)
@@ -48,7 +49,7 @@ def compute_QFI(
                 quotient = numer / denom
                 squared_modulus = np.absolute(term) ** 2
                 running_sum += quotient * squared_modulus
-                if grad.size > 0:
+                if len(grad) > 0:
                     for k in range(num_params):
                         # fill in gradient
                         grad[k] += kth_partial_derivative(
@@ -65,7 +66,7 @@ def compute_QFI(
                             G,
                         )
 
-    if grad.size > 0:
+    if len(grad) > 0:
         return 4 * running_sum, 4 * grad
     else:
         return 4 * running_sum, []
@@ -222,44 +223,45 @@ if __name__ == "__main__":
     print_precision = 6
     # Calculate QFI for models at random points in the domain.
     for num_params in [4, 5]:
-        match num_params:
-            case 4:
-                models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
-            case 5:
-                models = ["simulate_TAT", "simulate_local_TAT_chain"]
+        for mult in [1, 2, 3]:
+            match num_params:
+                case 4:
+                    models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
+                case 5:
+                    models = ["simulate_TAT", "simulate_local_TAT_chain"]
 
-        for model in models:
-            print(model)
-            np.random.seed(0)
-            obj = getattr(spin_models, model)
-            get_jacobian = spin_models.get_jacobian_func(obj)
+            for model in models:
+                print(model)
+                np.random.seed(0)
+                obj = getattr(spin_models, model)
+                # get_jacobian = spin_models.get_jacobian_func(obj)
 
-            params = 0.5 * np.ones(num_params)
-            rho = obj(params, num_spins, dissipation_rates=dissipation)
+                params = 0.5 * np.ones(num_params*mult)
+                rho = obj(params, num_spins, dissipation_rates=dissipation)
 
-            grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
-            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
-            vals, vecs = compute_eigendecomposition(rho)
+                # grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
+                # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
+                vals, vecs = compute_eigendecomposition(rho)
 
-            qfi = compute_QFI(vals, vecs, op)
-            print(f"QFI is {qfi} for {params}")
+                qfi = compute_QFI(vals, vecs, op, [], [], [], [])
+                print(f"QFI is {qfi} for {params}")
 
-            params[-1] = 0.0
-            rho = obj(params, num_spins, dissipation_rates=dissipation)
+                params[-1] = 0.0
+                rho = obj(params, num_spins, dissipation_rates=dissipation)
 
-            grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
-            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
-            vals, vecs = compute_eigendecomposition(rho)
+                # grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
+                # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
+                vals, vecs = compute_eigendecomposition(rho)
 
-            qfi = compute_QFI(vals, vecs, op)
-            print(f"QFI is {qfi} for {params}")
+                qfi = compute_QFI(vals, vecs, op, [], [], [], [])
+                print(f"QFI is {qfi} for {params}")
 
-            params[-1] = 1.0
-            rho = obj(params, num_spins, dissipation_rates=dissipation)
+                params[-1] = 1.0
+                rho = obj(params, num_spins, dissipation_rates=dissipation)
 
-            grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
-            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
-            vals, vecs = compute_eigendecomposition(rho)
+                # grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
+                # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
+                vals, vecs = compute_eigendecomposition(rho)
 
-            qfi = compute_QFI(vals, vecs, op)
-            print(f"QFI is {qfi} for {params}")
+                qfi = compute_QFI(vals, vecs, op, [], [], [], [])
+                print(f"QFI is {qfi} for {params}")
