@@ -77,7 +77,7 @@ def simulate_sensing_protocol(
     if axial_symmetry:
         params = check_and_modify_for_axial_symmetry(params, dissipation_rates, dissipation_format)
     if len(params) < 5 or not len(params) % 2:
-        raise ValueError(f"There should at this point be an odd number of parameters greater than 5, not {len(params)}.")
+        raise ValueError(f"The number of parameters should be an odd number >=5, not {len(params)}.")
 
     num_qubits = log2_int(entangling_hamiltonian.shape[0])
 
