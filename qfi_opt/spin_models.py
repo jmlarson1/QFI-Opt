@@ -255,7 +255,6 @@ def evolve_state(
     rtol: float = 1e-8,
     atol: float = 1e-8,
     disable_diffrax: bool = DISABLE_DIFFRAX,
-    solver: diffrax.AbstractSolver = diffrax.Tsit5(),  # try also diffrax.Dopri8()
     **diffrax_kwargs: object,
 ) -> np.ndarray:
     """
@@ -271,6 +270,7 @@ def evolve_state(
 
     if not DISABLE_DIFFRAX:
 
+        solver = diffrax.AbstractSolver = diffrax.Tsit5()  # try also diffrax.Dopri8()
         # set initial time step size, if necessary
         if "dt0" not in diffrax_kwargs:
             diffrax_kwargs["dt0"] = 0.002
