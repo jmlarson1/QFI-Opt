@@ -11,7 +11,6 @@ from qfi_opt.examples.calculate_qfi import (
     compute_QFI,
     h_more_struct_1,
     h_more_struct_1_combine,
-    minimize_norm_diff,
     vec_compute_QFI_max_sum_squares,
     vec_compute_QFI_max_sum_squares_all,
     vec_compute_QFI_more_struct_1,
@@ -66,6 +65,7 @@ def sim_wrapper(x, grad, obj, obj_params, out_type=0):
         print(x, qfi, flush=True)
         all_f.append(qfi)
         all_X.append(x)
+        all_eigvals.append(vals)
         return -1 * qfi  # negative because we are maximizing
     elif out_type == 1:
         vecqfi = vec_compute_QFI_max_sum_squares(vals, vecs, obj_params["G"])
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for dissipation_rate in [0.0]:
+    for dissipation_rate in [1.0]:
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = dissipation_rate
@@ -289,9 +289,9 @@ if __name__ == "__main__":
                         #     fvals[i] = qfi
                         #     print(x,fvals)
 
-                        # import matplotlib.pyplot as plt
-                        # plt.plot(fvals)
-                        # plt.savefig('fvals.png',dpi=300)
+
+                        # plt.semilogy(all_eigvals)
+                        # plt.savefig(fig_filename + solver + 'all_eigvals.png',dpi=300)
                         # plt.close()
                         # sys.exit("a")
 
