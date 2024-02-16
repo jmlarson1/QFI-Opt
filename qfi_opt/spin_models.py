@@ -131,8 +131,8 @@ def check_and_modify_for_axial_symmetry(
                 f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
                 "\nTry passing the argument `axial_symmetry=False` to the simulation method."
             )
-    if len(params) % 2:
-        raise ValueError(f"Simulations with symmetry should only have an even number of parameters, not {len(params)}.")
+    if len(params) > 4:
+        raise ValueError(f"Simulations with axial symmetry should only have four parameters, not {len(params)}.")
     return np.append(np.array(params), 0.0)
 
 
