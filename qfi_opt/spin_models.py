@@ -182,6 +182,7 @@ def simulate_spin_chain(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    axial_symmetry: bool = False,
 ) -> np.ndarray:
     """Simulate an entangling protocol for a spin chain with power-law interactions."""
     normalization_factor = num_qubits * np.array([1 / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)]).mean()
@@ -193,6 +194,7 @@ def simulate_spin_chain(
         hamiltonian / normalization_factor,
         dissipation_rates=dissipation_rates,
         dissipation_format=dissipation_format,
+        axial_symmetry=axial_symmetry,
     )
 
 
