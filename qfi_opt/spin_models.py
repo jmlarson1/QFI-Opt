@@ -46,6 +46,7 @@ def simulate_sensing_protocol(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    axial_symmetry: bool = False,
 ) -> np.ndarray:
     """
     Simulate a sensing protocol, and return the final state (density matrix).
@@ -55,11 +56,15 @@ def simulate_sensing_protocol(
     2. Evolve under a given entangling Hamiltonian.
     3. "Un-rotate" about an axis in the XY plane.
 
-    Step 1 rotates by an angle '+np.pi * params[1]', about the axis 'np.pi * params[2]'.
-    Step 2 evolves under the given entangling Hamiltonian for time 'params[0] * num_qubits * np.pi'.
-    Step 3 rotates by an angle '-np.pi * params[3]', about the axis 'np.pi * params[4]'.
+    Step 1 rotates by an angle '+np.pi * params[0]', about the axis 'np.pi * params[1]'.
+    Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * num_qubits * np.pi'.
+    Step 3 rotates by an angle '-np.pi * params[-2]', about the axis 'np.pi * params[-1]'.
 
-    If dissipation_rates is nonzero, qubits experience dissipation during the entangling step (2).
+    If axial_symmetry is set to True, a 0 is appended to the parameter list.
+    Afterwards, if there are more than 5 parameters, step (2) is replaced by alternating steps of
+    entanglement and global rotations about the X axis: ENT - ROT - ENT - ROT - ... - ENT.
+
+    If dissipation_rates is nonzero, qubits experience dissipation during the entangling steps.
     See the documentation for the Dissipator class for a general explanation of the
     dissipation_rates and dissipation_format arguments.
 
@@ -69,72 +74,75 @@ def simulate_sensing_protocol(
     dissipation rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes
     with probability 'e^(-params[0] * r)' by the end of the OAT protocol.
     """
-    assert len(params) == 5, "Spin sensing protocols accept five parameters."
+    if axial_symmetry:
+        params = check_and_modify_for_axial_symmetry(params, dissipation_rates, dissipation_format)
+    if len(params) < 5 or not len(params) % 2:
+        raise ValueError(f"There should at this point be an odd number of parameters greater than 5, not {len(params)}.")
 
     num_qubits = log2_int(entangling_hamiltonian.shape[0])
 
     # construct collective spin operators
-    collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
+    collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
 
     # rotate the all-|1> state about a chosen axis
-    time_1 = params[1] * np.pi
-    axis_angle_1 = params[2] * np.pi
-    qubit_ket = np.sin(time_1 / 2) * KET_0 + 1j * np.exp(1j * axis_angle_1) * np.cos(time_1 / 2) * KET_1
+    time_i = params[0] * np.pi
+    axis_angle_i = params[1] * np.pi
+    qubit_ket = np.sin(time_i / 2) * KET_0 + 1j * np.exp(1j * axis_angle_i) * np.cos(time_i / 2) * KET_1
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
-    state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
+    state = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
-    # entangle!
-    time_2 = params[0] * np.pi * num_qubits
+    # entangle
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
+    time_ent = params[2] * np.pi * num_qubits
+    state = evolve_state(state, time_ent, entangling_hamiltonian, dissipator)
+
+    for pp in range(3, len(params) - 2, 2):
+        # rotate about X
+        time_rot = params[pp] * np.pi
+        state = evolve_state(state, time_rot, collective_Sx)
+
+        # entangle
+        time_ent = params[pp + 1] * np.pi * num_qubits
+        state = evolve_state(state, time_ent, entangling_hamiltonian, dissipator)
 
     # un-rotate about a chosen axis
-    time_3 = -params[3] * np.pi
-    axis_angle_3 = params[4] * np.pi
-    final_hamiltonian = np.cos(axis_angle_3) * collective_Sx + np.sin(axis_angle_3) * collective_Sy
-    state_3 = evolve_state(state_2, time_3, final_hamiltonian)
+    time_f = -params[-2] * np.pi
+    axis_angle_f = params[-1] * np.pi
+    final_hamiltonian = np.cos(axis_angle_f) * collective_Sx + np.sin(axis_angle_f) * collective_Sy
+    state = evolve_state(state, time_f, final_hamiltonian)
 
-    return state_3
+    return state
 
 
-def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
-    """Decorator to enable an axially-symmetric version of a simulation method.
+def check_and_modify_for_axial_symmetry(
+    params: Sequence[float] | np.ndarray,
+    dissipation_rates: float | tuple[float, float, float],
+    dissipation_format: str,
+) -> np.ndarray:
+    """Check that the given simulation options are compatible with axial symmetry.
 
-    Axial symmetry means that the second parameter (which controls the axis of the first rotation) can be set to zero without loss of generality.
-    For this reason, if the simulation method is run with `axial_symmetry=True` (which this decorator sets by default), then the method accepts only
-    four parameters rather than the usual five.  The method additionally checks that the dissipation rates respect the axial symmetry, if applicable.
+    Axial symmetry means that the last parameter (which controls the axis of the last rotation) can be set to zero without loss of generality.
+    If the conditions for axial symmetry are satisfied, therefore, append a 0 to the parameters.
     """
-
-    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: object, axial_symmetry: bool = True, **kwargs: object) -> np.ndarray:
-        if axial_symmetry:
-            # Verify that dissipation satisfies axial symmetry.
-            dissipation_rates = kwargs.get("dissipation_rates", 0.0)
-            dissipation_format = kwargs.get("dissipation_format", DEFAULT_DISSIPATION_FORMAT)
-            if dissipation_format == "XYZ" and hasattr(dissipation_rates, "__iter__"):
-                rate_sx, rate_sy, *_ = dissipation_rates
-                if not rate_sx == rate_sy:
-                    raise ValueError(
-                        f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
-                        "\nTry passing the argument `axial_symmetry=False` to the simulation method."
-                    )
-
-            # If there are only four parameters, (entangling_time, initial_rotation_angle, initial_rotation_axis, final_rotation_angle),
-            # append a final_rotation_axis of 0.
-            if len(params) == 4:
-                params = np.append(np.array(params), 0.0)
-
-        return simulate_func(params, *args, **kwargs)
-
-    return simulate_func_with_symmetry
+    if dissipation_format == "XYZ" and hasattr(dissipation_rates, "__iter__"):
+        rate_sx, rate_sy, *_ = dissipation_rates
+        if not rate_sx == rate_sy:
+            raise ValueError(
+                f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
+                "\nTry passing the argument `axial_symmetry=False` to the simulation method."
+            )
+    if len(params) % 2:
+        raise ValueError(f"Simulations with symmetry should only have an even number of parameters, not {len(params)}.")
+    return np.append(np.array(params), 0.0)
 
 
-@enable_axial_symmetry
 def simulate_OAT(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    axial_symmetry: bool = True,
 ) -> np.ndarray:
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
@@ -144,6 +152,7 @@ def simulate_OAT(
         hamiltonian,
         dissipation_rates=dissipation_rates,
         dissipation_format=dissipation_format,
+        axial_symmetry=axial_symmetry,
     )
 
 
@@ -187,7 +196,6 @@ def simulate_spin_chain(
     )
 
 
-@enable_axial_symmetry
 def simulate_ising_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
@@ -195,6 +203,7 @@ def simulate_ising_chain(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    axial_symmetry: bool = True,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
     return simulate_spin_chain(
@@ -204,10 +213,10 @@ def simulate_ising_chain(
         coupling_exponent,
         dissipation_rates=dissipation_rates,
         dissipation_format=dissipation_format,
+        axial_symmetry=axial_symmetry,
     )
 
 
-@enable_axial_symmetry
 def simulate_XX_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
@@ -215,6 +224,7 @@ def simulate_XX_chain(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    axial_symmetry: bool = True,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
     return simulate_spin_chain(
@@ -224,6 +234,7 @@ def simulate_XX_chain(
         coupling_exponent,
         dissipation_rates=dissipation_rates,
         dissipation_format=dissipation_format,
+        axial_symmetry=axial_symmetry,
     )
 
 
@@ -258,9 +269,7 @@ def evolve_state(
     solver: diffrax.AbstractSolver = diffrax.Tsit5(),  # try also diffrax.Dopri8()
     **diffrax_kwargs: object,
 ) -> np.ndarray:
-    """
-    Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
-    """
+    """Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator."""
 
     # treat negative times as evolving under the negative of the Hamiltonian
     # NOTE: this is required for autodiff to work
@@ -351,9 +360,7 @@ def collective_op(op: np.ndarray, num_qubits: int) -> np.ndarray:
 
 
 def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarray:
-    """
-    Return an operator that acts with 'op' in the given qubits, and trivially (with the identity operator) on all other qubits.
-    """
+    """Return an operator that acts with 'op' in the given qubits, and trivially (with the identity operator) on all other qubits."""
     assert op.shape == (2 ** len(qubits),) * 2, "Operator shape {op.shape} is inconsistent with the number of target qubits provided, {num_qubits}!"
     identity = np.eye(2 ** (num_qubits - len(qubits)), dtype=op.dtype)
     system_op = np.kron(op, identity)
@@ -440,7 +447,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num_qubits", type=int, default=4)
     parser.add_argument("--dissipation", type=float, default=0.0)
-    parser.add_argument("--params", type=float, nargs=4, default=np.array([0.5, 0.5, 0.5, 0]))
+    parser.add_argument("--params", type=float, nargs="+", default=np.array([0.5, 0.5, 0.5, 0]))
     parser.add_argument("--jacobian", action="store_true", default=False)
     args = parser.parse_args(sys.argv[1:])
 
