@@ -222,8 +222,15 @@ if __name__ == "__main__":
     num_rand_pts = 2
     print_precision = 6
     # Calculate QFI for models at random points in the domain.
-    for num_params in [4, 5]:
-        for mult in [1, 2, 3]:
+    for num_params in [5, 4]:
+        for mult in [1,2,3]:
+            if mult==1:
+                sym_flag = True
+                JJJ = num_params
+            else:
+                sym_flag = False
+                JJJ = num_params * mult + 1
+
             match num_params:
                 case 4:
                     models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
