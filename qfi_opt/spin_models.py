@@ -100,12 +100,12 @@ def simulate_sensing_protocol(
 
         # rotate about Sx
         time = params[pp + 1] * np.pi
-        max_rx = np.cos(time / 2) * PAULI_I - 1j * np.sin(time / 2) * PAULI_X
-        state = apply_globally(state, max_rx, num_qubits)
+        mat_rx = np.cos(time / 2) * PAULI_I - 1j * np.sin(time / 2) * PAULI_X
+        state = apply_globally(state, mat_rx, num_qubits)
 
     # rotate about Sy
     time = params[-1] * np.pi
-    max_ry = np.cos(time / 2) * PAULI_I - 1j * np.sin(time / 2) * PAULI_Y
+    mat_ry = np.cos(time / 2) * PAULI_I - 1j * np.sin(time / 2) * PAULI_Y
     state = apply_globally(state, mat_ry, num_qubits)
 
     return state
