@@ -59,7 +59,7 @@ def simulate_sensing_protocol(
     4. Rotate about the Y axis.
 
     Step 1 rotates by an angle 'np.pi * params[0]', about the axis 'np.pi * params[1]'.
-    Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * num_qubits * np.pi'.
+    Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * np.pi * num_qubits'.
     Step 3 rotates by an angle 'np.pi * params[3]'.
     Step 3 rotates by an angle 'np.pi * params[-1]'.
 
