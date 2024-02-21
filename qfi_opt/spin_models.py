@@ -302,7 +302,7 @@ def evolve_state(
 
         term = diffrax.ODETerm(_time_deriv)
         solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
-        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, y0=density_op, args=(hamiltonian,), **diffrax_kwargs)
+        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, y0=density_op, args=(hamiltonian,), max_steps=None, **diffrax_kwargs)
         return solution.ys[-1]
 
     else:
