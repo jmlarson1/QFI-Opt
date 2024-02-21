@@ -85,33 +85,47 @@ def simulate_sensing_protocol(
     collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
 
     # rotate the all-|1> state about a chosen axis
-    time_i = params[0] * np.pi
-    axis_angle_i = params[1] * np.pi
-    qubit_ket = np.sin(time_i / 2) * KET_0 + 1j * np.exp(1j * axis_angle_i) * np.cos(time_i / 2) * KET_1
+    time = params[0] * np.pi
+    cos = np.cos(time / 2)
+    sin = np.sin(time / 2)
+    axis_angle = params[1] * np.pi
+    qubit_ket = -1j * np.exp(-1j * axis_angle) * sin * KET_0 + cos * KET_1
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
-    # entangle
+    # entangle - rotate layers
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    time_ent = params[2] * np.pi * num_qubits
-    state = evolve_state(state, time_ent, entangling_hamiltonian, dissipator)
-
-    for pp in range(3, len(params) - 2, 2):
-        # rotate about X
-        time_rot = params[pp] * np.pi
-        state = evolve_state(state, time_rot, collective_Sx)
-
+    for pp in range(2, len(params) - 1, 2):
         # entangle
-        time_ent = params[pp + 1] * np.pi * num_qubits
-        state = evolve_state(state, time_ent, entangling_hamiltonian, dissipator)
+        time = params[pp] * np.pi * num_qubits
+        state = evolve_state(state, time, entangling_hamiltonian, dissipator)
 
-    # un-rotate about a chosen axis
-    time_f = -params[-2] * np.pi
-    axis_angle_f = params[-1] * np.pi
-    final_hamiltonian = np.cos(axis_angle_f) * collective_Sx + np.sin(axis_angle_f) * collective_Sy
-    state = evolve_state(state, time_f, final_hamiltonian)
+        # rotate about Sx
+        time = params[pp + 1] * np.pi
+        cos = np.cos(time / 2)
+        sin = np.sin(time / 2)
+        mat_rx = np.array([[cos, -1j * sin], [-1j * sin, cos]])
+        state = apply_globally(state, mat_rx, num_qubits)
+
+    # rotate about Sy
+    time = params[-1] * np.pi
+    cos = np.cos(time / 2)
+    sin = np.sin(time / 2)
+    mat_ry = np.array([[cos, -sin], [sin, cos]])
+    state = apply_globally(state, mat_ry, num_qubits)
 
     return state
+
+
+def apply_globally(density_op: np.ndarray, qubit_op: np.ndarray, num_qubits: int) -> np.ndarray:
+    """Apply the given qubit operator to all qubits of a density operator."""
+    qubit_op_dag = qubit_op.conj()
+    for qubit in range(num_qubits):
+        dim_a = 2**qubit
+        dim_b = 2 ** (num_qubits - qubit - 1)
+        density_op = density_op.reshape((dim_a, 2, dim_b * dim_a, 2, dim_b))
+        density_op = np.einsum("ij,AjBkC,kl->AiBlC", qubit_op, density_op, qubit_op_dag)
+    return density_op.reshape((2**num_qubits,) * 2)
 
 
 def verify_and_modify_for_axial_symmetry(
