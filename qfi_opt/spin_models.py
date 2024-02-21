@@ -31,6 +31,7 @@ KET_0 = np.array([1, 0], dtype=COMPLEX_TYPE)  # |0>, spin up
 KET_1 = np.array([0, 1], dtype=COMPLEX_TYPE)  # |1>, spin down
 
 # Pauli operators
+PAULI_I = np.array([[1, 0], [0, 1]], dtype=COMPLEX_TYPE)  # |0><0| + |1><1|
 PAULI_Z = np.array([[1, 0], [0, -1]], dtype=COMPLEX_TYPE)  # |0><0| - |1><1|
 PAULI_X = np.array([[0, 1], [1, 0]], dtype=COMPLEX_TYPE)  # |0><1| + |1><0|
 PAULI_Y = -1j * PAULI_Z @ PAULI_X
@@ -99,16 +100,12 @@ def simulate_sensing_protocol(
 
         # rotate about Sx
         time = params[pp + 1] * np.pi
-        cos = np.cos(time / 2)
-        sin = np.sin(time / 2)
-        mat_rx = np.array([[cos, -1j * sin], [-1j * sin, cos]])
-        state = apply_globally(state, mat_rx, num_qubits)
+        max_rx = np.cos(time / 2) * PAULI_I - 1j * np.sin(time / 2) * PAULI_X
+        state = apply_globally(state, max_rx, num_qubits)
 
     # rotate about Sy
     time = params[-1] * np.pi
-    cos = np.cos(time / 2)
-    sin = np.sin(time / 2)
-    mat_ry = np.array([[cos, -sin], [sin, cos]])
+    max_ry = np.cos(time / 2) * PAULI_I - 1j * np.sin(time / 2) * PAULI_Y
     state = apply_globally(state, mat_ry, num_qubits)
 
     return state
