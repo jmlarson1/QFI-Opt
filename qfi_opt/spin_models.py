@@ -55,15 +55,16 @@ def simulate_sensing_protocol(
     Starting with an initial all-|1> state (all spins pointing down along the Z axis):
     1. Rotate about an axis in the XY plane.
     2. Evolve under a given entangling Hamiltonian.
-    3. "Un-rotate" about an axis in the XY plane.
+    3. Rotate about the X axis.
+    4. Rotate about the Y axis.
 
-    Step 1 rotates by an angle '+np.pi * params[0]', about the axis 'np.pi * params[1]'.
+    Step 1 rotates by an angle 'np.pi * params[0]', about the axis 'np.pi * params[1]'.
     Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * num_qubits * np.pi'.
-    Step 3 rotates by an angle '-np.pi * params[-2]', about the axis 'np.pi * params[-1]'.
+    Step 3 rotates by an angle 'np.pi * params[3]'.
+    Step 3 rotates by an angle 'np.pi * params[-1]'.
 
     If axial_symmetry is set to True, 0 is appended to the parameter list.
-    Afterwards, if there are more than 5 parameters, step (2) is replaced by alternating steps of
-    entanglement and global rotations about the X axis: ENT - ROT - ENT - ROT - ... - ENT.
+    Afterwards, if there are more than 5 parameters, steps 2 and 3 are repeated as appropriate.
 
     If dissipation_rates is nonzero, qubits experience dissipation during the entangling steps.
     See the documentation for the Dissipator class for a general explanation of the
