@@ -87,7 +87,7 @@ def simulate_sensing_protocol(
     cos = np.cos(time / 2)
     sin = np.sin(time / 2)
     axis_angle = params[1] * np.pi
-    qubit_ket = -1j * np.exp(-1j * axis_angle) * sin * KET_0 + cos * KET_1
+    qubit_ket = cos * KET_1 - 1j * np.exp(-1j * axis_angle) * sin * KET_0
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
     state = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
