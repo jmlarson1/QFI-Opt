@@ -81,9 +81,6 @@ def simulate_sensing_protocol(
 
     num_qubits = log2_int(entangling_hamiltonian.shape[0])
 
-    # construct collective spin operators
-    collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
-
     # rotate the all-|1> state about a chosen axis
     time = params[0] * np.pi
     cos = np.cos(time / 2)
