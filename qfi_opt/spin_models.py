@@ -49,8 +49,7 @@ def simulate_sensing_protocol(
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
     axial_symmetry: bool = False,
 ) -> np.ndarray:
-    """
-    Simulate a sensing protocol, and return the final state (density matrix).
+    """Simulate a sensing protocol, and return the final state (density matrix).
 
     Starting with an initial all-|1> state (all spins pointing down along the Z axis):
     1. Rotate about an axis in the XY plane.
@@ -76,8 +75,6 @@ def simulate_sensing_protocol(
     dissipation rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes
     with probability 'e^(-params[0] * r)' by the end of the OAT protocol.
     """
-    if axial_symmetry:
-        params = verify_and_modify_for_axial_symmetry(params, dissipation_rates, dissipation_format)
     if len(params) < 5 or not len(params) % 2:
         raise ValueError(f"The number of parameters should be an odd number >=5, not {len(params)}.")
 
@@ -123,35 +120,38 @@ def apply_globally(density_op: np.ndarray, qubit_op: np.ndarray, num_qubits: int
     return density_op.reshape((2**num_qubits,) * 2)
 
 
-def verify_and_modify_for_axial_symmetry(
-    params: Sequence[float] | np.ndarray,
-    dissipation_rates: float | tuple[float, float, float],
-    dissipation_format: str,
-) -> np.ndarray:
-    """Check that the given simulation options are compatible with axial symmetry.
+def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
+    """Decorator to enable an axially-symmetric version of a simulation method.
 
-    Axial symmetry means that the last parameter (which controls the axis of the last rotation) can be set to zero without loss of generality.
-    If the conditions for axial symmetry are satisfied, therefore, append a 0 to the parameters.
+    Axial symmetry means that the last parameter can be set to zero without loss of generality.
     """
-    if dissipation_format == "XYZ" and hasattr(dissipation_rates, "__iter__"):
-        rate_sx, rate_sy, *_ = dissipation_rates
-        if not rate_sx == rate_sy:
-            raise ValueError(
-                f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
-                "\nCannot simulate with `axial_symmetry=True`."
-            )
-    if len(params) > 4:
-        raise ValueError(f"Simulations with axial symmetry should only have four parameters, not {len(params)}.")
-    return np.append(np.array(params), 0.0)
+
+    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: object, **kwargs: object) -> np.ndarray:
+        if len(params) == 4:
+            # Verify that the dissipation arguments satisfies axial symmetry.
+            dissipation_rates = kwargs.get("dissipation_rates", 0.0)
+            dissipation_format = kwargs.get("dissipation_format", DEFAULT_DISSIPATION_FORMAT)
+            if dissipation_format == "XYZ" and hasattr(dissipation_rates, "__iter__"):
+                rate_sx, rate_sy, *_ = dissipation_rates
+                if not rate_sx == rate_sy:
+                    raise ValueError(
+                        f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
+                        "\nPlease provide at least 5 parameters, or adjust dissipation options as necessary."
+                    )
+            params = np.append(np.array(params), 0.0)
+
+        return simulate_func(params, *args, **kwargs)
+
+    return simulate_func_with_symmetry
 
 
+@enable_axial_symmetry
 def simulate_OAT(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = False,
 ) -> np.ndarray:
     """Simulate a one-axis twisting (OAT) protocol."""
     _, _, collective_Sz = collective_spin_ops(num_qubits)
@@ -161,7 +161,6 @@ def simulate_OAT(
         hamiltonian,
         dissipation_rates=dissipation_rates,
         dissipation_format=dissipation_format,
-        axial_symmetry=axial_symmetry,
     )
 
 
@@ -191,7 +190,6 @@ def simulate_spin_chain(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = False,
 ) -> np.ndarray:
     """Simulate an entangling protocol for a spin chain with power-law interactions."""
     normalization_factor = num_qubits * np.array([1 / abs(pp - qq) ** coupling_exponent for pp, qq in itertools.combinations(range(num_qubits), 2)]).mean()
@@ -203,10 +201,10 @@ def simulate_spin_chain(
         hamiltonian / normalization_factor,
         dissipation_rates=dissipation_rates,
         dissipation_format=dissipation_format,
-        axial_symmetry=axial_symmetry,
     )
 
 
+@enable_axial_symmetry
 def simulate_ising_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
@@ -214,7 +212,6 @@ def simulate_ising_chain(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = False,
 ) -> np.ndarray:
     coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
     return simulate_spin_chain(
@@ -224,10 +221,10 @@ def simulate_ising_chain(
         coupling_exponent,
         dissipation_rates=dissipation_rates,
         dissipation_format=dissipation_format,
-        axial_symmetry=axial_symmetry,
     )
 
 
+@enable_axial_symmetry
 def simulate_XX_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
@@ -235,7 +232,6 @@ def simulate_XX_chain(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-    axial_symmetry: bool = False,
 ) -> np.ndarray:
     coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
     return simulate_spin_chain(
@@ -245,7 +241,6 @@ def simulate_XX_chain(
         coupling_exponent,
         dissipation_rates=dissipation_rates,
         dissipation_format=dissipation_format,
-        axial_symmetry=axial_symmetry,
     )
 
 
