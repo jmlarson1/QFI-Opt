@@ -128,7 +128,7 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
 
     def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: object, **kwargs: object) -> np.ndarray:
         if len(params) == 4:
-            # Verify that the dissipation arguments satisfies axial symmetry.
+            # Verify that the dissipation arguments are compatible with axial symmetry.
             dissipation_rates = kwargs.get("dissipation_rates", 0.0)
             dissipation_format = kwargs.get("dissipation_format", DEFAULT_DISSIPATION_FORMAT)
             if dissipation_format == "XYZ" and hasattr(dissipation_rates, "__iter__"):
