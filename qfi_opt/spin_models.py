@@ -59,7 +59,7 @@ def simulate_sensing_protocol(
     4. Rotate about the Y axis.
 
     Step 1 rotates by an angle 'np.pi * params[0]', about the axis 'np.pi * params[1]'.
-    Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * num_qubits * np.pi'.
+    Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * np.pi * num_qubits'.
     Step 3 rotates by an angle 'np.pi * params[3]'.
     Step 3 rotates by an angle 'np.pi * params[-1]'.
 
@@ -114,7 +114,7 @@ def simulate_sensing_protocol(
 
 def apply_globally(density_op: np.ndarray, qubit_op: np.ndarray, num_qubits: int) -> np.ndarray:
     """Apply the given qubit operator to all qubits of a density operator."""
-    qubit_op_dag = qubit_op.conj()
+    qubit_op_dag = qubit_op.conj().T
     for qubit in range(num_qubits):
         dim_a = 2**qubit
         dim_b = 2 ** (num_qubits - qubit - 1)
