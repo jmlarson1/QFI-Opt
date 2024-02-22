@@ -136,7 +136,7 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
                 if not rate_sx == rate_sy:
                     raise ValueError(
                         f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
-                        "\nPlease provide at least 5 parameters, or adjust dissipation options as necessary."
+                        "\nPlease provide at least 5 parameters, or pick different options."
                     )
             params = np.append(np.array(params), 0.0)
 
