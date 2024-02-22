@@ -1,8 +1,9 @@
 import collections
 import functools
 import typing
-from typing import Optional, Sequence, Union
+from collections.abc import Sequence
 
+import jax.numpy as jnp
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,10 +11,7 @@ import numpy as np
 from qfi_opt import spin_models
 
 if typing.TYPE_CHECKING:
-    import jax.numpy as jnp
     from mpl_toolkits import mplot3d
-
-ARRAY_TYPE = Union[np.ndarray, "jnp.ndarray"]
 
 try:
     import cmocean
@@ -27,7 +25,7 @@ except ModuleNotFoundError:
         return plt.get_cmap("inferno")(color_vals)
 
 
-def get_spin_length_projections(state: ARRAY_TYPE) -> dict[float, np.ndarray]:
+def get_spin_length_projections(state: np.ndarray | jnp.ndarray) -> dict[float, np.ndarray]:
     """Compute the projections of a state onto manifolds of fixed spin length S.
 
     More specifically, compute the dictionary `{S: state_S for S in spin_length_vals}`, where
@@ -83,15 +81,15 @@ def get_polarization(state_projections: dict[float, np.ndarray], theta: float, p
 
 
 def husimi(
-    state: ARRAY_TYPE,
+    state: np.ndarray | jnp.ndarray,
     grid_size: int = 101,
     single_sphere: bool = True,
-    figsize: Optional[tuple[float, float]] = None,
+    figsize: tuple[float, float] | None = None,
     rasterized: bool = True,
     view_angles: tuple[float, float] = (0, 0),
     shade: bool = False,
-    color_max: Optional[float] = None,
-) -> tuple[mpl.figure.Figure, list["mplot3d.axes3d.Axes3D"]]:
+    color_max: float | None = None,
+) -> tuple[mpl.figure.Figure, list[mplot3d.axes3d.Axes3D]]:
     if figsize is None:
         figsize = plt.figaspect(1 if single_sphere else 0.5)
 
@@ -111,7 +109,7 @@ def husimi(
     # plot sphere
 
     figure = plt.figure(figsize=figsize)
-    axes: list["mplot3d.axes3d.Axes3D"]
+    axes: list[mplot3d.axes3d.Axes3D]
     if single_sphere:
         axes = [figure.add_subplot(111, projection="3d")]
     else:
@@ -140,7 +138,7 @@ def husimi(
 
 
 def histogram(
-    state: ARRAY_TYPE,
+    state: np.ndarray | jnp.ndarray,
     figsize: tuple[int, int] = (4, 3),
 ) -> tuple[mpl.figure.Figure, mpl.axes._axes.Axes]:
     """Plot the distribution function over collective-Sz measurement outcomes."""

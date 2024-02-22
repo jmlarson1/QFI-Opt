@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import ipdb
 import numpy as np
 
 from qfi_opt import spin_models
