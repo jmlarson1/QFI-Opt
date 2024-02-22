@@ -1,4 +1,7 @@
-from typing import Callable, Literal
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Literal
 
 import jax.numpy as jnp
 import numpy as np
@@ -68,7 +71,7 @@ class Dissipator:
     def __matmul__(self, density_op: ARRAY_TYPE) -> ARRAY_TYPE | Literal[0]:
         return sum(rate * term(density_op) for rate, term in zip(self._rates, self._terms))  # type: ignore[return-value,misc]
 
-    def __mul__(self, scalar: float) -> "Dissipator":
+    def __mul__(self, scalar: float) -> Dissipator:
         bare_rates = (
             scalar * self._bare_rates[0],
             scalar * self._bare_rates[1],
@@ -76,10 +79,10 @@ class Dissipator:
         )
         return Dissipator(bare_rates, self._format)
 
-    def __rmul__(self, scalar: float) -> "Dissipator":
+    def __rmul__(self, scalar: float) -> Dissipator:
         return self * scalar
 
-    def __truediv__(self, scalar: float) -> "Dissipator":
+    def __truediv__(self, scalar: float) -> Dissipator:
         return self * (1 / scalar)
 
     def __bool__(self) -> bool:

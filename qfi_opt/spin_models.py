@@ -4,7 +4,7 @@ import functools
 import itertools
 import os
 import sys
-from typing import Callable, Optional, Sequence
+from collections.abc import Callable, Sequence
 
 import numpy
 
@@ -267,12 +267,12 @@ def evolve_state(
     density_op: np.ndarray,
     time: float | np.ndarray,
     hamiltonian: np.ndarray,
-    dissipator: Optional[Dissipator] = None,
+    dissipator: Dissipator | None = None,
     *,
     rtol: float = 1e-8,
     atol: float = 1e-8,
     disable_diffrax: bool = DISABLE_DIFFRAX,
-    solver: Optional["diffrax.AbstractSolver"] = None,
+    solver: diffrax.AbstractSolver | None = None,
     **diffrax_kwargs: object,
 ) -> np.ndarray:
     """Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator."""
@@ -321,7 +321,7 @@ def evolve_state(
 
 def get_time_deriv(
     hamiltonian: np.ndarray,
-    dissipator: Optional[Dissipator] = None,
+    dissipator: Dissipator | None = None,
     *,
     disable_diffrax: bool = DISABLE_DIFFRAX,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
