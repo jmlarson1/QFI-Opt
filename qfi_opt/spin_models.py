@@ -114,7 +114,7 @@ def simulate_sensing_protocol(
 
 def apply_globally(density_op: np.ndarray, qubit_op: np.ndarray, num_qubits: int) -> np.ndarray:
     """Apply the given qubit operator to all qubits of a density operator."""
-    qubit_op_dag = qubit_op.conj()
+    qubit_op_dag = qubit_op.conj().T
     for qubit in range(num_qubits):
         dim_a = 2**qubit
         dim_b = 2 ** (num_qubits - qubit - 1)
