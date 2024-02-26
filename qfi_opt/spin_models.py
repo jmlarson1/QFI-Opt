@@ -9,7 +9,7 @@ from typing import Callable, Optional, Sequence
 import qfi_opt
 from qfi_opt.dissipation import Dissipator
 
-DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
+DISABLE_DIFFRAX = True #bool(os.getenv("DISABLE_DIFFRAX"))
 
 if not DISABLE_DIFFRAX:
     import jax
@@ -274,8 +274,8 @@ def evolve_state(
             return time_deriv(density_op, time)
 
         term = ODETerm(_time_deriv)
-        ODEsolver = Tsit5()  # Dopri5()
-        solution = diffeqsolve(term, ODEsolver, t0=0.0, t1=time, dt0=0.002, y0=density_op, args=(hamiltonian,))
+        ODEsolver = Tsit5() #Dopri8()
+        solution = diffeqsolve(term, ODEsolver, t0=0.0, t1=time, dt0=0.002, max_steps=50000, y0=density_op, args=(hamiltonian,))
         return solution.ys[-1]
     else:
         if np.isclose(time, 0.0, atol=1e-04):
