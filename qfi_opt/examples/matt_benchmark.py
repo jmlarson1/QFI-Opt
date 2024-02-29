@@ -9,6 +9,7 @@ import nlopt
 import numpy as np
 from ibcdfo.pounders import pounders
 from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
+from scipy.io import savemat
 #from mpi4py import MPI
 
 sys.path.append('../../')
@@ -58,8 +59,9 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
             np.save(database, DB)
 
     num_parameters = len(x)
-    dA = np.zeros((num_parameters, N ** 2, N ** 2), dtype="cdouble")
-    d2A = np.zeros((num_parameters, N ** 2, N ** 2), dtype="cdouble")
+    dA = np.zeros((num_parameters, 2 ** N, 2 ** N), dtype="cdouble")
+    d2A = np.zeros((num_parameters, 2 ** N, 2 ** N), dtype="cdouble")
+
     if qfi_grad.size > 0:
         # Approximate the gradient
         I = np.eye(num_parameters)
@@ -71,6 +73,9 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
             dA[parameter] = (rho_p - rho_m) / (2 * h)
             # compute d2A with respect to parameter
             d2A[parameter] = (rho_p - 2 * rho + rho_m) / (h ** 2)
+
+        mdic = {"A": rho, "dA": dA, "d2A:": d2A}
+        savemat("QFI_test.mat", mdic)
 
     # Compute eigendecomposition
     vals, vecs = compute_eigendecomposition(rho)
@@ -115,6 +120,8 @@ def sim_wrapper_diffrax(x, qfi_grad, obj, obj_params, get_jacobian):
             DB = np.append(DB, to_save)
             np.save(database, DB)
 
+    # force Hermitianness:
+    rho = (rho + rho.conj().T) / 2.0
     # Compute eigendecomposition
     vals, vecs = compute_eigendecomposition(rho)
 
@@ -172,19 +179,21 @@ def run_pounder(obj, obj_params, n, x0):
 
     return F[xkin], X[xkin]
 
-def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian):
+def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
     # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
     # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
 
-    #h = 1e-5
-    #opt.set_min_objective(lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params))
-    opt.set_min_objective(lambda x, grad: sim_wrapper_diffrax(x, grad, obj, obj_params, get_jacobian))
+    h = 1e-5
+    if not get_jacobian:
+        opt.set_min_objective(lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params))
+    else:
+        opt.set_min_objective(lambda x, grad: sim_wrapper_diffrax(x, grad, obj, obj_params, get_jacobian))
     opt.set_xtol_rel(1e-4)
     opt.set_maxeval(300)
     opt.set_lower_bounds(-10.0 * np.ones(num_params))
     opt.set_upper_bounds(10.0 * np.ones(num_params))
-    opt.set_vector_storage(0)
+    opt.set_vector_storage(1)
 
 
     # # Because the objective is periodic, don't set bounds (but don't need to sample so much)
@@ -206,26 +215,26 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
     #size = comm.Get_size()
     size = 1
 
-    N = 1 # 4
+    N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for dissipation_rate in np.append([0], np.linspace(0.1, 5, 20)):
+    for dissipation_rate in [1.0]:#np.linspace(0.1, 5, 20):
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = dissipation_rate
         obj_params["G"] = G
 
-        max_evals = 300
+        max_evals = 50
 
-        seed = 888
+        seed = 88
         np.random.seed(seed)
 
-        for num_params in [4, 5]:
+        for num_params in [4]:#[4, 5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
-            #x0 = 0.5 * np.ones(num_params)
             x0 = np.random.uniform(lb, ub, num_params)
+            #x0 = np.array([3.54936991e-05, 1.84647997e+00, 1.84488415e-01, 3.57291064e-01])
 
             match num_params:
                 case 4:
@@ -237,10 +246,12 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
 
             for model in models:
                 obj = getattr(spin_models, model)
+
                 get_jacobian = spin_models.get_jacobian_func(obj)
                 minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
-                # h = 1e-6
-                # calfun = lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params)
+
+                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS")
+
                 #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
                 #grad = np.zeros(num_params)
                 #calfun(xfinal, grad)
