@@ -11,6 +11,7 @@ import numpy
 from qfi_opt.dissipation import Dissipator
 
 DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
+USE_FORWARD = bool(os.getenv("USE_FORWARD"))
 
 if not DISABLE_DIFFRAX:
     import diffrax
@@ -295,7 +296,11 @@ def evolve_state(
 
         term = diffrax.ODETerm(_time_deriv)
         solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
-        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, y0=density_op, args=(hamiltonian,), max_steps=None, **diffrax_kwargs)
+        if USE_FORWARD:
+            adjoint_method = diffrax.DirectAdjoint()
+            solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, y0=density_op, adjoint=adjoint_method, args=(hamiltonian,), **diffrax_kwargs)
+        else:
+            solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, y0=density_op, args=(hamiltonian,), **diffrax_kwargs)
         return solution.ys[-1]
 
     else:
@@ -404,19 +409,33 @@ def get_jacobian_func(
 
     if not DISABLE_DIFFRAX:
 
-        def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
-            primals, vjp_func = jax.vjp(simulate_func, params, *args)
-            result = np.zeros((primals.shape[1], primals.shape[0], len(params)), dtype=COMPLEX_TYPE)
-            for ii, jj in numpy.ndindex(primals.shape):
-                seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
-                seed = seed.at[ii, jj].set(1.0)
-                res = np.array(vjp_func(seed)[0]).flatten()
-                seed = seed.at[ii, jj].set(1.0j)
-                res = res + np.array(vjp_func(seed)[0]).flatten() * 1.0j
-                # Take the conjugate to account for Jax convention. See discussion:
-                # https://github.com/google/jax/issues/4891
-                result = result.at[ii, jj, :].set(np.conj(res))
-            return result
+        if USE_FORWARD:
+            def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+                call_func = lambda params: simulate_func(params, *args)
+                result = []
+                for ii in numpy.ndindex(params.shape):
+                    seed = np.zeros(params.shape, dtype=np.float64)
+                    seed = seed.at[ii].set(1.0)
+                    _, res = jax.jvp(call_func, (params,), (seed,))
+                    seed = seed.at[ii].set(1.0j)
+                    _, resj = jax.jvp(call_func, (params,), (seed,))
+                    res = res + resj
+                    result.append(res)
+                return np.stack(result, axis=2)
+        else:
+            def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+                primals, vjp_func = jax.vjp(simulate_func, params, *args)
+                result = np.zeros((primals.shape[1], primals.shape[0], len(params)), dtype=COMPLEX_TYPE)
+                for ii, jj in numpy.ndindex(primals.shape):
+                    seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
+                    seed = seed.at[ii, jj].set(1.0)
+                    res = np.array(vjp_func(seed)[0]).flatten()
+                    seed = seed.at[ii, jj].set(1.0j)
+                    res = res + np.array(vjp_func(seed)[0]).flatten() * 1.0j
+                    # Take the conjugate to account for Jax convention. See discussion:
+                    # https://github.com/google/jax/issues/4891
+                    result = result.at[ii, jj, :].set(np.conj(res))
+                return result
 
         return get_jacobian
 
