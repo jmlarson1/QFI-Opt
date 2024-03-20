@@ -187,7 +187,7 @@ def simulate_spin_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
     coupling_op: np.ndarray,
-    coupling_exponent: float = 0.0,
+    coupling_exponent: float = 1.0,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
@@ -209,7 +209,7 @@ def simulate_spin_chain(
 def simulate_ising_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
-    coupling_exponent: float = 0.0,
+    coupling_exponent: float = 1.0,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
@@ -229,7 +229,7 @@ def simulate_ising_chain(
 def simulate_XX_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
-    coupling_exponent: float = 0.0,
+    coupling_exponent: float = 1.0,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
@@ -248,7 +248,7 @@ def simulate_XX_chain(
 def simulate_local_TAT_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
-    coupling_exponent: float = 0.0,
+    coupling_exponent: float = 1.0,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
