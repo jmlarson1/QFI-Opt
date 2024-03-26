@@ -411,6 +411,7 @@ def get_jacobian_func(
         if not REVERSE_MODE:
 
             def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+                params = np.array(params)
                 call_func = lambda params: simulate_func(params, *args)
                 result = []
                 for ii in range(len(params)):
