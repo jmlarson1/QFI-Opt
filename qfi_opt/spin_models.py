@@ -12,7 +12,7 @@ import numpy
 from qfi_opt.dissipation import Dissipator
 
 DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
-USE_FORWARD = bool(os.getenv("USE_FORWARD"))
+REVERSE_MODE = bool(os.getenv("REVERSE_MODE"))
 
 if not DISABLE_DIFFRAX:
     import jax
@@ -297,7 +297,7 @@ def evolve_state(
         term = diffrax.ODETerm(_time_deriv)
         solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
         solver_args = dict(t0=0.0, t1=time, y0=density_op, args=(hamiltonian,))
-        if USE_FORWARD:
+        if not REVERSE_MODE:
             solver_args |= dict(adjoint=diffrax.DirectAdjoint())
         solution = diffrax.diffeqsolve(term, solver, **solver_args, **diffrax_kwargs)
         return solution.ys[-1]
@@ -408,7 +408,7 @@ def get_jacobian_func(
 
     if not DISABLE_DIFFRAX:
 
-        if USE_FORWARD:
+        if not REVERSE_MODE:
 
             def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
                 call_func = lambda params: simulate_func(params, *args)
