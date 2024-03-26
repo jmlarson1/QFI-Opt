@@ -6,6 +6,7 @@ import os
 import sys
 from collections.abc import Callable, Sequence
 
+import diffrax
 import numpy
 
 from qfi_opt.dissipation import Dissipator
@@ -14,7 +15,6 @@ DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
 USE_FORWARD = bool(os.getenv("USE_FORWARD"))
 
 if not DISABLE_DIFFRAX:
-    import diffrax
     import jax
     import jax.numpy as np
 
