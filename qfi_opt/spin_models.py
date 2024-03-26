@@ -416,11 +416,10 @@ def get_jacobian_func(
                 for ii in range(len(params)):
                     seed = np.zeros(len(params), dtype=np.float64)
                     seed = seed.at[ii].set(1.0)
-                    _, res = jax.jvp(call_func, (params,), (seed,))
+                    _, real_part = jax.jvp(call_func, (params,), (seed,))
                     seed = seed.at[ii].set(1.0j)
-                    _, resj = jax.jvp(call_func, (params,), (seed,))
-                    res = res + resj
-                    result.append(res)
+                    _, imag_part = jax.jvp(call_func, (params,), (seed,))
+                    result.append(real_part + 1j * imag_part)
                 return np.stack(result, axis=2)
 
         else:
