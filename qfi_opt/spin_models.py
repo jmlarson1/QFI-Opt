@@ -431,12 +431,12 @@ def get_jacobian_func(
                 for ii, jj in numpy.ndindex(primals.shape):
                     seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
                     seed = seed.at[ii, jj].set(1.0)
-                    res = np.array(vjp_func(seed)[0]).flatten()
+                    real = np.array(vjp_func(seed)[0]).flatten()
                     seed = seed.at[ii, jj].set(1.0j)
-                    res = res + np.array(vjp_func(seed)[0]).flatten() * 1.0j
+                    imag = np.array(vjp_func(seed)[0]).flatten()
                     # Take the conjugate to account for Jax convention. See discussion:
                     # https://github.com/google/jax/issues/4891
-                    result = result.at[ii, jj, :].set(np.conj(res))
+                    result = result.at[ii, jj, :].set(real - 1j * imag)
                 return result
 
         return get_jacobian
