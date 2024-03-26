@@ -420,7 +420,7 @@ def get_jacobian_func(
                     _, real_part = jax.jvp(call_func, (params,), (seed,))
                     seed = seed.at[ii].set(1.0j)
                     _, imag_part = jax.jvp(call_func, (params,), (seed,))
-                    result.append(real_part + 1j * imag_part)
+                    result.append(real_part + 1.0j * imag_part)
                 return np.stack(result, axis=2)
 
         else:
@@ -436,7 +436,7 @@ def get_jacobian_func(
                     imag_part = np.array(vjp_func(seed)[0]).flatten()
                     # Take the conjugate to account for Jax convention. See discussion:
                     # https://github.com/google/jax/issues/4891
-                    result = result.at[ii, jj, :].set(real_part - 1j * imag_part)
+                    result = result.at[ii, jj, :].set(real_part - 1.0j * imag_part)
                 return result
 
         return get_jacobian
