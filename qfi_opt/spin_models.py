@@ -297,6 +297,7 @@ def evolve_state(
         solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
         solver_args = dict(t0=0.0, t1=time, y0=density_op, args=(hamiltonian,))
         if FORWARD_MODE:
+            diffrax_kwargs["max_steps"] = diffrax_kwargs.get("max_steps", None)
             solver_args |= dict(adjoint=diffrax.DirectAdjoint())
         solution = diffrax.diffeqsolve(term, solver, **solver_args, **diffrax_kwargs)
         return solution.ys[-1]
