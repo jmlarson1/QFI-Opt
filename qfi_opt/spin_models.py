@@ -403,15 +403,15 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
         # forward-mode automatic differentiation
 
         def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
-            params = np.array(params)
+            param_array = np.array(params)
             call_func = lambda params: simulate_func(params, *args)
             result = []
-            for ii in range(len(params)):
-                seed = np.zeros(len(params), dtype=np.float64)
+            for ii in range(len(param_array)):
+                seed = np.zeros(len(param_array), dtype=np.float64)
                 seed = seed.at[ii].set(1.0)
-                _, real_part = jax.jvp(call_func, (params,), (seed,))
+                _, real_part = jax.jvp(call_func, (param_array,), (seed,))
                 seed = seed.at[ii].set(1.0j)
-                _, imag_part = jax.jvp(call_func, (params,), (seed,))
+                _, imag_part = jax.jvp(call_func, (param_array,), (seed,))
                 result.append(real_part + 1.0j * imag_part)
             return np.stack(result, axis=2)
 
