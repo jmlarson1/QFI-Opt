@@ -395,11 +395,7 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
     ).reshape((2**num_qubits,) * 2)
 
 
-def get_jacobian_func(
-    simulate_func: Callable,
-    *,
-    step_sizes: float | Sequence[float] = 1e-10,
-) -> Callable:
+def get_jacobian_func(simulate_func: Callable) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
     if USE_DIFFRAX and not REVERSE_MODE:
@@ -440,6 +436,7 @@ def get_jacobian_func(
         return get_jacobian
 
     def get_jacobian_manually(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+        step_sizes = kwargs.get("step_sizes", 1e-10)
         if isinstance(step_sizes, float):
             param_step_sizes = [step_sizes] * len(params)
         assert len(param_step_sizes) == len(params)
