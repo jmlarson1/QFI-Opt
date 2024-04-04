@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 import os
-import pickle
 import sys
-
-import ipdb
 
 import nlopt
 import numpy as np
@@ -17,6 +14,8 @@ sys.path.append('../../')
 import qfi_opt
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI_diffrax, compute_QFI
+
+sys.path.append("../../")
 
 root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
 minq5_dir = os.path.join(root_dir, "minq", "py", "minq5")
@@ -33,7 +32,6 @@ sys.path.append(minq5_dir)
 
 
 def sim_wrapper(x, h, qfi_grad, obj, obj_params):
-
     use_DB = False
     match = 0
     if use_DB:
@@ -72,7 +70,7 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
             rho_m = obj(x - h * I[parameter], obj_params["N"], dissipation_rates=obj_params["dissipation"])
             dA[parameter] = (rho_p - rho_m) / (2 * h)
             # compute d2A with respect to parameter
-            d2A[parameter] = (rho_p - 2 * rho + rho_m) / (h ** 2)
+            d2A[parameter] = (rho_p - 2 * rho + rho_m) / (h**2)
 
         mdic = {"A": rho, "dA": dA, "d2A:": d2A}
         savemat("QFI_test.mat", mdic)
@@ -89,8 +87,8 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
     except:
         qfi_grad[:] = []
 
-    return -1.0 * qfi #, -qfi_grad  # negative because we are maximizing
-    #else:
+    return -1.0 * qfi  # , -qfi_grad  # negative because we are maximizing
+    # else:
     #    return -1 * qfi
 
 
@@ -153,8 +151,6 @@ def quick_test_gradient(obj, obj_params, x):
         print("fp: ", fp, "stepsize: ", stepsize)
 
 
-
-
 def run_pounder(obj, obj_params, n, x0):
     h = 1e-6
     calfun = lambda x: sim_wrapper(x, h, False, obj, obj_params)
@@ -195,7 +191,6 @@ def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
     opt.set_upper_bounds(10.0 * np.ones(num_params))
     opt.set_vector_storage(1)
 
-
     # # Because the objective is periodic, don't set bounds (but don't need to sample so much)
     # opt.set_lower_bounds(lb)
     # opt.set_upper_bounds(ub)
@@ -210,9 +205,9 @@ def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
 
 
 if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the code below
-    #comm = MPI.COMM_WORLD
-    #rank = comm.Get_rank()
-    #size = comm.Get_size()
+    # comm = MPI.COMM_WORLD
+    # rank = comm.Get_rank()
+    # size = comm.Get_size()
     size = 1
 
     N = 4
@@ -248,8 +243,9 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
                 obj = getattr(spin_models, model)
 
                 get_jacobian = spin_models.get_jacobian_func(obj)
-                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
-
-                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
-                #grad = np.zeros(num_params)
-                #calfun(xfinal, grad)
+                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS")
+                # h = 1e-6
+                # calfun = lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params)
+                # minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
+                # grad = np.zeros(num_params)
+                # calfun(xfinal, grad)

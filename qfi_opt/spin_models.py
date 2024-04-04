@@ -4,19 +4,21 @@ import functools
 import itertools
 import os
 import sys
-from typing import Callable, Optional, Sequence
+from collections.abc import Callable, Sequence
 
-import qfi_opt
+import diffrax
+import numpy
+
 from qfi_opt.dissipation import Dissipator
 
-DISABLE_DIFFRAX = True #bool(os.getenv("DISABLE_DIFFRAX"))
+USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
+FORWARD_MODE = not bool(os.getenv("REVERSE_MODE"))
 
-if not DISABLE_DIFFRAX:
+if USE_DIFFRAX:
     import jax
     import jax.numpy as np
 
     jax.config.update("jax_enable_x64", True)
-    from diffrax import Dopri5, ODETerm, Tsit5, diffeqsolve
 
 else:
     import numpy as np  # type: ignore[no-redef]
@@ -30,6 +32,7 @@ KET_0 = np.array([1, 0], dtype=COMPLEX_TYPE)  # |0>, spin up
 KET_1 = np.array([0, 1], dtype=COMPLEX_TYPE)  # |1>, spin down
 
 # Pauli operators
+PAULI_I = np.array([[1, 0], [0, 1]], dtype=COMPLEX_TYPE)  # |0><0| + |1><1|
 PAULI_Z = np.array([[1, 0], [0, -1]], dtype=COMPLEX_TYPE)  # |0><0| - |1><1|
 PAULI_X = np.array([[0, 1], [1, 0]], dtype=COMPLEX_TYPE)  # |0><1| + |1><0|
 PAULI_Y = -1j * PAULI_Z @ PAULI_X
@@ -45,20 +48,25 @@ def simulate_sensing_protocol(
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    axial_symmetry: bool = False,
 ) -> np.ndarray:
-    """
-    Simulate a sensing protocol, and return the final state (density matrix).
+    """Simulate a sensing protocol, and return the final state (density matrix).
 
     Starting with an initial all-|1> state (all spins pointing down along the Z axis):
     1. Rotate about an axis in the XY plane.
     2. Evolve under a given entangling Hamiltonian.
-    3. "Un-rotate" about an axis in the XY plane.
+    3. Rotate about the X axis.
+    4. Rotate about the Y axis.
 
-    Step 1 rotates by an angle '+np.pi * params[1]', about the axis 'np.pi * params[2]'.
-    Step 2 evolves under the given entangling Hamiltonian for time 'params[0] * num_qubits * np.pi'.
-    Step 3 rotates by an angle '-np.pi * params[3]', about the axis 'np.pi * params[4]'.
+    Step 1 rotates by an angle 'np.pi * params[0]', about the axis 'np.pi * params[1]'.
+    Step 2 evolves under the given entangling Hamiltonian for time 'params[2] * np.pi * num_qubits'.
+    Step 3 rotates by an angle 'np.pi * params[3]'.
+    Step 3 rotates by an angle 'np.pi * params[-1]'.
 
-    If dissipation_rates is nonzero, qubits experience dissipation during the entangling step (2).
+    If axial_symmetry is set to True, 0 is appended to the parameter list.
+    Afterwards, if there are more than 5 parameters, steps 2 and 3 are repeated as appropriate.
+
+    If dissipation_rates is nonzero, qubits experience dissipation during the entangling steps.
     See the documentation for the Dissipator class for a general explanation of the
     dissipation_rates and dissipation_format arguments.
 
@@ -68,45 +76,60 @@ def simulate_sensing_protocol(
     dissipation rates 'r' by a factor of 'np.pi * num_qubits' makes so that each qubit depolarizes
     with probability 'e^(-params[0] * r)' by the end of the OAT protocol.
     """
-    assert len(params) == 5, "Spin sensing protocols accept five parameters."
+    if len(params) < 5 or not len(params) % 2:
+        raise ValueError(f"The number of parameters should be an odd number >=5, not {len(params)}.")
 
     num_qubits = log2_int(entangling_hamiltonian.shape[0])
 
-    # construct collective spin operators
-    collective_Sx, collective_Sy, collective_Sz = collective_spin_ops(num_qubits)
-
     # rotate the all-|1> state about a chosen axis
-    time_1 = params[1] * np.pi
-    axis_angle_1 = params[2] * np.pi
-    qubit_ket = np.sin(time_1 / 2) * KET_0 + 1j * np.exp(1j * axis_angle_1) * np.cos(time_1 / 2) * KET_1
+    time = params[0] * np.pi
+    cos = np.cos(time / 2)
+    sin = np.sin(time / 2)
+    axis_angle = params[1] * np.pi
+    qubit_ket = cos * KET_1 - 1j * np.exp(-1j * axis_angle) * sin * KET_0
     qubit_state = np.outer(qubit_ket, qubit_ket.conj())
-    state_1 = functools.reduce(np.kron, [qubit_state] * num_qubits)
+    state = functools.reduce(np.kron, [qubit_state] * num_qubits)
 
-    # entangle!
-    time_2 = params[0] * np.pi * num_qubits
+    # entangle - rotate layers
     dissipator = Dissipator(dissipation_rates, dissipation_format) / (np.pi * num_qubits)
-    state_2 = evolve_state(state_1, time_2, entangling_hamiltonian, dissipator)
+    for pp in range(2, len(params) - 1, 2):
+        # entangle
+        time = params[pp] * np.pi * num_qubits
+        state = evolve_state(state, time, entangling_hamiltonian, dissipator)
 
-    # un-rotate about a chosen axis
-    time_3 = -params[3] * np.pi
-    axis_angle_3 = params[4] * np.pi
-    final_hamiltonian = np.cos(axis_angle_3) * collective_Sx + np.sin(axis_angle_3) * collective_Sy
-    state_3 = evolve_state(state_2, time_3, final_hamiltonian)
+        # rotate about Sx
+        time = params[pp + 1] * np.pi
+        mat_rx = np.cos(time / 2) * PAULI_I - 1j * np.sin(time / 2) * PAULI_X
+        state = apply_globally(state, mat_rx, num_qubits)
 
-    return state_3
+    # rotate about Sy
+    time = params[-1] * np.pi
+    mat_ry = np.cos(time / 2) * PAULI_I - 1j * np.sin(time / 2) * PAULI_Y
+    state = apply_globally(state, mat_ry, num_qubits)
+
+    return state
+
+
+def apply_globally(density_op: np.ndarray, qubit_op: np.ndarray, num_qubits: int) -> np.ndarray:
+    """Apply the given qubit operator to all qubits of a density operator."""
+    qubit_op_dag = qubit_op.conj().T
+    for qubit in range(num_qubits):
+        dim_a = 2**qubit
+        dim_b = 2 ** (num_qubits - qubit - 1)
+        density_op = density_op.reshape((dim_a, 2, dim_b * dim_a, 2, dim_b))
+        density_op = np.einsum("ij,AjBkC,kl->AiBlC", qubit_op, density_op, qubit_op_dag)
+    return density_op.reshape((2**num_qubits,) * 2)
 
 
 def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
     """Decorator to enable an axially-symmetric version of a simulation method.
 
-    Axial symmetry means that the second parameter (which controls the axis of the first rotation) can be set to zero without loss of generality.
-    For this reason, if the simulation method is run with `axial_symmetry=True` (which this decorator sets by default), then the method accepts only
-    four parameters rather than the usual five.  The method additionally checks that the dissipation rates respect the axial symmetry, if applicable.
+    Axial symmetry means that the last parameter can be set to zero without loss of generality.
     """
 
-    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: object, axial_symmetry: bool = True, **kwargs: object) -> np.ndarray:
-        if axial_symmetry:
-            # Verify that dissipation satisfies axial symmetry.
+    def simulate_func_with_symmetry(params: Sequence[float] | np.ndarray, *args: object, **kwargs: object) -> np.ndarray:
+        if len(params) == 4:
+            # Verify that the dissipation arguments are compatible with axial symmetry.
             dissipation_rates = kwargs.get("dissipation_rates", 0.0)
             dissipation_format = kwargs.get("dissipation_format", DEFAULT_DISSIPATION_FORMAT)
             if dissipation_format == "XYZ" and hasattr(dissipation_rates, "__iter__"):
@@ -114,13 +137,9 @@ def enable_axial_symmetry(simulate_func: Callable[..., np.ndarray]) -> Callable[
                 if not rate_sx == rate_sy:
                     raise ValueError(
                         f"Dissipation format {dissipation_format} with rates {dissipation_rates} does not respect axial symmetry."
-                        "\nTry passing the argument `axial_symmetry=False` to the simulation method."
+                        "\nPlease provide at least 5 parameters, or pick different options."
                     )
-
-            # If there are only four parameters, (entangling_time, initial_rotation_angle, initial_rotation_axis, final_rotation_angle),
-            # append a final_rotation_axis of 0.
-            if len(params) == 4:
-                params = np.append(np.array(params), 0.0)
+            params = np.append(np.array(params), 0.0)
 
         return simulate_func(params, *args, **kwargs)
 
@@ -168,7 +187,7 @@ def simulate_spin_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
     coupling_op: np.ndarray,
-    coupling_exponent: float = 0.0,
+    coupling_exponent: float = 1.0,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
@@ -190,7 +209,7 @@ def simulate_spin_chain(
 def simulate_ising_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
-    coupling_exponent: float = 0.0,
+    coupling_exponent: float = 1.0,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
@@ -210,7 +229,7 @@ def simulate_ising_chain(
 def simulate_XX_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
-    coupling_exponent: float = 0.0,
+    coupling_exponent: float = 1.0,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
@@ -229,7 +248,7 @@ def simulate_XX_chain(
 def simulate_local_TAT_chain(
     params: Sequence[float] | np.ndarray,
     num_qubits: int,
-    coupling_exponent: float = 0.0,
+    coupling_exponent: float = 1.0,
     *,
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
@@ -249,48 +268,55 @@ def evolve_state(
     density_op: np.ndarray,
     time: float | np.ndarray,
     hamiltonian: np.ndarray,
-    dissipator: Optional[Dissipator] = None,
+    dissipator: Dissipator | None = None,
     *,
     rtol: float = 1e-8,
     atol: float = 1e-8,
-    disable_diffrax: bool = DISABLE_DIFFRAX,
+    solver: diffrax.AbstractSolver | None = None,
+    **diffrax_kwargs: object,
 ) -> np.ndarray:
-    """
-    Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator.
-    """
+    """Time-evolve a given initial density operator for a given amount of time under the given Hamiltonian and (optionally) Dissipator."""
 
     # treat negative times as evolving under the negative of the Hamiltonian
     # NOTE: this is required for autodiff to work
     if time.real < 0:
         time, hamiltonian = -time, -hamiltonian
 
-    times = np.linspace(0.0, time, 2)
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
-    if not DISABLE_DIFFRAX:
+    if USE_DIFFRAX:
 
-        def _time_deriv(time: float, density_op: np.ndarray, hamiltonian) -> np.ndarray:
-            # return time_deriv(time, density_op, hamiltonian[0], dissipator)
-            return time_deriv(density_op, time)
+        # set initial time step size, if necessary
+        if "dt0" not in diffrax_kwargs:
+            diffrax_kwargs["dt0"] = 0.002
 
-        term = ODETerm(_time_deriv)
-        ODEsolver = Tsit5() #Dopri8()
-        solution = diffeqsolve(term, ODEsolver, t0=0.0, t1=time, dt0=0.002, max_steps=50000, y0=density_op, args=(hamiltonian,))
+        def _time_deriv(time: float, density_op: np.ndarray, hamiltonian: np.ndarray) -> np.ndarray:
+            return time_deriv(time, density_op)
+
+        term = diffrax.ODETerm(_time_deriv)
+        solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
+        solver_args = dict(t0=0.0, t1=time, y0=density_op, args=(hamiltonian,))
+        if FORWARD_MODE:
+            diffrax_kwargs["max_steps"] = diffrax_kwargs.get("max_steps", None)
+            solver_args |= dict(adjoint=diffrax.DirectAdjoint())
+        solution = diffrax.diffeqsolve(term, solver, **solver_args, **diffrax_kwargs)
         return solution.ys[-1]
+
     else:
-        if np.isclose(time, 0.0, atol=1e-04):
+        if np.isclose(time, 0, atol=atol):
             return density_op
 
         def scipy_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
             density_op.shape = (hamiltonian.shape[0],) * 2  # type: ignore[misc]
-            output = time_deriv(density_op, time)
+            output = time_deriv(time, density_op)
             density_op.shape = (-1,)  # type: ignore[misc]
             return output.ravel()
 
         result = scipy.integrate.solve_ivp(
             scipy_time_deriv,
-            times.real,
+            [0, time],
             density_op.ravel(),
+            t_eval=[time],
             rtol=rtol,
             atol=atol,
         )
@@ -299,16 +325,14 @@ def evolve_state(
 
 def get_time_deriv(
     hamiltonian: np.ndarray,
-    dissipator: Optional[Dissipator] = None,
-    *,
-    disable_diffrax: bool = DISABLE_DIFFRAX,
-) -> Callable[[np.ndarray, float], np.ndarray]:
+    dissipator: Dissipator | None = None,
+) -> Callable[[float, np.ndarray], np.ndarray]:
     """Construct a time derivative function that maps (state, time) --> d(state)/d(time)."""
 
     # construct the time derivative from coherent evolution
     if hamiltonian.ndim == 2:
         # ... with ordinary matrix multiplication
-        def coherent_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
+        def coherent_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
             return -1j * (hamiltonian @ density_op - density_op @ hamiltonian)
 
     else:
@@ -316,14 +340,14 @@ def get_time_deriv(
         # so we can compute the commutator with array broadcasting, which is faster than matrix multiplication
         expanded_hamiltonian = np.expand_dims(hamiltonian, 1)
 
-        def coherent_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
+        def coherent_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
             return -1j * (expanded_hamiltonian * density_op - density_op * hamiltonian)
 
     if not dissipator:
         return coherent_time_deriv
 
-    def dissipative_time_deriv(density_op: np.ndarray, time: float) -> np.ndarray:
-        return coherent_time_deriv(density_op, time) + dissipator @ density_op
+    def dissipative_time_deriv(time: float, density_op: np.ndarray) -> np.ndarray:
+        return coherent_time_deriv(time, density_op) + dissipator @ density_op
 
     return dissipative_time_deriv
 
@@ -345,9 +369,7 @@ def collective_op(op: np.ndarray, num_qubits: int) -> np.ndarray:
 
 
 def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarray:
-    """
-    Return an operator that acts with 'op' in the given qubits, and trivially (with the identity operator) on all other qubits.
-    """
+    """Return an operator that acts with 'op' in the given qubits, and trivially (with the identity operator) on all other qubits."""
     assert op.shape == (2 ** len(qubits),) * 2, "Operator shape {op.shape} is inconsistent with the number of target qubits provided, {num_qubits}!"
     identity = np.eye(2 ** (num_qubits - len(qubits)), dtype=op.dtype)
     system_op = np.kron(op, identity)
@@ -374,45 +396,55 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
     ).reshape((2**num_qubits,) * 2)
 
 
-def get_jacobian_func(
-    simulate_func: Callable,
-    *,
-    disable_diffrax: bool = DISABLE_DIFFRAX,
-    step_sizes: float | Sequence[float] = 1e-6,
-) -> Callable:
+def get_jacobian_func(simulate_func: Callable) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
-    if not DISABLE_DIFFRAX:
+    if USE_DIFFRAX and FORWARD_MODE:
+        # forward-mode automatic differentiation
 
-        def get_jacobian(*args: object, **kwargs: object) -> np.ndarray:
-            primals, vjp_func = jax.vjp(simulate_func, *args)
-            params = args[0]
+        def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+            param_array = np.array(params)
+            call_func = lambda params: simulate_func(params, *args)
+            result = []
+            for ii in range(len(param_array)):
+                seed = np.zeros(len(param_array), dtype=np.float64)
+                seed = seed.at[ii].set(1.0)
+                _, real_part = jax.jvp(call_func, (param_array,), (seed,))
+                seed = seed.at[ii].set(1.0j)
+                _, imag_part = jax.jvp(call_func, (param_array,), (seed,))
+                result.append(real_part + 1.0j * imag_part)
+            return np.stack(result, axis=2)
+
+        return get_jacobian
+
+    elif USE_DIFFRAX and not FORWARD_MODE:
+        # reverse-mode automatic differentiation
+
+        def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+            primals, vjp_func = jax.vjp(simulate_func, params, *args)
             result = np.zeros((primals.shape[1], primals.shape[0], len(params)), dtype=COMPLEX_TYPE)
-            for i in range(primals.shape[1]):
-                for j in range(primals.shape[0]):
-                    seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
-                    seed = seed.at[i, j].set(1.0)
-                    res = np.array(vjp_func(seed)[0]).flatten()
-                    seed = seed.at[i, j].set(1.0j)
-                    res = res + np.array(vjp_func(seed)[0]).flatten() * 1.0j
-                    # Take the conjugate to account for Jax convention. See discussion:
-                    # https://github.com/google/jax/issues/4891
-                    res = np.conj(res)
-                    for p in range(len(params)):
-                        result = result.at[i, j, p].set(res[p])
+            for ii, jj in numpy.ndindex(primals.shape):
+                seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
+                seed = seed.at[ii, jj].set(1.0)
+                real_part = np.array(vjp_func(seed)[0]).flatten()
+                seed = seed.at[ii, jj].set(1.0j)
+                imag_part = np.array(vjp_func(seed)[0]).flatten()
+                # Take the conjugate to account for Jax convention. See discussion:
+                # https://github.com/google/jax/issues/4891
+                result = result.at[ii, jj, :].set(real_part - 1.0j * imag_part)
             return result
 
         return get_jacobian
 
-    def get_jacobian_manually(params: Sequence[float] | np.ndarray, *args: object, **kwargs: object) -> np.ndarray:
-        nonlocal step_sizes
+    def get_jacobian_manually(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+        step_sizes = kwargs.get("step_sizes", 1e-10)
         if isinstance(step_sizes, float):
-            step_sizes = [step_sizes] * len(params)
-        assert len(step_sizes) == len(params)
+            param_step_sizes = [step_sizes] * len(params)
+        assert len(param_step_sizes) == len(params)
 
         result_at_params = simulate_func(params, *args, **kwargs)
         shifted_results = []
-        for idx, step_size in enumerate(step_sizes):
+        for idx, step_size in enumerate(param_step_sizes):
             new_params = list(params)
             new_params[idx] += step_size
             result_at_params_with_step = simulate_func(new_params, *args, **kwargs)
@@ -422,12 +454,14 @@ def get_jacobian_func(
 
     return get_jacobian_manually
 
-def print_jacobian(jacobian, precision=3):
-    np.set_printoptions(precision=precision, suppress=True, linewidth=10000000)
+
+def print_jacobian(jacobian: np.ndarray, precision: int = 3, linewidth: int = 200) -> None:
+    np.set_printoptions(precision=precision, suppress=True, linewidth=linewidth)
     params = jacobian.shape[2]
     for pp in range(params):
         print(f"d(final_state/d(params[{pp}]):")
         print(jacobian[:, :, pp])
+
 
 if __name__ == "__main__":
     # parse arguments
@@ -437,17 +471,14 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num_qubits", type=int, default=4)
     parser.add_argument("--dissipation", type=float, default=0.0)
-    parser.add_argument("--params", type=float, nargs=4, default=np.array([0.5, 0.5, 0.5, 0]))
+    parser.add_argument("--params", type=float, nargs="+", default=np.array([0.5, 0.5, 0.5, 0]))
     parser.add_argument("--jacobian", action="store_true", default=False)
     args = parser.parse_args(sys.argv[1:])
 
     if args.jacobian:
-        np.set_printoptions(precision=8, suppress=True)
         get_jacobian = get_jacobian_func(simulate_OAT)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
-        for pp in range(len(args.params)):
-            print(f"d(final_state/d(params[{pp}]):")
-            print(jacobian[:, :, pp])
+        print_jacobian(jacobian)
 
     # simulate the OAT protocol
     final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)

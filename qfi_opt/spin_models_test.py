@@ -1,6 +1,6 @@
 import dataclasses
 import functools
-from typing import Callable, Optional, Sequence
+from collections.abc import Callable, Sequence
 
 import jax.numpy as np
 import numpy
@@ -13,7 +13,7 @@ class Transformation:
     """An object representing a sequence of transformations to apply to a quantum state."""
 
     final_rz: float = 0
-    flip_xy: Optional[float] = None
+    flip_xy: float | None = None
     conjugate: bool = False
 
     def transform(self, state: np.ndarray) -> np.ndarray:
@@ -52,10 +52,7 @@ def get_random_hamiltonian(dim: int) -> np.ndarray:
 
 @functools.cache
 def rot_z_mat(num_qubits: int, angle: float) -> np.ndarray:
-    """
-    Construct the matrix 'phase_mat' for which element-wise multiplication 'phase_mat * density_op' rotates the state 'density_op' about the Z axis by the
-    given angle.
-    """
+    """Construct the matrix 'phase_mat' for which 'phase_mat * density_op' rotates the state 'density_op' about the Z axis by the given angle."""
     if not angle:
         return np.ones((2**num_qubits,) * 2)
     _, _, collective_Sz = spin_models.collective_spin_ops(num_qubits)
@@ -64,8 +61,7 @@ def rot_z_mat(num_qubits: int, angle: float) -> np.ndarray:
 
 
 def get_symmetries_common() -> Sequence[Symmetry]:
-    """
-    Generate a list of parameter symmetries common to all protocols.
+    """Generate a list of parameter symmetries common to all protocols.
 
     Assumes zero dissipation.
 
@@ -171,6 +167,7 @@ def test_symmetries() -> None:
                 get_symmetries_OAT(num_qubits % 2 == 0),
             )
 
+
 def run_derivatives_tests(simulate_method: Callable[[Sequence[float]], np.ndarray], symmetries: Sequence[Symmetry], atol: float = 1e-6) -> None:
     """Test that the given simulation method obeys the given symmetries."""
     params = tuple(numpy.random.random(5))
@@ -212,4 +209,3 @@ def test_derivatives() -> None:
                 lambda params: spin_models.simulate_OAT(params, num_qubits),
                 get_symmetries_OAT(num_qubits % 2 == 0),
             )
-
