@@ -11,9 +11,10 @@ import numpy
 
 from qfi_opt.dissipation import Dissipator
 
-DISABLE_DIFFRAX = bool(os.getenv("DISABLE_DIFFRAX"))
+USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
+FORWARD_MODE = not bool(os.getenv("REVERSE_MODE"))
 
-if not DISABLE_DIFFRAX:
+if USE_DIFFRAX:
     import jax
     import jax.numpy as np
 
@@ -271,7 +272,6 @@ def evolve_state(
     *,
     rtol: float = 1e-8,
     atol: float = 1e-8,
-    disable_diffrax: bool = DISABLE_DIFFRAX,
     solver: diffrax.AbstractSolver | None = None,
     **diffrax_kwargs: object,
 ) -> np.ndarray:
@@ -284,7 +284,7 @@ def evolve_state(
 
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
-    if not DISABLE_DIFFRAX:
+    if USE_DIFFRAX:
 
         # set initial time step size, if necessary
         if "dt0" not in diffrax_kwargs:
@@ -295,7 +295,11 @@ def evolve_state(
 
         term = diffrax.ODETerm(_time_deriv)
         solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
-        solution = diffrax.diffeqsolve(term, solver, t0=0.0, t1=time, y0=density_op, args=(hamiltonian,), **diffrax_kwargs)
+        solver_args = dict(t0=0.0, t1=time, y0=density_op, args=(hamiltonian,))
+        if FORWARD_MODE:
+            diffrax_kwargs["max_steps"] = diffrax_kwargs.get("max_steps", None)
+            solver_args |= dict(adjoint=diffrax.DirectAdjoint())
+        solution = diffrax.diffeqsolve(term, solver, **solver_args, **diffrax_kwargs)
         return solution.ys[-1]
 
     else:
@@ -322,8 +326,6 @@ def evolve_state(
 def get_time_deriv(
     hamiltonian: np.ndarray,
     dissipator: Dissipator | None = None,
-    *,
-    disable_diffrax: bool = DISABLE_DIFFRAX,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Construct a time derivative function that maps (state, time) --> d(state)/d(time)."""
 
@@ -394,15 +396,29 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
     ).reshape((2**num_qubits,) * 2)
 
 
-def get_jacobian_func(
-    simulate_func: Callable,
-    *,
-    disable_diffrax: bool = DISABLE_DIFFRAX,
-    step_sizes: float | Sequence[float] = 1e-10,
-) -> Callable:
+def get_jacobian_func(simulate_func: Callable) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
-    if not DISABLE_DIFFRAX:
+    if USE_DIFFRAX and FORWARD_MODE:
+        # forward-mode automatic differentiation
+
+        def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+            param_array = np.array(params)
+            call_func = lambda params: simulate_func(params, *args)
+            result = []
+            for ii in range(len(param_array)):
+                seed = np.zeros(len(param_array), dtype=np.float64)
+                seed = seed.at[ii].set(1.0)
+                _, real_part = jax.jvp(call_func, (param_array,), (seed,))
+                seed = seed.at[ii].set(1.0j)
+                _, imag_part = jax.jvp(call_func, (param_array,), (seed,))
+                result.append(real_part + 1.0j * imag_part)
+            return np.stack(result, axis=2)
+
+        return get_jacobian
+
+    elif USE_DIFFRAX and not FORWARD_MODE:
+        # reverse-mode automatic differentiation
 
         def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
             primals, vjp_func = jax.vjp(simulate_func, params, *args)
@@ -410,17 +426,18 @@ def get_jacobian_func(
             for ii, jj in numpy.ndindex(primals.shape):
                 seed = np.zeros(primals.shape, dtype=COMPLEX_TYPE)
                 seed = seed.at[ii, jj].set(1.0)
-                res = np.array(vjp_func(seed)[0]).flatten()
+                real_part = np.array(vjp_func(seed)[0]).flatten()
                 seed = seed.at[ii, jj].set(1.0j)
-                res = res + np.array(vjp_func(seed)[0]).flatten() * 1.0j
+                imag_part = np.array(vjp_func(seed)[0]).flatten()
                 # Take the conjugate to account for Jax convention. See discussion:
                 # https://github.com/google/jax/issues/4891
-                result = result.at[ii, jj, :].set(np.conj(res))
+                result = result.at[ii, jj, :].set(real_part - 1.0j * imag_part)
             return result
 
         return get_jacobian
 
     def get_jacobian_manually(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+        step_sizes = kwargs.get("step_sizes", 1e-10)
         if isinstance(step_sizes, float):
             param_step_sizes = [step_sizes] * len(params)
         assert len(param_step_sizes) == len(params)
