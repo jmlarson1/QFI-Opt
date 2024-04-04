@@ -12,7 +12,7 @@ import numpy
 from qfi_opt.dissipation import Dissipator
 
 USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
-REVERSE_MODE = bool(os.getenv("REVERSE_MODE"))
+FORWARD_MODE = not bool(os.getenv("REVERSE_MODE"))
 
 if USE_DIFFRAX:
     import jax
@@ -296,7 +296,7 @@ def evolve_state(
         term = diffrax.ODETerm(_time_deriv)
         solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
         solver_args = dict(t0=0.0, t1=time, y0=density_op, args=(hamiltonian,))
-        if not REVERSE_MODE:
+        if FORWARD_MODE:
             solver_args |= dict(adjoint=diffrax.DirectAdjoint())
         solution = diffrax.diffeqsolve(term, solver, **solver_args, **diffrax_kwargs)
         return solution.ys[-1]
@@ -398,7 +398,7 @@ def act_on_subsystem(num_qubits: int, op: np.ndarray, *qubits: int) -> np.ndarra
 def get_jacobian_func(simulate_func: Callable) -> Callable:
     """Convert a simulation method into a function that returns its Jacobian."""
 
-    if USE_DIFFRAX and not REVERSE_MODE:
+    if USE_DIFFRAX and FORWARD_MODE:
         # forward-mode automatic differentiation
 
         def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
@@ -416,7 +416,7 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
 
         return get_jacobian
 
-    elif USE_DIFFRAX and REVERSE_MODE:
+    elif USE_DIFFRAX and not FORWARD_MODE:
         # reverse-mode automatic differentiation
 
         def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
