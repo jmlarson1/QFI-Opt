@@ -229,7 +229,7 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
         seed = 88
         np.random.seed(seed)
 
-        for num_params in [4]:#[4, 5]:
+        for num_params in [5]:#[4, 5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
@@ -248,10 +248,8 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
                 obj = getattr(spin_models, model)
 
                 get_jacobian = spin_models.get_jacobian_func(obj)
-                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
+                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
 
-                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS")
-
-                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
+                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
                 #grad = np.zeros(num_params)
                 #calfun(xfinal, grad)
