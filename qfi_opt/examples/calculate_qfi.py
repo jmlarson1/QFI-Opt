@@ -16,9 +16,10 @@ def compute_eigendecomposition(rho: np.ndarray):
     return eigvals, eigvecs
 
 
-def compute_QFI(
-    eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A: np.ndarray, dA: np.ndarray, d2A: np.ndarray, grad, tol: float = 1e-8, etol_scale: float = 10
-) -> float:
+def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A:
+        np.ndarray= np.empty(0), dA: np.ndarray= np.empty(0), d2A: np.ndarray = np.empty(0),
+        grad: np.ndarray = np.empty(0), tol: float = 1e-8, etol_scale: float =
+        10) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
     num_params = dA.shape[0]
@@ -237,7 +238,7 @@ if __name__ == "__main__":
             rho = obj(params, num_spins, dissipation_rates=dissipation)
 
             grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
-            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
+            # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)
 
             qfi = compute_QFI(vals, vecs, op)
@@ -247,7 +248,7 @@ if __name__ == "__main__":
             rho = obj(params, num_spins, dissipation_rates=dissipation)
 
             grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
-            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
+            # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)
 
             qfi = compute_QFI(vals, vecs, op)
@@ -257,7 +258,7 @@ if __name__ == "__main__":
             rho = obj(params, num_spins, dissipation_rates=dissipation)
 
             grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
-            spin_models.print_jacobian(grad_of_rho, precision=print_precision)
+            # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)
 
             qfi = compute_QFI(vals, vecs, op)
