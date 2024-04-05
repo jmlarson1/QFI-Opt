@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import numpy as np
-
-from qfi_opt import spin_models
 from scipy.linalg import solve_sylvester
 
+from qfi_opt import spin_models
 
 
 def variance(rho: np.ndarray, G: np.ndarray) -> float:
@@ -17,10 +16,9 @@ def compute_eigendecomposition(rho: np.ndarray):
     eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
     return eigvals, eigvecs
 
+
 def compute_QFI_simpler_api(
-    eigvals: np.ndarray, eigvecs: np.ndarray, A: np.ndarray, params:
-    np.ndarray, grad, get_jacobian, obj_params, tol: float = 1e-8, etol_scale:
-    float = 10
+    eigvals: np.ndarray, eigvecs: np.ndarray, A: np.ndarray, params: np.ndarray, grad, get_jacobian, obj_params, tol: float = 1e-8, etol_scale: float = 10
 ) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
@@ -85,10 +83,17 @@ def compute_QFI_simpler_api(
         return 4 * running_sum, []
 
 
-def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A:
-        np.ndarray= np.empty(0), dA: np.ndarray= np.empty(0), d2A: np.ndarray = np.empty(0),
-        grad: np.ndarray = np.empty(0), tol: float = 1e-8, etol_scale: float =
-        10) -> float:
+def compute_QFI(
+    eigvals: np.ndarray,
+    eigvecs: np.ndarray,
+    G: np.ndarray,
+    A: np.ndarray = np.empty(0),
+    dA: np.ndarray = np.empty(0),
+    d2A: np.ndarray = np.empty(0),
+    grad: np.ndarray = np.empty(0),
+    tol: float = 1e-8,
+    etol_scale: float = 10,
+) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
     num_params = dA.shape[0]
@@ -154,6 +159,45 @@ def get_matrix_grads_lazy(A, dA, eigvals, eigvecs):
             psi_grads[k, index] = dpsi.flatten()
 
     return lambda_grads, psi_grads
+
+
+def get_matrix_grads_sylvester(dA, eigvals, eigvecs, tol):
+
+    dim = eigvecs.shape[0]
+    lambda_grads = np.zeros(dim, dtype="cdouble")
+    psi_grads = np.zeros((dim, dim), dtype="cdouble")
+
+    # force Hermitianness:
+    dA = (dA + dA.conj().T) / 2.0
+
+    # group the sorted eigvals by tolerance, intended to help stability of eigenvector derivatives:
+    current_ind = 0
+    for ind1 in range(dim):
+        if current_ind == ind1:
+            for ind2 in range(ind1 + 1, dim):
+                if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol, rtol=tol):
+                    break  # the for loop over ind2
+            # we just broke the for loop, so:
+            current_ind = ind2
+
+            # do a sylvester solve:
+            group_set = np.arange(ind1, ind2)
+            # special case when ind2=dim (must be something smarter)
+            if group_set.size == 0:
+                group_set = [ind2]
+            not_in_group_set = np.setdiff1d(np.arange(dim), group_set)
+            A_group = np.diag(eigvals[group_set])
+            A_not_in_group = np.diag(eigvals[not_in_group_set])
+            rotation = eigvecs[group_set].conj() @ dA @ eigvecs[not_in_group_set].T
+            sol = solve_sylvester(A_group, -1.0 * A_not_in_group, rotation)
+            psi_grads[group_set] = sol @ eigvecs[not_in_group_set].conj()
+
+            # average eigenvalue:
+            multiplicity = len(group_set)
+            dLambda = (1.0 / multiplicity) * np.trace(eigvecs[group_set].conj() @ dA @ eigvecs[group_set].T)
+            lambda_grads[group_set] = np.ones(multiplicity) * dLambda
+
+    return np.real(lambda_grads), psi_grads.conj()
 
 
 def get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol):
