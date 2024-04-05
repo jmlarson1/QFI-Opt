@@ -50,11 +50,6 @@ if __name__ == "__main__":
 
     obj = getattr(spin_models, model)
 
-    grad = np.empty(0)
-    get_jacobian = np.empty(0)
-    out = sim_wrapper_diffrax(x0, grad, obj, obj_params, get_jacobian)
-    print(out)
-
     grad = np.zeros(num_params)
     get_jacobian = spin_models.get_jacobian_func(obj)
     out = sim_wrapper_diffrax(x0, grad, obj, obj_params, get_jacobian)
