@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import numpy as np
-import ipdb
 from scipy.io import savemat
 from scipy.linalg import solve_sylvester
 
@@ -46,10 +45,17 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A:
     running_sum = 0
 
     if grad.size > 0:
+        # THIS SHOULD NOT BE ENTERED
         grad[:] = np.zeros(num_params)
         # compute gradients of each eigenvalue
-        # lambda_grads, psi_grads, eigvecs = get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol)
-        lambda_grads, psi_grads = get_matrix_grads_lazy(A, dA, eigvals, eigvecs)
+        lambda_grads = np.zeros((num_params, num_vals))
+        psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
+
+        for k in range(num_params):
+            # compute gradients of each eigenvalue
+            lambda_grad_k, psi_grad_k = get_matrix_grads_sylvester(dA[k], eigvals, eigvecs, tol)
+            lambda_grads[k] = lambda_grad_k
+            psi_grads[k] = psi_grad_k
 
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
@@ -121,7 +127,6 @@ def compute_QFI_diffrax(eigvals: np.ndarray, eigvecs: np.ndarray, A: np.ndarray,
             denom = eigvals[i] + eigvals[j]
             diff = eigvals[i] - eigvals[j]
             if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
-                #ipdb.set_trace()
                 numer = diff ** 2
                 term = eigvecs[i].conj() @ G @ eigvecs[j]
                 quotient = numer / denom
@@ -171,7 +176,6 @@ def get_matrix_grads_sylvester(dA, eigvals, eigvecs, tol):
             rotation = eigvecs[group_set].conj() @ dA @ eigvecs[not_in_group_set].T
             sol = solve_sylvester(A_group, -1.0 * A_not_in_group, rotation)
             psi_grads[group_set] = sol @ eigvecs[not_in_group_set].conj()
-            #ipdb.set_trace()
 
             # average eigenvalue:
             multiplicity = len(group_set)
@@ -181,124 +185,7 @@ def get_matrix_grads_sylvester(dA, eigvals, eigvecs, tol):
     return np.real(lambda_grads), psi_grads.conj()
 
 
-def get_matrix_grads_lazy(A, dA, eigvals, eigvecs):
-    num_vals = len(eigvals)
-    num_params = dA.shape[0]
-    lambda_grads = np.zeros((num_params, num_vals))
-    psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
 
-    for k in range(num_params):
-        for index in range(num_vals):
-            dlambda, dpsi = matrixder_lazy(A, dA[k], eigvals[index], eigvecs[index])
-
-            lambda_grads[k, index] = np.real(dlambda)
-            psi_grads[k, index] = dpsi.flatten()
-
-    return lambda_grads, psi_grads
-
-
-def get_matrix_grads(A, dA, d2A, eigvals, eigvecs, tol):
-    num_vals = len(eigvals)
-    num_params = dA.shape[0]
-    lambda_grads = np.zeros((num_params, num_vals))
-    psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
-    updated_eigvecs = np.zeros((num_vals, num_vals), dtype="cdouble")
-
-    for k in range(num_params):
-        already_used = []
-        for val in range(num_vals):
-            if val not in already_used:
-                # check for multiplicity within tolerance
-                eigval = eigvals[val]
-                indices = np.where(np.abs(eigvals.flatten() - eigval) <= tol)[0]
-                already_used = already_used + indices.tolist()
-
-                dlambda_k, dV_k, V_k = matrixder(A, dA[k], d2A[k], eigval, eigvecs[indices])
-
-                lambda_grads[k, indices] = dlambda_k
-                psi_grads[k, indices] = dV_k
-                updated_eigvecs[indices] = V_k
-
-    return lambda_grads, psi_grads, updated_eigvecs
-
-
-def matrixder_lazy(A, dA, eigval, eigvec):
-    # build the big matrix
-    num_vals = A.shape[0]
-    Eye = np.eye(num_vals)
-    Z = np.zeros((num_vals, num_vals))
-    eigvec = eigvec[:, np.newaxis]
-    #W = np.concatenate((A - eigval * Eye, Z, -1.0 * eigvec), axis=1, dtype="cdouble")
-    W = np.concatenate((A - eigval * Eye, -1.0 * eigvec), axis=1, dtype="cdouble")
-    #row = np.append(eigvec.conj().T, eigvec.T)
-    row = eigvec.conj().T
-    row = np.append(row, 0)
-    row = row[:, np.newaxis].T
-    #W2 = np.concatenate((Z, A.conj() - eigval * Eye,  -1.0 * eigvec.conj()), axis=1, dtype="cdouble")
-    W = np.concatenate((W, row), axis=0, dtype="cdouble")
-
-    # right hand side
-    prod = dA @ eigvec
-    rhs = -1.0 * prod
-    rhs = np.append(rhs, 0)
-    #rhs = np.append(rhs, -1.0 * prod.conj())
-    rhs = rhs[:, np.newaxis]
-
-    sol = np.linalg.solve(W, rhs)
-    ipdb.set_trace()
-
-    # read off values
-    dlambda = sol[-1]
-    dpsi = sol[:num_vals]
-
-    return dlambda, dpsi
-
-
-def matrixder(A, dA, ddA, lam, arbV):
-    # A is a Hermitian n times n matrix
-    # dA is the first derivative of A with respect to a parameter of interest
-    # ddA is the second derivative of A with respect to a parameter of interest
-    # lam is one eigenvalue of A
-    # arbV is an orthonormal basis for the eigenspace associated with lam, of shape n x r (r is multiplicity)
-
-    # because arbV is transposed
-    arbV = arbV.T
-
-    # Step 1: Initialize a few structures
-    n, r = arbV.shape
-    B = np.eye(n)
-
-    # Step 2: set up initial eigenvalue problem
-    M = arbV.conj().T @ dA @ arbV
-    W = A - lam * B
-
-    # Step 3: (we only want first derivatives, so Step 3 is not necessary)
-
-    # Step 4: Solve the eigenvalue problem
-    dLambda, U = np.linalg.eigh(M)
-    V = arbV @ U  # this is V in the "correct" basis
-
-    # Step 5: reduced eigenspace
-    V1 = np.linalg.solve(W, -dA @ arbV + V @ np.diag(dLambda) @ U.conj().T)
-
-    # Step 6: Compute M2
-    if r > 1:  # only do this step if repeated eigenvalue
-        M2 = V.conj().T @ ddA @ V + 2.0 * V.conj().T @ (-V1 @ U @ np.diag(dLambda) + dA @ V1 @ U)
-
-    # Step 7: Build C
-    D = -1.0 * V.conj().T @ V1 @ U
-    C = np.zeros((r, r), dtype="cdouble")
-    for i in range(r):
-        for j in range(r):
-            if i == j:
-                C[i, j] = D[i, j]
-            else:
-                C[i, j] = M2[i, j] / (2 * (dLambda[j] - dLambda[i]))
-
-    # Step 8: Derivatives of eigenvectors
-    dV = V1 @ U + V @ C
-
-    return dLambda, dV.T, V.T
 
 
 def quotient_partial_derivative(lambda_i, lambda_j, d_lambda_i, d_lambda_j):

@@ -88,8 +88,6 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
         qfi_grad[:] = []
 
     return -1.0 * qfi  # , -qfi_grad  # negative because we are maximizing
-    # else:
-    #    return -1 * qfi
 
 
 def sim_wrapper_diffrax(x, qfi_grad, obj, obj_params, get_jacobian):
@@ -133,22 +131,7 @@ def sim_wrapper_diffrax(x, qfi_grad, obj, obj_params, get_jacobian):
         qfi_grad[:] = []
 
     return -1.0 * qfi #, -qfi_grad  # negative because we are maximizing
-    #else:
-    #    return -1 * qfi
 
-def quick_test_gradient(obj, obj_params, x):
-    h = 1e-8
-    calfun = lambda x: sim_wrapper(x, h, True, obj, obj_params)
-    calfun_f = lambda x: sim_wrapper(x, h, False, obj, obj_params)
-    f0, g = calfun(x)
-    print("f0: ", f0)
-
-    # check for descent in gradient direction
-    for j in range(4, 18, 2):
-        stepsize = 10 ** (-j)
-        xp = x - stepsize * g
-        fp = calfun_f(xp)
-        print("fp: ", fp, "stepsize: ", stepsize)
 
 
 def run_pounder(obj, obj_params, n, x0):
@@ -177,8 +160,6 @@ def run_pounder(obj, obj_params, n, x0):
 
 def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
-    # opt = nlopt.opt(nlopt.LN_NELDERMEAD, num_params)  # Doesn't use derivatives and will work
-    # opt = nlopt.opt(nlopt.LD_MMA, num_params) # Needs derivatives to work. Without grad being set (in-place) it is zero, so first iterate is deemed stationary
 
     h = 1e-5
     if not get_jacobian:
@@ -199,16 +180,11 @@ def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
     minf = opt.last_optimum_value()
     # print("optimum at ", x)
     # print("minimum value = ", minf)
-    # print("result code = ", opt.last_optimize_result())
 
     return minf, x
 
 
-if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the code below
-    # comm = MPI.COMM_WORLD
-    # rank = comm.Get_rank()
-    # size = comm.Get_size()
-    size = 1
+if __name__ == "__main__":
 
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
@@ -229,7 +205,6 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
             ub = np.ones(num_params)
 
             x0 = np.random.uniform(lb, ub, num_params)
-            #x0 = np.array([3.54936991e-05, 1.84647997e+00, 1.84488415e-01, 3.57291064e-01])
 
             match num_params:
                 case 4:
@@ -244,8 +219,5 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
 
                 get_jacobian = spin_models.get_jacobian_func(obj)
                 minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
-                # h = 1e-6
-                # calfun = lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params)
                 #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
-                # grad = np.zeros(num_params)
-                # calfun(xfinal, grad)
+
