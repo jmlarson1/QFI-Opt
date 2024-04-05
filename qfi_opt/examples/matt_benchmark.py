@@ -243,9 +243,9 @@ if __name__ == "__main__":  # noqa: C901 # ignore "complexity" check for the cod
                 obj = getattr(spin_models, model)
 
                 get_jacobian = spin_models.get_jacobian_func(obj)
-                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS")
+                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
                 # h = 1e-6
                 # calfun = lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params)
-                # minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
+                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
                 # grad = np.zeros(num_params)
                 # calfun(xfinal, grad)
