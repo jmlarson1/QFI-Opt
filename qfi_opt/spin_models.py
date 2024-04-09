@@ -404,7 +404,7 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
 
         def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
             param_array = np.array(params)
-            call_func = lambda params: simulate_func(params, *args,  **kwargs)
+            call_func = lambda params: simulate_func(params, *args, **kwargs,  **kwargs)
             result = []
             for ii in range(len(param_array)):
                 seed = np.zeros(len(param_array), dtype=np.float64)
