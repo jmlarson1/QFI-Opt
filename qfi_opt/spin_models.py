@@ -403,10 +403,9 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
         # forward-mode automatic differentiation
 
         def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
-            param_array = np.array(params, dtype=COMPLEX_TYPE)
             _simulate_func = lambda params: simulate_func(params, *args, **kwargs)
             _get_jacobian = jax.jacfwd(_simulate_func, argnums=0, holomorphic=True)
-            return _get_jacobian(param_array)
+            return _get_jacobian(np.array(params, dtype=COMPLEX_TYPE))
 
         return get_jacobian
 
