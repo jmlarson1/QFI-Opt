@@ -403,28 +403,32 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
     if USE_DIFFRAX and FORWARD_MODE:
         # forward-mode automatic differentiation
 
-        if not GET_ALL:
+        if GET_ALL:
+
             def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
                 param_array = np.array(params)
-                call_func = lambda params: simulate_func(params, *args,  **kwargs)
-                result = []
-                for ii in range(len(param_array)):
-                    seed = np.zeros(len(param_array), dtype=np.float64)
-                    seed = seed.at[ii].set(1.0)
-                    _, real_part = jax.jvp(call_func, (param_array,), (seed,))
-                    seed = seed.at[ii].set(1.0j)
-                    _, imag_part = jax.jvp(call_func, (param_array,), (seed,))
-                    result.append(real_part + 1.0j * imag_part)
-                return np.stack(result, axis=2)
-            return get_jacobian
-        else:
-            def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
-                param_array = np.array(params)
-                call_func = lambda params: simulate_func(params, *args,  **kwargs)
+                call_func = lambda params: simulate_func(params, *args, **kwargs)
                 jacfwd_fun = jax.jacfwd(call_func, argnums=0, holomorphic=True)
                 jacobian = jacfwd_fun(np.array(param_array, dtype=COMPLEX_TYPE))
                 return jacobian
+
             return get_jacobian
+
+        def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+            param_array = np.array(params)
+            call_func = lambda params: simulate_func(params, *args, **kwargs)
+            result = []
+            for ii in range(len(param_array)):
+                seed = np.zeros(len(param_array), dtype=np.float64)
+                seed = seed.at[ii].set(1.0)
+                _, real_part = jax.jvp(call_func, (param_array,), (seed,))
+                seed = seed.at[ii].set(1.0j)
+                _, imag_part = jax.jvp(call_func, (param_array,), (seed,))
+                result.append(real_part + 1.0j * imag_part)
+            return np.stack(result, axis=2)
+
+        return get_jacobian
+
     elif USE_DIFFRAX and not FORWARD_MODE:
         # reverse-mode automatic differentiation
 
