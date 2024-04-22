@@ -27,13 +27,10 @@ def compute_eigendecomposition(rho: np.ndarray):
     return eigvals, eigvecs
 
 
-def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A:
-        np.ndarray= np.empty(0), dA: np.ndarray= np.empty(0), d2A: np.ndarray = np.empty(0),
-        grad: np.ndarray = np.empty(0), tol: float = 1e-8, etol_scale: float =
-        10) -> float:
+def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float=1e-8,
+                etol_scale: float=10) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
-    num_params = dA.shape[0]
 
     # There should never be negative eigenvalues, so their magnitude gives an
     # empirical estimate of the numerical accuracy of the eigendecomposition.
@@ -43,19 +40,6 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A:
 
     # Compute QFI and grad
     running_sum = 0
-
-    if grad.size > 0:
-        # THIS SHOULD NOT BE ENTERED
-        grad[:] = np.zeros(num_params)
-        # compute gradients of each eigenvalue
-        lambda_grads = np.zeros((num_params, num_vals))
-        psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
-
-        for k in range(num_params):
-            # compute gradients of each eigenvalue
-            lambda_grad_k, psi_grad_k = get_matrix_grads_sylvester(dA[k], eigvals, eigvecs, tol)
-            lambda_grads[k] = lambda_grad_k
-            psi_grads[k] = psi_grad_k
 
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
@@ -67,30 +51,11 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, A:
                 quotient = numer / denom
                 squared_modulus = np.absolute(term) ** 2
                 running_sum += quotient * squared_modulus
-                if grad.size > 0:
-                    for k in range(num_params):
-                        # fill in gradient
-                        grad[k] += kth_partial_derivative(
-                            quotient,
-                            squared_modulus,
-                            eigvals[i],
-                            eigvals[j],
-                            lambda_grads[k, i],
-                            lambda_grads[k, j],
-                            eigvecs[i],
-                            eigvecs[j],
-                            psi_grads[k, i],
-                            psi_grads[k, j],
-                            G,
-                        )
 
-    if grad.size > 0:
-        return 4 * running_sum, 4 * grad
-    else:
-        return 4 * running_sum, []
+        return 4 * running_sum
 
 
-def compute_QFI_diffrax(eigvals: np.ndarray, eigvecs: np.ndarray, A: np.ndarray, params: np.ndarray, grad,
+def compute_QFI_diffrax(eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, grad,
                 get_jacobian, obj_params, tol: float = 1e-8, etol_scale: float = 10) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)

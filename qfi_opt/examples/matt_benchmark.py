@@ -31,7 +31,7 @@ if not os.path.isdir(minq5_dir):
 sys.path.append(minq5_dir)
 
 
-def sim_wrapper(x, h, qfi_grad, obj, obj_params):
+def sim_wrapper(x, obj, obj_params):
     use_DB = False
     match = 0
     if use_DB:
@@ -56,38 +56,13 @@ def sim_wrapper(x, h, qfi_grad, obj, obj_params):
             DB = np.append(DB, to_save)
             np.save(database, DB)
 
-    num_parameters = len(x)
-    dA = np.zeros((num_parameters, 2 ** N, 2 ** N), dtype="cdouble")
-    d2A = np.zeros((num_parameters, 2 ** N, 2 ** N), dtype="cdouble")
-
-    if qfi_grad.size > 0:
-        # Approximate the gradient
-        I = np.eye(num_parameters)
-
-        for parameter in range(num_parameters):
-            # compute dA with respect to parameter
-            rho_p = obj(x + h * I[parameter], obj_params["N"], dissipation_rates=obj_params["dissipation"])
-            rho_m = obj(x - h * I[parameter], obj_params["N"], dissipation_rates=obj_params["dissipation"])
-            dA[parameter] = (rho_p - rho_m) / (2 * h)
-            # compute d2A with respect to parameter
-            d2A[parameter] = (rho_p - 2 * rho + rho_m) / (h**2)
-
-        mdic = {"A": rho, "dA": dA, "d2A:": d2A}
-        savemat("QFI_test.mat", mdic)
-
     # Compute eigendecomposition
     vals, vecs = compute_eigendecomposition(rho)
 
-    qfi, new_grad = compute_QFI(vals, vecs, obj_params["G"], rho, dA, d2A, qfi_grad)
-    print(x, qfi, new_grad, flush=True)
+    qfi = compute_QFI(vals, vecs, obj_params["G"])
+    print(x, qfi, flush=True)
 
-    try:
-        if qfi_grad.size > 0:
-            qfi_grad[:] = -1.0 * new_grad
-    except:
-        qfi_grad[:] = []
-
-    return -1.0 * qfi  # , -qfi_grad  # negative because we are maximizing
+    return -1.0 * qfi
 
 
 def sim_wrapper_diffrax(x, qfi_grad, obj, obj_params, get_jacobian):
@@ -121,7 +96,7 @@ def sim_wrapper_diffrax(x, qfi_grad, obj, obj_params, get_jacobian):
     # Compute eigendecomposition
     vals, vecs = compute_eigendecomposition(rho)
 
-    qfi, new_grad = compute_QFI_diffrax(vals, vecs, rho, x, qfi_grad, get_jacobian, obj_params)
+    qfi, new_grad = compute_QFI_diffrax(vals, vecs, x, qfi_grad, get_jacobian, obj_params)
     print(x, qfi, new_grad, flush=True)
 
     try:
@@ -130,13 +105,12 @@ def sim_wrapper_diffrax(x, qfi_grad, obj, obj_params, get_jacobian):
     except:
         qfi_grad[:] = []
 
-    return -1.0 * qfi #, -qfi_grad  # negative because we are maximizing
+    return -1.0 * qfi
 
 
 
 def run_pounder(obj, obj_params, n, x0):
-    h = 1e-6
-    calfun = lambda x: sim_wrapper(x, h, False, obj, obj_params)
+    calfun = lambda x: sim_wrapper(x, obj, obj_params)
     X = np.array(x0)
     F = np.array(calfun(X))
     Low = -np.inf * np.ones((1, n))
@@ -161,16 +135,15 @@ def run_pounder(obj, obj_params, n, x0):
 def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
 
-    h = 1e-5
     if not get_jacobian:
-        opt.set_min_objective(lambda x, grad: sim_wrapper(x, h, grad, obj, obj_params))
+        opt.set_min_objective(lambda x, grad: sim_wrapper(x, obj, obj_params))
     else:
         opt.set_min_objective(lambda x, grad: sim_wrapper_diffrax(x, grad, obj, obj_params, get_jacobian))
     opt.set_xtol_rel(1e-4)
     opt.set_maxeval(300)
     opt.set_lower_bounds(-10.0 * np.ones(num_params))
     opt.set_upper_bounds(10.0 * np.ones(num_params))
-    opt.set_vector_storage(1)
+    #opt.set_vector_storage(1)
 
     # # Because the objective is periodic, don't set bounds (but don't need to sample so much)
     # opt.set_lower_bounds(lb)
