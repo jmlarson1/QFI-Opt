@@ -27,36 +27,8 @@ def compute_eigendecomposition(rho: np.ndarray):
     return eigvals, eigvecs
 
 
-def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: float=1e-8,
-                etol_scale: float=10) -> float:
-    # Note: The eigenvectors must be rows of eigvecs
-    num_vals = len(eigvals)
 
-    # There should never be negative eigenvalues, so their magnitude gives an
-    # empirical estimate of the numerical accuracy of the eigendecomposition.
-    # We discard any QFI terms denominators within an order of magnitude of
-    # this value.
-    tol = max(tol, -etol_scale * np.min(eigvals))
-
-    # Compute QFI and grad
-    running_sum = 0
-
-    for i in range(num_vals):
-        for j in range(i + 1, num_vals):
-            denom = eigvals[i] + eigvals[j]
-            diff = eigvals[i] - eigvals[j]
-            if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
-                numer = diff ** 2
-                term = eigvecs[i].conj() @ G @ eigvecs[j]
-                quotient = numer / denom
-                squared_modulus = np.absolute(term) ** 2
-                running_sum += quotient * squared_modulus
-
-    return 4 * running_sum
-
-
-def compute_QFI_diffrax(eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, grad,
-                get_jacobian, obj_params, tol: float = 1e-8, etol_scale: float = 10) -> float:
+def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, obj_params, tol: float = 1e-8, etol_scale: float = 10, grad= np.empty(0), get_jacobian= []) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
     num_params = len(params)
