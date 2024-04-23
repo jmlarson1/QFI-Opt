@@ -103,7 +103,8 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for dissipation_rate in [1.0]:  # np.linspace(0.1, 5, 20):
+    # for dissipation_rate in [1.0]:  # np.linspace(0.1, 5, 20):
+    for dissipation_rate in np.linspace(0.1, 5, 20):
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = dissipation_rate
@@ -114,7 +115,8 @@ if __name__ == "__main__":
         seed = 88
         np.random.seed(seed)
 
-        for num_params in [5]:  # [4, 5]:
+        # for num_params in [5]:  # [4, 5]:
+        for num_params in [5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
@@ -138,6 +140,5 @@ if __name__ == "__main__":
                 obj_vals = []
                 minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
                 np.savetxt(f"vals_nlopt_model={model}_dissipation={dissipation_rate}", obj_vals)
-                sys.exit("a")
 
                 # minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
