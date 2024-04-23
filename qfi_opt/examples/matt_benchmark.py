@@ -6,9 +6,7 @@ import nlopt
 import numpy as np
 from ibcdfo.pounders import pounders
 from ibcdfo.pounders.general_h_funs import identity_combine
-from scipy.io import savemat
 
-import qfi_opt
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI
 

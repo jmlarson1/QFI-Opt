@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import sys
-
 import numpy as np
 from scipy.io import savemat
 from scipy.linalg import solve_sylvester
