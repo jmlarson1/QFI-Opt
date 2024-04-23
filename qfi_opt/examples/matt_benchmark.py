@@ -9,26 +9,9 @@ from ibcdfo.pounders.general_h_funs import identity_combine as combinemodels
 from scipy.io import savemat
 #from mpi4py import MPI
 
-sys.path.append('../../')
-
 import qfi_opt
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI_diffrax, compute_QFI
-
-sys.path.append("../../")
-
-root_dir = os.path.dirname(os.path.dirname(qfi_opt.__file__))
-minq5_dir = os.path.join(root_dir, "minq", "py", "minq5")
-if not os.path.isdir(minq5_dir):
-    messages = [
-        "Please install (or symlink) MINQ in the QFI-Opt project directory.",
-        "You can do this with:",
-        f"\n  git clone https://github.com/POptUS/MINQ.git {root_dir}/minq\n",
-        "Or, if you already have MINQ somewhere, run:",
-        f"\n  ln -s <minq-path> {root_dir}/minq\n",
-    ]
-    exit("\n".join(messages))
-sys.path.append(minq5_dir)
 
 
 def sim_wrapper(x, obj, obj_params):
@@ -193,4 +176,3 @@ if __name__ == "__main__":
                 get_jacobian = spin_models.get_jacobian_func(obj)
                 minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
                 #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
-
