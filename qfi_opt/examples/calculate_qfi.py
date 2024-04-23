@@ -97,12 +97,12 @@ def compute_QFI_diffrax(eigvals: np.ndarray, eigvecs: np.ndarray, params: np.nda
                 quotient = numer / denom
                 squared_modulus = np.absolute(term) ** 2
                 running_sum += quotient * squared_modulus
-    if grad.size > 0:
-        for k in range(num_params):
-            # fill in gradient
-            grad[k] += kth_partial_derivative(quotient, squared_modulus, eigvals[i], eigvals[j],
-                                            lambda_grads[k, i], lambda_grads[k, j], eigvecs[i], eigvecs[j],
-                                            psi_grads[k, i], psi_grads[k, j], G)
+                if grad.size > 0:
+                    for k in range(num_params):
+                        # fill in gradient
+                        grad[k] += kth_partial_derivative(quotient, squared_modulus, eigvals[i], eigvals[j],
+                                                        lambda_grads[k, i], lambda_grads[k, j], eigvecs[i], eigvecs[j],
+                                                        psi_grads[k, i], psi_grads[k, j], G)
 
     if grad.size > 0:
         return 4 * running_sum, 4 * grad
