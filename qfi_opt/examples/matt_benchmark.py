@@ -99,6 +99,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
 
 
 if __name__ == "__main__":
+    os.makedirs('results',exist_ok=True)
 
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
@@ -136,9 +137,9 @@ if __name__ == "__main__":
                 get_jacobian = spin_models.get_jacobian_func(obj)
                 obj_vals = []
                 minf, xfinal = run_pounder(obj, obj_params, num_params, x0)
-                np.savetxt(f"vals_pounder_model={model}_dissipation={dissipation_rate}", obj_vals)
+                np.savetxt(f"./results/vals_pounder_N={N}_seed={seed}_model={model}_dissipation={dissipation_rate}", obj_vals)
                 obj_vals = []
                 minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
-                np.savetxt(f"vals_nlopt_model={model}_dissipation={dissipation_rate}", obj_vals)
+                np.savetxt(f"./results/vals_nlopt_N={N}_seed={seed}_model={model}_dissipation={dissipation_rate}", obj_vals)
 
                 # minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
