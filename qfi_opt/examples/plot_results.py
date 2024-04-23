@@ -16,8 +16,8 @@ if __name__ == "__main__":
                 f1 = np.loadtxt(f"vals_pounder_model={model}_dissipation={dissipation_rate}")
                 f2 = np.loadtxt(f"vals_nlopt_model={model}_dissipation={dissipation_rate}")
 
-                plt.figure()  # This ensures a new figure is used for each loop iteration   
-                plt.plot(f1,label = 'pounder')
-                plt.plot(f2,label = 'nlopt')
+                plt.figure()  # This ensures a new figure is used for each loop iteration
+                plt.plot(f1, label="pounder")
+                plt.plot(f2, label="nlopt")
                 plt.legend()
                 plt.savefig(f"model={model}_dissipation={dissipation_rate}.png", dpi=300)
