@@ -7,11 +7,12 @@ import numpy as np
 from ibcdfo.pounders import pounders
 from ibcdfo.pounders.general_h_funs import identity_combine
 from scipy.io import savemat
-#from mpi4py import MPI
 
 import qfi_opt
 from qfi_opt import spin_models
 from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI
+
+# from mpi4py import MPI
 
 
 def sim_wrapper_nlopt(x, qfi_grad, obj, obj_params, get_jacobian):
@@ -58,7 +59,6 @@ def sim_wrapper_nlopt(x, qfi_grad, obj, obj_params, get_jacobian):
 
 
 def run_pounder(obj, obj_params, n, x0):
-    import ipdb; ipdb.set_trace(context=21)
     calfun = lambda x: sim_wrapper_nlopt(x, np.empty(0), obj, obj_params, [])
     Low = -np.inf * np.ones((1, n))
     Upp = np.inf * np.ones((1, n))
@@ -74,6 +74,7 @@ def run_pounder(obj, obj_params, n, x0):
 
     return F[xkin], X[xkin]
 
+
 def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
 
@@ -85,7 +86,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
     opt.set_maxeval(max_evals)
     opt.set_lower_bounds(-10.0 * np.ones(num_params))
     opt.set_upper_bounds(10.0 * np.ones(num_params))
-    #opt.set_vector_storage(1)
+    # opt.set_vector_storage(1)
 
     # # Because the objective is periodic, don't set bounds (but don't need to sample so much)
     # opt.set_lower_bounds(lb)
@@ -104,7 +105,7 @@ if __name__ == "__main__":
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    for dissipation_rate in [1.0]:#np.linspace(0.1, 5, 20):
+    for dissipation_rate in [1.0]:  # np.linspace(0.1, 5, 20):
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = dissipation_rate
@@ -115,7 +116,7 @@ if __name__ == "__main__":
         seed = 88
         np.random.seed(seed)
 
-        for num_params in [5]:#[4, 5]:
+        for num_params in [5]:  # [4, 5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
@@ -135,10 +136,10 @@ if __name__ == "__main__":
                 get_jacobian = spin_models.get_jacobian_func(obj)
                 obj_vals = []
                 minf, xfinal = run_pounder(obj, obj_params, num_params, x0)
-                np.savetxt(f'vals_pounder_model={model}_dissipation={dissipation_rate}', obj_vals)
+                np.savetxt(f"vals_pounder_model={model}_dissipation={dissipation_rate}", obj_vals)
                 obj_vals = []
                 minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
-                np.savetxt(f'vals_nlopt_model={model}_dissipation={dissipation_rate}', obj_vals)
-                sys.exit('a')
+                np.savetxt(f"vals_nlopt_model={model}_dissipation={dissipation_rate}", obj_vals)
+                sys.exit("a")
 
-                #minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
+                # minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")

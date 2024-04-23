@@ -1,10 +1,8 @@
 #!/usr/local/bin/ python3
-import numpy as np
-from scipy.io import savemat
-
 import sys
 
-sys.path.append('../../')
+import numpy as np
+from scipy.io import savemat
 
 from qfi_opt import spin_models
 
@@ -19,7 +17,7 @@ if __name__ == "__main__":
         model = "simulate_TAT"  # , "simulate_local_TAT_chain"]
 
     # from command line input, the point we wish to evaluate:
-    center = np.array([float(v) for v in sys.argv[5:num_params+5]])
+    center = np.array([float(v) for v in sys.argv[5 : num_params + 5]])
 
     op = spin_models.collective_op(spin_models.PAULI_Z, num_spins) / (2 * num_spins)
     obj = getattr(spin_models, model)

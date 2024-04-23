@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
+import sys
+
 import numpy as np
 from scipy.io import savemat
 from scipy.linalg import solve_sylvester
-
-import sys
-
-sys.path.append('../../')
 
 from qfi_opt import spin_models
 
@@ -27,8 +25,9 @@ def compute_eigendecomposition(rho: np.ndarray):
     return eigvals, eigvecs
 
 
-
-def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, obj_params, tol: float = 1e-8, etol_scale: float = 10, grad= np.empty(0), get_jacobian= []) -> float:
+def compute_QFI(
+    eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, obj_params, tol: float = 1e-8, etol_scale: float = 10, grad=np.empty(0), get_jacobian=[]
+) -> float:
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
     num_params = len(params)
@@ -64,7 +63,7 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, ob
             denom = eigvals[i] + eigvals[j]
             diff = eigvals[i] - eigvals[j]
             if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
-                numer = diff ** 2
+                numer = diff**2
                 term = eigvecs[i].conj() @ G @ eigvecs[j]
                 quotient = numer / denom
                 squared_modulus = np.absolute(term) ** 2
@@ -72,9 +71,19 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, ob
                 if grad.size > 0:
                     for k in range(num_params):
                         # fill in gradient
-                        grad[k] += kth_partial_derivative(quotient, squared_modulus, eigvals[i], eigvals[j],
-                                                        lambda_grads[k, i], lambda_grads[k, j], eigvecs[i], eigvecs[j],
-                                                        psi_grads[k, i], psi_grads[k, j], G)
+                        grad[k] += kth_partial_derivative(
+                            quotient,
+                            squared_modulus,
+                            eigvals[i],
+                            eigvals[j],
+                            lambda_grads[k, i],
+                            lambda_grads[k, j],
+                            eigvecs[i],
+                            eigvecs[j],
+                            psi_grads[k, i],
+                            psi_grads[k, j],
+                            G,
+                        )
 
     if grad.size > 0:
         return 4 * running_sum, 4 * grad
@@ -91,14 +100,13 @@ def get_matrix_grads_sylvester(dA, eigvals, eigvecs, tol):
     # force Hermitianness:
     dA = (dA + dA.conj().T) / 2.0
 
-
     # group the sorted eigvals by tolerance, intended to help stability of eigenvector derivatives:
     current_ind = 0
     for ind1 in range(dim):
         if current_ind == ind1:
             for ind2 in range(ind1 + 1, dim):
                 if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol, rtol=tol):
-                    break # the for loop over ind2
+                    break  # the for loop over ind2
             # we just broke the for loop, so:
             current_ind = ind2
 
@@ -120,9 +128,6 @@ def get_matrix_grads_sylvester(dA, eigvals, eigvecs, tol):
             lambda_grads[group_set] = np.ones(multiplicity) * dLambda
 
     return np.real(lambda_grads), psi_grads.conj()
-
-
-
 
 
 def quotient_partial_derivative(lambda_i, lambda_j, d_lambda_i, d_lambda_j):
@@ -167,16 +172,16 @@ if __name__ == "__main__":
     seed = 8888
     np.random.seed(seed)
 
-    for num_params in [4]:#[4, 5]:
-        #center = 0.5 * np.ones(num_params)
+    for num_params in [4]:  # [4, 5]:
+        # center = 0.5 * np.ones(num_params)
         center = np.random.uniform(np.zeros(num_params), np.ones(num_params), num_params)
         B = np.eye(num_params)
         h = 1e-6
         match num_params:
             case 4:
-                models = ["simulate_OAT"]#, "simulate_ising_chain", "simulate_XX_chain"]
+                models = ["simulate_OAT"]  # , "simulate_ising_chain", "simulate_XX_chain"]
             case 5:
-                models = ["simulate_TAT"]#, "simulate_local_TAT_chain"]
+                models = ["simulate_TAT"]  # , "simulate_local_TAT_chain"]
 
         for model in models:
             obj = getattr(spin_models, model)
@@ -198,11 +203,9 @@ if __name__ == "__main__":
             # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)
 
-
             params[-1] = 0.0
             rho = obj(params, num_spins, dissipation_rates=dissipation)
 
             grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
             # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
             vals, vecs = compute_eigendecomposition(rho)
-
