@@ -99,7 +99,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
 
 
 if __name__ == "__main__":
-    os.makedirs('results',exist_ok=True)
+    os.makedirs("results", exist_ok=True)
 
     N = 4
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)

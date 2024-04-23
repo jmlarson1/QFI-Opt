@@ -1,9 +1,10 @@
+import os
+
 import matplotlib.pyplot as plt
-import os 
 import numpy as np
 
 if __name__ == "__main__":
-    os.makedirs('figures',exist_ok=True)
+    os.makedirs("figures", exist_ok=True)
 
     N = 4
     seed = 88
