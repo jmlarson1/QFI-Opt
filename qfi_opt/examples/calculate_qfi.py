@@ -52,7 +52,7 @@ def compute_QFI(eigvals: np.ndarray, eigvecs: np.ndarray, G: np.ndarray, tol: fl
                 squared_modulus = np.absolute(term) ** 2
                 running_sum += quotient * squared_modulus
 
-        return 4 * running_sum
+    return 4 * running_sum
 
 
 def compute_QFI_diffrax(eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, grad,
