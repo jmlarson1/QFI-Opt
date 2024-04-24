@@ -406,7 +406,7 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
             _simulate_func = lambda params: simulate_func(params, *args, **kwargs)
             _get_jacobian = jax.jacfwd(_simulate_func, argnums=0, holomorphic=True)
             return _get_jacobian(np.array(params, dtype=COMPLEX_TYPE))
-         
+
         return get_jacobian
 
     elif USE_DIFFRAX and not FORWARD_MODE:
