@@ -295,7 +295,7 @@ def evolve_state(
 
         term = diffrax.ODETerm(_time_deriv)
         solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
-        solver_args = dict(t0=0.0, t1=time, y0=density_op, args=(hamiltonian,))
+        solver_args = dict(t0=0.0, t1=time.real, y0=density_op, args=(hamiltonian,))
         if FORWARD_MODE:
             diffrax_kwargs["max_steps"] = diffrax_kwargs.get("max_steps", None)
             solver_args |= dict(adjoint=diffrax.DirectAdjoint())
@@ -403,18 +403,10 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
         # forward-mode automatic differentiation
 
         def get_jacobian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
-            param_array = np.array(params)
-            call_func = lambda params: simulate_func(params, *args, **kwargs)
-            result = []
-            for ii in range(len(param_array)):
-                seed = np.zeros(len(param_array), dtype=np.float64)
-                seed = seed.at[ii].set(1.0)
-                _, real_part = jax.jvp(call_func, (param_array,), (seed,))
-                seed = seed.at[ii].set(1.0j)
-                _, imag_part = jax.jvp(call_func, (param_array,), (seed,))
-                result.append(real_part + 1.0j * imag_part)
-            return np.stack(result, axis=2)
-
+            _simulate_func = lambda params: simulate_func(params, *args, **kwargs)
+            _get_jacobian = jax.jacfwd(_simulate_func, argnums=0, holomorphic=True)
+            return _get_jacobian(np.array(params, dtype=COMPLEX_TYPE))
+         
         return get_jacobian
 
     elif USE_DIFFRAX and not FORWARD_MODE:
