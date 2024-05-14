@@ -77,7 +77,7 @@ def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
     opt = nlopt.opt(getattr(nlopt, solver), num_params)
 
     if not get_jacobian:
-        opt.set_min_objective(lambda x, grad: sim_wrapper_nlopt(x, obj, obj_params))
+        opt.set_min_objective(lambda x, grad: sim_wrapper_nlopt(x, grad, obj, obj_params, get_jacobian))
     else:
         opt.set_min_objective(lambda x, grad: sim_wrapper_nlopt(x, grad, obj, obj_params, get_jacobian))
     opt.set_xtol_rel(1e-4)
@@ -101,11 +101,11 @@ def run_nlopt(obj, obj_params, num_params, x0, solver, get_jacobian=False):
 if __name__ == "__main__":
     os.makedirs("results", exist_ok=True)
 
-    N = 4
+    N = 2
     G = spin_models.collective_op(spin_models.PAULI_Z, N) / (2 * N)
 
-    # for dissipation_rate in [1.0]:  # np.linspace(0.1, 5, 20):
-    for dissipation_rate in np.linspace(0.1, 5, 20):
+    for dissipation_rate in [0.1]:  # np.linspace(0.1, 5, 20):
+    # for dissipation_rate in np.linspace(0.1, 5, 20):
         obj_params = {}
         obj_params["N"] = N
         obj_params["dissipation"] = dissipation_rate
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         np.random.seed(seed)
 
         # for num_params in [5]:  # [4, 5]:
-        for num_params in [5]:
+        for num_params in [4, 5]:
             lb = np.zeros(num_params)
             ub = np.ones(num_params)
 
@@ -125,11 +125,11 @@ if __name__ == "__main__":
 
             match num_params:
                 case 4:
-                    models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
-                    # models = ["simulate_OAT"]
+                    # models = ["simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"]
+                    models = ["simulate_OAT"]
                 case 5:
-                    models = ["simulate_TAT", "simulate_local_TAT_chain"]
-                    # models = ["simulate_TAT"]
+                    # models = ["simulate_TAT", "simulate_local_TAT_chain"]
+                    models = ["simulate_TAT"]
 
             for model in models:
                 obj = getattr(spin_models, model)
@@ -140,6 +140,9 @@ if __name__ == "__main__":
                 np.savetxt(f"./results/vals_pounder_N={N}_seed={seed}_model={model}_dissipation={dissipation_rate}", obj_vals)
                 obj_vals = []
                 minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LD_LBFGS", get_jacobian)
-                np.savetxt(f"./results/vals_nlopt_N={N}_seed={seed}_model={model}_dissipation={dissipation_rate}", obj_vals)
+                np.savetxt(f"./results/vals_nlopt_BFGS_N={N}_seed={seed}_model={model}_dissipation={dissipation_rate}", obj_vals)
+                obj_vals = []
+                minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_NELDERMEAD")
+                np.savetxt(f"./results/vals_nlopt_NM_N={N}_seed={seed}_model={model}_dissipation={dissipation_rate}", obj_vals)
 
                 # minf, xfinal = run_nlopt(obj, obj_params, num_params, x0, "LN_BOBYQA")
