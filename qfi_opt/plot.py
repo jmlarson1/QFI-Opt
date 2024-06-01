@@ -71,7 +71,7 @@ def get_polarization(state_projections: dict[float, np.ndarray], theta: float, p
 
     polarization = 0
     for spin_length_val, state_projection in state_projections.items():
-        weight = 2 * spin_length_val + 1  # normalization factor for Husimi probability distribution
+        weight = spin_length_val + 1  # normalization factor for Husimi probability distribution
         if weight * np.trace(state_projection) < cutoff:
             continue
 
