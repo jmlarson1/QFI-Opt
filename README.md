@@ -11,7 +11,7 @@ functions, incorporating auxiliary information, and building or updating models
 dynamically, ensuring flexibility and scalability for various quantum
 optimization scenarios.
 
-See the associated publications [arxiv:2406.01859](arxiv:2406.01859) and [arxiv.org:2311.17275](https://arxiv.org/abs/2311.17275) for a
+See the associated publications [arxiv:2406.01859]([arxiv:2406.0185](https://arxiv.org/abs/2406.01859) and [arxiv.org:2311.17275](https://arxiv.org/abs/2311.17275) for a
 deeper understanding of the underlying principles and the wide range of
 applications enabled by QFI-Opt.
 
