@@ -1,4 +1,4 @@
-![image info](./images/qfi-opt.png)
+|qfiopt_logo|
 
 QFI-Opt collects custom simulation packages and configurations for numerical
 optimization methods that exploit problem structures in 
@@ -15,18 +15,21 @@ See the associated publications [arxiv:2406.01859](https://arxiv.org/abs/2406.01
 deeper understanding of the underlying principles and the wide range of
 applications enabled by QFI-Opt.
 
-## Installation
+Installation
+============
 
-This package requires Python>=3.10, and can be installed from PyPI with
-```
-pip install qfi-opt
-```
-To install from source:
-```
-git clone https://github.com/jmlarson1/QFI-Opt.git
-pip install -e QFI-Opt
-```
-## Cite QFI-Opt
+This package requires Python>=3.10, and can be installed from PyPI with::
+
+  pip install qfi-opt
+
+To install from source::
+
+  git clone https://github.com/jmlarson1/QFI-Opt.git
+  pip install -e QFI-Opt
+
+
+Cite QFI-Opt
+============
 
 .. code-block:: bibtex
 
@@ -37,3 +40,28 @@ pip install -e QFI-Opt
     url    = {https://github.com/jmlarson1/QFI-Opt},
     year   = {2024}
   }
+
+  @article{Zuniga2024,
+    doi = {10.48550/arXiv.2406.01859},
+    author = {Juan C. Zu\~{n}iga Castro and Jeffrey Larson and Sri Hari Krishna Narayanan 
+              and Victor E. Colussi and Michael A. Perlin and Robert J. Lewis-Swan},
+    title = {Variational quantum state preparation for quantum-enhanced metrology in noisy systems},
+    year = {2024},
+    journal = (arXiv:2406.01859},    
+  }
+
+  @article{LewisSwan2023,
+    doi = {10.48550/arXiv.2311.17275},
+    author = {Robert J. Lewis-Swan and Juan C. Zu\~{n}iga Castro and D. Barberena and A. M. Rey},
+    title = {Exploiting nonclassical motion of a trapped ion crystal for quantum-enhanced 
+             metrology of global and differential spin rotations},
+    year = {2023},
+    journal = (arXiv:2311.17275},    
+  }
+
+
+
+
+.. |qfiopt_logo| image:: https://raw.githubusercontent.com/jmlarson1/QFI-Opt/main/images/qfi-opt.png
+   :align: middle
+   :alt: QFI-Opt
