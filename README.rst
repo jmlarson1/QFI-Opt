@@ -31,7 +31,8 @@ pip install -e QFI-Opt
 .. code-block:: bibtex
 
   @misc{qfiopt,
-    author = {Colussi, V.~E. and Larson, J. and Lewis-Swan, R.~J. and Narayanan, S.~H.~K. and Perlin, M.~A. and Zu\~{n}iga Castro, J.~C.},
+    author = {Colussi, V.~E. and Larson, J. and Lewis-Swan, R.~J. and 
+              Narayanan, S.~H.~K. and Perlin, M.~A. and Zu\~{n}iga Castro, J.~C.},
     title  = {{QFI-Opt}},
     url    = {https://github.com/jmlarson1/QFI-Opt},
     year   = {2024}
