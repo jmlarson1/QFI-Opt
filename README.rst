@@ -2,7 +2,7 @@
 
 QFI-Opt collects custom simulation packages and configurations for numerical
 optimization methods that exploit problem structures in 
-`quantum fisher information (QFI)`(https://en.wikipedia.org/wiki/Quantum_Fisher_information) 
+`quantum fisher information (QFI) <https://en.wikipedia.org/wiki/Quantum_Fisher_information>`_
 optimization tasks. This repository provides a Python-based
 framework that interfaces seamlessly with simulation evaluation scripts,
 allowing researchers to efficiently tackle complex optimization problems in
