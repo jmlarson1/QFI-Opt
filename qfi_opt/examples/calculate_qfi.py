@@ -42,7 +42,6 @@ def compute_QFI(
     running_sum = 0
 
     if grad.size > 0:
-
         dA = get_jacobian(params, obj_params["N"], dissipation_rates=obj_params["dissipation"])
         dA = np.transpose(dA, (2, 0, 1))
 
@@ -90,7 +89,6 @@ def compute_QFI(
 
 
 def get_matrix_grads_sylvester(dA, eigvals, eigvecs, tol):
-
     dim = eigvecs.shape[0]
     lambda_grads = np.zeros(dim, dtype="cdouble")
     psi_grads = np.zeros((dim, dim), dtype="cdouble")

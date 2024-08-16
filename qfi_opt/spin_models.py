@@ -285,7 +285,6 @@ def evolve_state(
     time_deriv = get_time_deriv(hamiltonian, dissipator)
 
     if USE_DIFFRAX:
-
         # set initial time step size, if necessary
         if "dt0" not in diffrax_kwargs:
             diffrax_kwargs["dt0"] = 0.002
