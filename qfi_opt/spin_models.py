@@ -293,9 +293,9 @@ def evolve_state(
         def _time_deriv(time: float, density_op: np.ndarray, hamiltonian: np.ndarray) -> np.ndarray:
             return time_deriv(time, density_op)
 
-        term = diffrax.ODETerm(_time_deriv)
+        term: diffrax.ODETerm = diffrax.ODETerm(_time_deriv)
         solver = solver or diffrax.Tsit5()  # try also diffrax.Dopri8()
-        solver_args = dict(t0=0.0, t1=time.real, y0=density_op, args=(hamiltonian,))
+        solver_args: dict[str, object] = dict(t0=0.0, t1=time.real, y0=density_op, args=(hamiltonian,))
         if FORWARD_MODE:
             diffrax_kwargs["max_steps"] = diffrax_kwargs.get("max_steps", None)
             solver_args |= dict(adjoint=diffrax.DirectAdjoint())
