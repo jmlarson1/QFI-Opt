@@ -33,16 +33,14 @@ def compute_QFIM(vals:np.ndarray, vecs:np.ndarray, num_qubits:int)->[np.ndarray,
 pts = 5
 
 # passed in params
-gamma_idx = int(sys.argv[1]); assert gamma_idx < pts - 1 and gamma_idx >= 0, f"dissipation_rates outside of preset range [10**{{-2}}, 10**{{1.5}}]. Choose gamma_idx in [0, {pts - 1}]."
+dissipation_rate = float(sys.argv[1])
 model = sys.argv[2]; assert 'simulate' not in model and 'chain' not in model and '_' not in model, f"Only pass in the name of the model Hamiltonian, e.g., {{'ising', 'local_TAT', 'XX'}}"
 N = int(sys.argv[3])
 coupling_exponent = int(sys.argv[4])
 layers = int(sys.argv[5])
 
-gamma = np.logspace(-2, 1.5, pts)
-
 obj = getattr(sm, f'simulate_{model}_chain')
-obj_params = {'G': sm.collective_op(sm.PAULI_Z, num_qubits=N)/(2*N), 'N': N, 'dissipation': gamma[gamma_idx],
+obj_params = {'G': sm.collective_op(sm.PAULI_Z, num_qubits=N)/(2*N), 'N': N, 'dissipation':dissipation_rate,
               'coupling_exponent': coupling_exponent}
 
 def min_func(x:np.ndarray, obj_params:dict, layers:int)-> float:
@@ -76,7 +74,7 @@ starting_seed = x.tolist()
 starting_seed += 2 * [0]
 output_params = out.x.tolist()
 output_params += 2 * [0]
-print(f'Dissipation_rate = {gamma[gamma_idx]:.2f}',
+print(f'Dissipation_rate = {dissipation_rate:.2f}',
       f'Starting seed = {[round(elem, 2) for elem in starting_seed]}',
       f'Output params = {[round(elem, 2) for elem in output_params]}',
       f'Output QFI = {-out.fun}',
