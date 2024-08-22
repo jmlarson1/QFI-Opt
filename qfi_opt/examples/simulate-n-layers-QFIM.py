@@ -34,7 +34,7 @@ pts = 5
 
 # passed in params
 dissipation_rate = float(sys.argv[1])
-model = sys.argv[2]; assert 'simulate' not in model and 'chain' not in model and '_' not in model, f"Only pass in the name of the model Hamiltonian, e.g., {{'ising', 'local_TAT', 'XX'}}"
+model = sys.argv[2]; assert 'simulate' not in model and 'chain' not in model, f"Only pass in the name of the model Hamiltonian, e.g., {{'ising', 'local_TAT', 'XX'}}"
 N = int(sys.argv[3])
 coupling_exponent = int(sys.argv[4])
 layers = int(sys.argv[5])
