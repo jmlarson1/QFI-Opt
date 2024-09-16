@@ -164,6 +164,24 @@ def simulate_OAT(
         dissipation_format=dissipation_format,
     )
 
+@enable_axial_symmetry
+def simulate_driven_OAT(
+    params: Sequence[float] | np.ndarray,
+    num_qubits: int,
+    *,
+    dissipation_rates: float | tuple[float, float, float] = 0.0,
+    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+    drive_strength: float = 0,
+) -> np.ndarray:
+    """Simulate a one-axis twisting (OAT) with a drive protocol."""
+    collective_Sx, _, collective_Sz = collective_spin_ops(num_qubits)
+    hamiltonian = (collective_Sz @ collective_Sz + drive_strength *  collective_Sx) / num_qubits
+    return simulate_sensing_protocol(
+        params,
+        hamiltonian,
+        dissipation_rates=dissipation_rates,
+        dissipation_format=dissipation_format,
+    )
 
 def simulate_TAT(
     params: Sequence[float] | np.ndarray,
