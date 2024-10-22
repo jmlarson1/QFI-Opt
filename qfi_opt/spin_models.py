@@ -5,13 +5,16 @@ import itertools
 import os
 import sys
 from collections.abc import Callable, Sequence
+import warnings
+
+warnings.filterwarnings('ignore', message='Complex dtype support is work in progress, please read*')
 
 import diffrax
 import numpy
 
 from qfi_opt.dissipation import Dissipator
 
-USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
+USE_DIFFRAX = True #bool(os.getenv("USE_DIFFRAX"))
 FORWARD_MODE = not bool(os.getenv("REVERSE_MODE"))
 
 if USE_DIFFRAX:
