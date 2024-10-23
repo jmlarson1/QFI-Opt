@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import numpy as np
-from scipy.io import savemat
+from scipy.io import savemat, loadmat
 from scipy.linalg import solve_sylvester
 
-from qfi_opt import spin_models
+import ipdb
 
+from qfi_opt import spin_models as sm
 
 def variance(rho: np.ndarray, G: np.ndarray) -> float:
     """Variance of self-adjoint operator (observable) G in the state rho."""
@@ -23,9 +24,7 @@ def compute_eigendecomposition(rho: np.ndarray):
     return eigvals, eigvecs
 
 
-def compute_QFI(
-    eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, obj_params, tol: float = 1e-8, etol_scale: float = 10, grad=np.empty(0), get_jacobian=[]
-) -> float:
+def compute_QFI(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, params: np.ndarray, obj_params, tol: float = 1e-8, etol_scale: float = 10, grad=np.empty(0), get_jacobian=[]):
     # Note: The eigenvectors must be rows of eigvecs
     num_vals = len(eigvals)
     num_params = len(params)
@@ -46,42 +45,31 @@ def compute_QFI(
         dA = get_jacobian(params, obj_params["N"], dissipation_rates=obj_params["dissipation"])
         dA = np.transpose(dA, (2, 0, 1))
 
+        # for testing, dump dA and rho to file:
+        mdic = {"dA": dA, "eigvals": eigvals, "eigvecs": eigvecs, "G": G}
+        savemat("dA.mat", mdic)
+        mdic = {"rho": rho}
+        savemat('rho.mat', mdic)
+
         grad[:] = np.zeros(num_params)
-        lambda_grads = np.zeros((num_params, num_vals))
         psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
 
         for k in range(num_params):
             # compute gradients of each eigenvalue
-            lambda_grad_k, psi_grad_k = get_matrix_grads_sylvester(dA[k], eigvals, eigvecs, tol)
-            lambda_grads[k] = lambda_grad_k
+            psi_grad_k = get_matrix_grads_sylvester(rho, dA[k], eigvals, eigvecs, tol)
             psi_grads[k] = psi_grad_k
 
+    # NOW COMPUTE
     for i in range(num_vals):
         for j in range(i + 1, num_vals):
             denom = eigvals[i] + eigvals[j]
             diff = eigvals[i] - eigvals[j]
             if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
-                numer = diff**2
-                term = eigvecs[i].conj() @ G @ eigvecs[j]
-                quotient = numer / denom
-                squared_modulus = np.absolute(term) ** 2
-                running_sum += quotient * squared_modulus
+                f_quotient, g_quotient = qfi_quotient(eigvals[i], eigvals[j], eigvecs[i], eigvecs[j], dA)
+                f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigvecs[i], eigvecs[j])
+                running_sum += f_quotient * f_modulus
                 if grad.size > 0:
-                    for k in range(num_params):
-                        # fill in gradient
-                        grad[k] += kth_partial_derivative(
-                            quotient,
-                            squared_modulus,
-                            eigvals[i],
-                            eigvals[j],
-                            lambda_grads[k, i],
-                            lambda_grads[k, j],
-                            eigvecs[i],
-                            eigvecs[j],
-                            psi_grads[k, i],
-                            psi_grads[k, j],
-                            G,
-                        )
+                    grad[:] += f_quotient * g_modulus + f_modulus * g_quotient
 
     if grad.size > 0:
         return 4 * running_sum, 4 * grad
@@ -89,10 +77,9 @@ def compute_QFI(
         return 4 * running_sum, []
 
 
-def get_matrix_grads_sylvester(dA, eigvals, eigvecs, tol):
+def get_matrix_grads_sylvester(rho, dA, eigvals, eigvecs, tol):
 
     dim = eigvecs.shape[0]
-    lambda_grads = np.zeros(dim, dtype="cdouble")
     psi_grads = np.zeros((dim, dim), dtype="cdouble")
 
     # force Hermitianness:
@@ -103,107 +90,110 @@ def get_matrix_grads_sylvester(dA, eigvals, eigvecs, tol):
     for ind1 in range(dim):
         if current_ind == ind1:
             for ind2 in range(ind1 + 1, dim):
-                if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol, rtol=tol):
+                if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol):
                     break  # the for loop over ind2
             # we just broke the for loop, so:
             current_ind = ind2
 
-            # do a sylvester solve:
             group_set = np.arange(ind1, ind2)
-            # special case when ind2=dim (must be something smarter)
+
             if group_set.size == 0:
                 group_set = [ind2]
-            not_in_group_set = np.setdiff1d(np.arange(dim), group_set)
-            A_group = np.diag(eigvals[group_set])
-            A_not_in_group = np.diag(eigvals[not_in_group_set])
-            rotation = eigvecs[group_set].conj() @ dA @ eigvecs[not_in_group_set].T
-            sol = solve_sylvester(A_group, -1.0 * A_not_in_group, rotation)
-            psi_grads[group_set] = sol @ eigvecs[not_in_group_set].conj()
 
-            # average eigenvalue:
-            multiplicity = len(group_set)
-            dLambda = (1.0 / multiplicity) * np.trace(eigvecs[group_set].conj() @ dA @ eigvecs[group_set].T)
-            lambda_grads[group_set] = np.ones(multiplicity) * dLambda
+            # Two cases - either the eigenvalue has multiplicity one or it doesn't.
+            if len(group_set) > 1:
+                not_in_group_set = np.setdiff1d(np.arange(dim), group_set)
+                A_group = np.diag(eigvals[group_set])
+                A_not_in_group = np.diag(eigvals[not_in_group_set])
+                rotation = eigvecs[group_set].conj() @ dA @ eigvecs[not_in_group_set].T
+                sol = solve_sylvester(A_group, A_not_in_group, rotation)
+                psi_grads[group_set] = sol @ eigvecs[not_in_group_set].conj()
 
-    return np.real(lambda_grads), psi_grads.conj()
+            else: # The eigenvalue has multiplicity one and we can do the more obvious thing:
+                M = np.hstack((rho - eigvals[ind1] * np.eye(dim), -np.expand_dims(eigvecs[ind1].T, 1)))
+                M = np.vstack((M, np.expand_dims(np.hstack((eigvecs[ind1].conj(), 0)), 0)))
+                rhs = np.vstack((np.expand_dims(-dA @ eigvecs[ind1].T, 1), 0))
+                sol = np.linalg.solve(M, rhs)
+                psi_grads[ind1] = np.squeeze(sol[:dim])
 
-
-def quotient_partial_derivative(lambda_i, lambda_j, d_lambda_i, d_lambda_j):
-    squared_diff = (lambda_i - lambda_j) ** 2
-    fprimeg = 2 * (lambda_i - lambda_j) * (lambda_i + lambda_j) * (d_lambda_i - d_lambda_j)
-    gprimef = squared_diff * (d_lambda_i + d_lambda_j)
-    der = (fprimeg - gprimef) / (lambda_i + lambda_j) ** 2
-
-    return der
+    return psi_grads
 
 
-def modulus_partial_derivative(psi_i, psi_j, d_psi_i, d_psi_j, G):
-    inner_product = psi_i.conj() @ G @ psi_j
-    left_derivative = d_psi_i.conj() @ G @ psi_j
-    right_derivative = psi_i.conj() @ G @ d_psi_j
+def qfi_quotient(lambda_i, lambda_j, psi_i, psi_j, dA):
 
-    real_der = 2 * inner_product.real * (left_derivative.real + right_derivative.real)
-    imag_der = 2 * inner_product.imag * (left_derivative.imag + right_derivative.imag)
+    dim = np.shape(dA)[0]
 
-    der = real_der + imag_der
+    diff = lambda_i - lambda_j
+    sum = lambda_i + lambda_j
 
-    return der
+    f = diff ** 2 / sum
+
+    # compute a single subgradient in the nonsmooth case
+    fprimeg = 2 * diff * sum * (np.outer(psi_i, psi_i.conj()) - np.outer(psi_j, psi_j.conj()))
+    gprimef = (diff ** 2) * (np.outer(psi_i, psi_i.conj()) + np.outer(psi_j, psi_j.conj()))
+    drhoQ = (fprimeg - gprimef) / (sum ** 2)
+
+    g = np.zeros(dim)
+    # trace inner product
+    for k in range(dim):
+        der = (dA[k].T.ravel()).conj().T @ (drhoQ.T).ravel()
+        g[k] = np.real(der.tolist())
+
+    g = np.real(g)
+
+    return f, g
 
 
-def kth_partial_derivative(quotient, modulus, lambda_i, lambda_j, d_lambda_i, d_lambda_j, psi_i, psi_j, d_psi_i, d_psi_j, G):
-    quotient_der = quotient_partial_derivative(lambda_i, lambda_j, d_lambda_i, d_lambda_j)
-    modulus_der = modulus_partial_derivative(psi_i, psi_j, d_psi_i, d_psi_j, G)
+def qfi_modulus(G, psi_grads, i, j, psi_i, psi_j):
 
-    der = quotient * modulus_der + modulus * quotient_der
+    dim = np.shape(psi_grads)[0]
+    g = np.zeros(dim)
 
-    return der
+    ip = psi_i.conj() @ G @ psi_j.T
+
+    f = np.absolute(ip) ** 2
+
+    for k in range(dim):
+        d_xk_psi_i = psi_grads[k, i]
+        d_xk_psi_j = psi_grads[k, j]
+        der_product = d_xk_psi_i.conj() @ G @ psi_j.T + psi_i.conj() @ G @ d_xk_psi_j.T
+        g[k] = 2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product)
+
+    return f, g
 
 
 if __name__ == "__main__":
-    num_spins = 5
-    dissipation = 1.0
-    op = spin_models.collective_op(spin_models.PAULI_Z, num_spins) / (2 * num_spins)
 
-    num_rand_pts = 2
-    print_precision = 6
+    # read in a point to evaluate from params.mat
+    loaded_file = loadmat('params.mat')
+    params = loaded_file['params'][0]
 
-    seed = 8888
-    np.random.seed(seed)
+    ## HIGHER DIM EXAMPLE
+    dissipation = 0.01
+    model = 'local_TAT'
+    N = 4
+    coupling_exponent = 0
+    layers = 5
+    num_params = 2 * layers + 3
 
-    for num_params in [4]:  # [4, 5]:
-        # center = 0.5 * np.ones(num_params)
-        center = np.random.uniform(np.zeros(num_params), np.ones(num_params), num_params)
-        B = np.eye(num_params)
-        h = 1e-6
-        match num_params:
-            case 4:
-                models = ["simulate_OAT"]  # , "simulate_ising_chain", "simulate_XX_chain"]
-            case 5:
-                models = ["simulate_TAT"]  # , "simulate_local_TAT_chain"]
+    obj = getattr(sm, f'simulate_{model}_chain')
+    obj_params = {'G': sm.collective_op(sm.PAULI_Z, num_qubits=N) / (2 * N), 'N': N, 'dissipation': dissipation,
+                  'coupling_exponent': coupling_exponent}
 
-        for model in models:
-            obj = getattr(spin_models, model)
-            get_jacobian = spin_models.get_jacobian_func(obj)
+    # LOWER DIM EXAMPLE
+    #dissipation = 0.01
+    #num_params = 4
+    #model = "simulate_XX_chain"
+    #N = 5
+    #obj = getattr(sm, model)
+    #obj_params = {'G': sm.collective_op(sm.PAULI_Z, num_qubits=N) / (2 * N), 'N': N, 'dissipation': dissipation}
 
-            obj_params = {}
-            obj_params["N"] = num_spins
-            obj_params["dissipation"] = dissipation
-            obj_params["G"] = op
+    get_jacobian = sm.get_jacobian_func(obj)
 
-            grad_of_rho = np.zeros(num_params)
-            params = center
-            rho = obj(params, num_spins, dissipation_rates=dissipation)
-            mdic = {"rho": rho}
-            outputfile = "QFI_test_center.mat"
-            savemat(outputfile, mdic)
+    rho = obj(params, N, dissipation_rates=dissipation)
+    vals, vecs = compute_eigendecomposition(rho)
+    qfi_grad = np.zeros(num_params)
+    qfi = compute_QFI(rho, vals, vecs, params, obj_params=obj_params, grad=qfi_grad, get_jacobian=get_jacobian)
 
-            grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
-            # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
-            vals, vecs = compute_eigendecomposition(rho)
+    #grad_of_rho = get_jacobian(params, N, dissipation_rates=dissipation)
 
-            params[-1] = 0.0
-            rho = obj(params, num_spins, dissipation_rates=dissipation)
-
-            grad_of_rho = get_jacobian(params, num_spins, dissipation_rates=dissipation)
-            # spin_models.print_jacobian(grad_of_rho, precision=print_precision)
-            vals, vecs = compute_eigendecomposition(rho)

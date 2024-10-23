@@ -1,81 +1,71 @@
 #!/usr/bin/env python3
-import nlopt
 import numpy as np
 import qfi_opt.spin_models as sm
 from qfi_opt.examples import calculate_qfi as calc_qfi
-from scipy.optimize import minimize as mini
-from qfi_opt.examples.calculate_qfi import compute_eigendecomposition, compute_QFI
 import random
 import time
 import sys
+import ipdb
+from LBFGSB import LBFGSB
 
-attempts = 10
-# model = sys.argv[1]
-# N = int(sys.argv[2])
-# coupling_exponent = int(sys.argv[3])
-# dissipation = float(sys.argv[4])
-# layers = int(sys.argv[5])
+def LBFGSB_wrapper(x, obj, obj_params, get_jacobian):
 
-dissipation = 0.01
-model = 'local_TAT'
-N = 4
-coupling_exponent = 0
-layers = 5
+    x = np.squeeze(x.T)
+    dim = len(x)
+    qfi_grad = np.zeros(dim)
 
-obj = getattr(sm, f'simulate_{model}_chain')
+    rho = obj(params=x, num_qubits=obj_params['N'], dissipation_rates=obj_params['dissipation'], coupling_exponent=obj_params['coupling_exponent'])
+    vals, vecs = calc_qfi.compute_eigendecomposition(rho)
+    # when you want to debug nonsmoothness, uncomment this line for sure:
+    # print("params: ", x.T, "eigenvalues of rho(params): ", vals)
+    qfi, new_grad = calc_qfi.compute_QFI(rho, vals, vecs, x, obj_params=obj_params, grad=qfi_grad, get_jacobian=get_jacobian)
+
+    new_grad = np.expand_dims(new_grad, 0).T
+
+    return -1.0 * qfi, -1.0 * new_grad
+
+# N is number of spins, the examples we have use N = 4 or N = 5
+#
+# model should be a string argument.
+# if N = 4, then valid arguments from our examples include
+# "simulate_OAT", "simulate_ising_chain", "simulate_XX_chain"
+# if N = 5, then valid arguments from our examples include
+# "simulate_local_TAT_chain", "simulate_TAT"
+#
+# coupling exponent should be a nonnegative integer. 0 is hard, seems to induce more nonsmoothness,
+# this hypothesis is worth studying.
+#
+# dissipation is a nonnegative float.
+#
+# layers should be a positive integer specifying the depth of a parameterized circuit.
+# in the examples we were given, this only made sense for simulate_local_TAT_chain, and in that case,
+# the number of parameters scales like 3 + 2 * layers
+
+
+N = int(sys.argv[1])
+model = sys.argv[2]
+coupling_exponent = int(sys.argv[3])
+dissipation = float(sys.argv[4])
+layers = int(sys.argv[5])
+
+obj = getattr(sm, f'{model}')
 obj_params = {'G': sm.collective_op(sm.PAULI_Z, num_qubits=N)/(2*N), 'N': N, 'dissipation': dissipation,
               'coupling_exponent': coupling_exponent}
 
-def min_func(x:np.ndarray, obj_params:dict)->float:
-    rho = obj(params = x, num_qubits=obj_params['N'], dissipation_rates=obj_params['dissipation'], coupling_exponent=obj_params['coupling_exponent'])
-    vals, vecs = calc_qfi.compute_eigendecomposition(rho)
-    qfi = calc_qfi.compute_QFI(vals, vecs, x, obj_params=obj_params)[0]
-    return -qfi
-
-def sim_wrapper_nlopt(x, qfi_grad, obj, obj_params, get_jacobian):
-    print(x)
-    rho = obj(params = x, num_qubits=obj_params['N'], dissipation_rates=obj_params['dissipation'], coupling_exponent=obj_params['coupling_exponent'])
-    vals, vecs = calc_qfi.compute_eigendecomposition(rho)
-    qfi, new_grad = calc_qfi.compute_QFI(vals, vecs, x, obj_params=obj_params, grad=qfi_grad, get_jacobian=get_jacobian)
-
-    try:
-        if qfi_grad.size > 0:
-            qfi_grad[:] = -1.0 * new_grad
-    except:
-        qfi_grad[:] = []
-
-    return -1.0 * qfi
-
-
 # set up initial vector, parameter bounds
-x0, bounds = np.ones(3 + 2 * layers) * 1/2, [(0, 1/2) for _ in range(3 + 2 * layers)]
+x0, bounds = np.random.rand(3 + 2 * layers), [(0.0, 1.0) for _ in range(3 + 2 * layers)]
 
-minimum = 0
 num_params = 3 + 2 * layers
 
 get_jacobian = sm.get_jacobian_func(obj)
-# attempt optimization attempts * layers times, keep best
-for attempt in range(attempts * layers):
 
-    random.seed((time.time() * 10**7) % 10**7)
-    x = x0 * np.random.rand(num_params)
-    # out = mini(min_func, x, args=(obj_params, ), tol=1e-2, bounds=bounds, method='Nelder-Mead')
+random.seed((time.time() * 10**7) % 10**7)
 
-    opt = nlopt.opt(getattr(nlopt, "LD_LBFGS"), num_params)
-    opt.set_min_objective(lambda x, grad: sim_wrapper_nlopt(x, grad, obj, obj_params, get_jacobian))
-    opt.set_xtol_rel(1e-4)
-    opt.set_maxeval(1000)
-    opt.set_lower_bounds(0 * np.ones(num_params))
-    opt.set_upper_bounds(0.5 * np.ones(num_params))
-    xout = opt.optimize(x0)
-
-    if out.fun < minimum:
-        minimum = out.fun
-        opt_qfi = out.fun
-        opt_params = out.x
-
-
-print(f'Optimal qfi found = {opt_qfi}, \nOptimal Params found = {opt_params}')
+func = lambda x: LBFGSB_wrapper(x, obj, obj_params, get_jacobian)
+lower_bounds = np.expand_dims(np.zeros(num_params), 0).T
+upper_bounds = np.expand_dims(np.ones(num_params), 0).T
+x0 = np.expand_dims(x0, 0).T
+x, xhist = LBFGSB(func, x0, lower_bounds, upper_bounds, m=10, tol=1e-5, max_iters=50, display=True, xhistory=False)
 
 
 
