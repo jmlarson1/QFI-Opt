@@ -44,7 +44,7 @@ def LBFGSB_wrapper(x, obj, obj_params, get_jacobian):
 
 N = int(sys.argv[1])
 model = sys.argv[2]
-coupling_exponent = int(sys.argv[3])
+coupling_exponent = float(sys.argv[3])
 dissipation = float(sys.argv[4])
 layers = int(sys.argv[5])
 
@@ -53,7 +53,7 @@ obj_params = {'G': sm.collective_op(sm.PAULI_Z, num_qubits=N)/(2*N), 'N': N, 'di
               'coupling_exponent': coupling_exponent}
 
 # set up initial vector, parameter bounds
-x0, bounds = np.random.rand(3 + 2 * layers), [(0.0, 1.0) for _ in range(3 + 2 * layers)]
+x0, bounds = 0.5 * np.random.rand(3 + 2 * layers), [(0.0, 1.0) for _ in range(3 + 2 * layers)]
 
 num_params = 3 + 2 * layers
 
