@@ -45,12 +45,6 @@ def compute_QFI(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, param
         dA = get_jacobian(params, obj_params["N"], dissipation_rates=obj_params["dissipation"])
         dA = np.transpose(dA, (2, 0, 1))
 
-        # for testing, dump dA and rho to file:
-        mdic = {"dA": dA, "eigvals": eigvals, "eigvecs": eigvecs, "G": G}
-        savemat("dA.mat", mdic)
-        mdic = {"rho": rho}
-        savemat('rho.mat', mdic)
-
         grad[:] = np.zeros(num_params)
         psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
 

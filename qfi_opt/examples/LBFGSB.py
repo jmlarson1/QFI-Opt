@@ -71,7 +71,7 @@ def LBFGSB(func, x0, l, u, m=10, tol=1e-5, max_iters=20, display=True, xhistory=
 
         if alpha <= 1e-8 or np.abs(f_new - f_old) <= 1e-12:
             print('Stopping because line search failed - gradient error or nonsmoothness likely to blame.')
-            return x, xhist
+            return x, xhist, 2
 
         # Update LBFGS data structures
         y = g - g_old
@@ -113,11 +113,11 @@ def LBFGSB(func, x0, l, u, m=10, tol=1e-5, max_iters=20, display=True, xhistory=
 
     if k == max_iters:
         print('Warning: maximum number of iterations reached')
-        return x, np.array(xhist)
+        return x, np.array(xhist), 0
 
     if get_optimality(x, g, l, u) < tol:
         print('Stopping because convergence tolerance met!')
-        return x, np.array(xhist)
+        return x, np.array(xhist), 1
 
 
 
