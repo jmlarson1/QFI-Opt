@@ -52,6 +52,11 @@ obj = getattr(sm, f'{model}')
 obj_params = {'G': sm.collective_op(sm.PAULI_Z, num_qubits=N)/(2*N), 'N': N, 'dissipation': dissipation,
               'coupling_exponent': coupling_exponent}
 
+# The seed "3" was the fastest to give an exitflag of 2 from LBFGSB, but all of the seeds: 
+# 1 2 3 5 6 7 8
+# also gave an exitflag of 2 from LBFGSB
+random.seed(3)
+np.random.seed(3)
 # set up initial vector, parameter bounds
 x0, bounds = 0.5 * np.random.rand(3 + 2 * layers), [(0.0, 1.0) for _ in range(3 + 2 * layers)]
 
@@ -59,16 +64,10 @@ num_params = 3 + 2 * layers
 
 get_jacobian = sm.get_jacobian_func(obj)
 
-random.seed((time.time() * 10**7) % 10**7)
 
 func = lambda x: LBFGSB_wrapper(x, obj, obj_params, get_jacobian)
 lower_bounds = np.expand_dims(np.zeros(num_params), 0).T
 upper_bounds = np.expand_dims(np.ones(num_params), 0).T
 x0 = np.expand_dims(x0, 0).T
-x, xhist = LBFGSB(func, x0, lower_bounds, upper_bounds, m=10, tol=1e-5, max_iters=50, display=True, xhistory=False)
-
-
-
-
-
-
+x, xhist, exitflag = LBFGSB(func, x0, lower_bounds, upper_bounds, m=10, tol=1e-5, max_iters=50, display=True, xhistory=False)
+print(flag)
