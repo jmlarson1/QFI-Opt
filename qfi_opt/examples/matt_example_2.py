@@ -70,4 +70,4 @@ lower_bounds = np.expand_dims(np.zeros(num_params), 0).T
 upper_bounds = np.expand_dims(np.ones(num_params), 0).T
 x0 = np.expand_dims(x0, 0).T
 x, xhist, exitflag = LBFGSB(func, x0, lower_bounds, upper_bounds, m=10, tol=1e-5, max_iters=50, display=True, xhistory=False)
-print(flag)
+print(exitflag)
