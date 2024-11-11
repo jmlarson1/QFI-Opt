@@ -299,8 +299,6 @@ def subspace_min(x, g, l, u, xc, c, theta, W, M):
 
     # Compute W^T Z, the restriction of W to free variables
     WTZ = np.zeros((len(c), num_free_vars))  # len(c) = 2*m
-    if num_free_vars == 1 or len(c) == 0:
-        ipdb.set_trace()
     for i in range(num_free_vars):
         WTZ[:, i] = W[free_vars_idx[i], :]
 
@@ -324,6 +322,8 @@ def subspace_min(x, g, l, u, xc, c, theta, W, M):
 
     # Compute the subspace minimization
     d_star = alpha_star * du
+    if num_free_vars == 1:
+        d_star = np.expand_dims(d_star, 0)
     xbar = xc.copy()
     for i in range(num_free_vars):
         idx = free_vars_idx[i]
@@ -349,6 +349,9 @@ def find_alpha(l, u, xc, du, free_vars_idx):
 
     alpha_star = 1.0  # Initialize alpha_star to 1
     n = len(free_vars_idx)
+
+    if len(np.shape(du)) == 0:
+        du = np.expand_dims(du, 0)
 
     for i in range(n):
         idx = free_vars_idx[i]
