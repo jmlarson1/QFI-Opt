@@ -174,7 +174,7 @@ def simulate_TAT(
 ) -> np.ndarray:
     """Simulate a two-axis twisting (TAT) protocol."""
     collective_Sx, collective_Sy, _ = collective_spin_ops(num_qubits)
-    hamiltonian = (collective_Sx @ collective_Sy + collective_Sy @ collective_Sx) / num_qubits
+    hamiltonian = (collective_Sx @ collective_Sy + collective_Sy @ collective_Sx) / (2 * num_qubits)
     return simulate_sensing_protocol(
         params,
         hamiltonian,
@@ -234,7 +234,7 @@ def simulate_XX_chain(
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
-    coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
+    coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2 / 4
     return simulate_spin_chain(
         params,
         num_qubits,
