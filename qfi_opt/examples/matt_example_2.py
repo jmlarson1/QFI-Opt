@@ -15,6 +15,12 @@ def LBFGSB_wrapper(x, obj, obj_params, get_jacobian):
     qfi_grad = np.zeros(dim)
 
     rho = obj(params=x, num_qubits=obj_params['N'], dissipation_rates=obj_params['dissipation'], coupling_exponent=obj_params['coupling_exponent'])
+
+    # our test: perturb rho by a "staggered" tol:
+    tol = 1e-8
+    basis_states = rho.shape[0]
+    rho += tol * np.diag(np.arange(basis_states))
+
     vals, vecs = calc_qfi.compute_eigendecomposition(rho)
     # when you want to debug nonsmoothness, uncomment this line for sure:
     # print("params: ", x.T, "eigenvalues of rho(params): ", vals)

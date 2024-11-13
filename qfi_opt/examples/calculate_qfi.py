@@ -59,7 +59,7 @@ def compute_QFI(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, param
             denom = eigvals[i] + eigvals[j]
             diff = eigvals[i] - eigvals[j]
             if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
-                f_quotient, g_quotient = qfi_quotient(eigvals[i], eigvals[j], eigvecs[i], eigvecs[j], dA)
+                f_quotient, g_quotient = qfi_quotient2(eigvals[i], eigvals[j], eigvecs[i], eigvecs[j], dA)
                 f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigvecs[i], eigvecs[j])
                 running_sum += f_quotient * f_modulus
                 if grad.size > 0:
@@ -112,6 +112,46 @@ def get_matrix_grads_sylvester(rho, dA, eigvals, eigvecs, tol):
 
     return psi_grads
 
+def get_matrix_grads_naive(rho, dA, eigvals, eigvecs, tol):
+
+    dim = eigvecs.shape[0]
+    psi_grads = np.zeros((dim, dim), dtype="cdouble")
+
+    # force Hermitianness:
+    dA = (dA + dA.conj().T) / 2.0
+
+    # group the sorted eigvals by tolerance, intended to help stability of eigenvector derivatives:
+    current_ind = 0
+    for ind1 in range(dim):
+        if current_ind == ind1:
+            for ind2 in range(ind1 + 1, dim):
+                if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol):
+                    break  # the for loop over ind2
+            # we just broke the for loop, so:
+            current_ind = ind2
+
+            group_set = np.arange(ind1, ind2)
+
+            if group_set.size == 0:
+                group_set = [ind2]
+
+            # Two cases - either the eigenvalue has multiplicity one or it doesn't.
+            if len(group_set) > 1:
+                lhs = rho - eigvals[group_set[-1]] * np.eye(dim)
+                Lambda_prime = eigvecs[group_set].conj() @ dA @ eigvecs[group_set].T
+                rhs = -dA @ eigvecs[group_set].T + eigvecs[group_set].T @ Lambda_prime
+                sol = np.linalg.solve(lhs, rhs)
+                psi_grads[group_set] = sol.T
+
+            else: # The eigenvalue has multiplicity one and we can do the more obvious thing:
+                M = np.hstack((rho - eigvals[ind1] * np.eye(dim), -np.expand_dims(eigvecs[ind1].T, 1)))
+                M = np.vstack((M, np.expand_dims(np.hstack((eigvecs[ind1].conj(), 0)), 0)))
+                rhs = np.vstack((np.expand_dims(-dA @ eigvecs[ind1].T, 1), 0))
+                sol = np.linalg.solve(M, rhs)
+                psi_grads[ind1] = np.squeeze(sol[:dim])
+
+    return psi_grads
+
 
 def qfi_quotient(lambda_i, lambda_j, psi_i, psi_j, dA):
 
@@ -134,6 +174,25 @@ def qfi_quotient(lambda_i, lambda_j, psi_i, psi_j, dA):
         g[k] = np.real(der.tolist())
 
     g = np.real(g)
+
+    return f, g
+
+
+def qfi_quotient2(lambda_i, lambda_j, psi_i, psi_j, dA):
+
+    dim = np.shape(dA)[0]
+
+    diff = lambda_i - lambda_j
+    sum = lambda_i + lambda_j
+
+    f = diff ** 2 / sum
+
+    g = np.zeros(dim)
+    for k in range(dim):
+        dk_lambda_i = psi_i.conj() @ dA[k] @ psi_i.T
+        dk_lambda_j = psi_j.conj() @ dA[k] @ psi_j.T
+
+        g[k] = np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2))
 
     return f, g
 
