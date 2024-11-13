@@ -12,7 +12,7 @@ authors = [
   "Sri Hari Krishna Narayanan <snarayan@anl.gov>",
   "Michael A. Perlin <mika.perlin@gmail.com>",
 ]
-readme = "README.md"
+readme = "README.rst"
 license = "Apache-2.0"
 repository = "https://github.com/jmlarson1/QFI-Opt"
 keywords = ["quantum fisher information", "QFI", "quantum metrology"]
