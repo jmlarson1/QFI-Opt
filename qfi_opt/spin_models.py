@@ -214,7 +214,7 @@ def simulate_ising_chain(
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
-    coupling_op = np.kron(PAULI_Z, PAULI_Z) / 4
+    coupling_op = np.kron(PAULI_Z, PAULI_Z) / 2
     return simulate_spin_chain(
         params,
         num_qubits,
@@ -234,7 +234,7 @@ def simulate_XX_chain(
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
-    coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 4
+    coupling_op = (np.kron(PAULI_X, PAULI_X) + np.kron(PAULI_Y, PAULI_Y)) / 2
     return simulate_spin_chain(
         params,
         num_qubits,
@@ -253,7 +253,7 @@ def simulate_local_TAT_chain(
     dissipation_rates: float | tuple[float, float, float] = 0.0,
     dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
 ) -> np.ndarray:
-    coupling_op = (np.kron(PAULI_X, PAULI_Y) + np.kron(PAULI_Y, PAULI_X)) / 8
+    coupling_op = (np.kron(PAULI_X, PAULI_Y) + np.kron(PAULI_Y, PAULI_X)) / 4
     return simulate_spin_chain(
         params,
         num_qubits,
