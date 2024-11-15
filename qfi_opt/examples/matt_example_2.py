@@ -16,19 +16,32 @@ def LBFGSB_wrapper(x, obj, obj_params, get_jacobian):
 
     rho = obj(params=x, num_qubits=obj_params['N'], dissipation_rates=obj_params['dissipation'], coupling_exponent=obj_params['coupling_exponent'])
 
-    # our test: perturb rho by a "staggered" tol:
-    tol = 1e-8
-    basis_states = rho.shape[0]
-    rho += tol * np.diag(np.arange(basis_states))
-
     vals, vecs = calc_qfi.compute_eigendecomposition(rho)
-    # when you want to debug nonsmoothness, uncomment this line for sure:
-    # print("params: ", x.T, "eigenvalues of rho(params): ", vals)
     qfi, new_grad = calc_qfi.compute_QFI(rho, vals, vecs, x, obj_params=obj_params, grad=qfi_grad, get_jacobian=get_jacobian)
 
     new_grad = np.expand_dims(new_grad, 0).T
 
-    return -1.0 * qfi, -1.0 * new_grad
+    # THIS IS FOR TESTING FINITE DIFFERENCE GRADIENTS, OBVIOUSLY VERY SLOW IF YOU UNCOMMENT
+    #fd = 1e-6
+    #num_params = len(x)
+    #dirs = np.eye(num_params)
+    #approx_grad = np.zeros(num_params)
+    #for k in range(num_params):
+    #    xperturbed = x + fd * dirs[k]
+    #    rho = obj(params=xperturbed, num_qubits=obj_params['N'], dissipation_rates=obj_params['dissipation'],
+    #              coupling_exponent=obj_params['coupling_exponent'])
+
+    #    vals, vecs = calc_qfi.compute_eigendecomposition(rho)
+    #    fp, _ = calc_qfi.compute_QFI(rho, vals, vecs, xperturbed, obj_params=obj_params, grad=qfi_grad, get_jacobian=get_jacobian)
+    #    approx_grad[k] = (fp - qfi) / fd
+
+    # UNCOMMENT THESE FOR LIVE DEBUGGING
+    #print("approx grad: ", approx_grad)
+    #print("vals: ", vals)
+    #print("x: ", x)
+    #print("true grad: ", new_grad.T)
+    #approx_grad = np.expand_dims(approx_grad, 0).T
+    return -1.0 * qfi, -1.0 * new_grad #approx_grad
 
 # N is number of spins, the examples we have use N = 4 or N = 5
 #
@@ -64,7 +77,8 @@ obj_params = {'G': sm.collective_op(sm.PAULI_Z, num_qubits=N)/(2*N), 'N': N, 'di
 random.seed(3)
 np.random.seed(3)
 # set up initial vector, parameter bounds
-x0, bounds = 0.5 * np.random.rand(3 + 2 * layers), [(0.0, 1.0) for _ in range(3 + 2 * layers)]
+#x0, bounds = 0.5 * np.random.rand(3 + 2 * layers), [(0.0, 1.0) for _ in range(3 + 2 * layers)]
+x0, bounds = 0.5 * np.random.rand(3 + 2 * layers), [(-np.Inf, np.Inf) for _ in range(3 + 2 * layers)]
 
 num_params = 3 + 2 * layers
 
@@ -72,8 +86,8 @@ get_jacobian = sm.get_jacobian_func(obj)
 
 
 func = lambda x: LBFGSB_wrapper(x, obj, obj_params, get_jacobian)
-lower_bounds = np.expand_dims(np.zeros(num_params), 0).T
-upper_bounds = np.expand_dims(np.ones(num_params), 0).T
+lower_bounds = np.expand_dims(-np.Inf * np.ones(num_params), 0).T
+upper_bounds = np.expand_dims(np.Inf * np.ones(num_params), 0).T
 x0 = np.expand_dims(x0, 0).T
 x, xhist, exitflag = LBFGSB(func, x0, lower_bounds, upper_bounds, m=10, tol=1e-5, max_iters=50, display=True, xhistory=False)
 print(exitflag)

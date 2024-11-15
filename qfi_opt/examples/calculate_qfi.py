@@ -47,11 +47,13 @@ def compute_QFI(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, param
 
         grad[:] = np.zeros(num_params)
         psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
+        lambda_grads = np.zeros((num_params, num_vals))
 
         for k in range(num_params):
             # compute gradients of each eigenvalue
-            psi_grad_k = get_matrix_grads_sylvester(rho, dA[k], eigvals, eigvecs, tol)
+            psi_grad_k, lambda_grad_k = get_matrix_grads_naive(rho, dA[k], eigvals, eigvecs, tol)
             psi_grads[k] = psi_grad_k
+            lambda_grads[k] = lambda_grad_k
 
     # NOW COMPUTE
     for i in range(num_vals):
@@ -60,6 +62,7 @@ def compute_QFI(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, param
             diff = eigvals[i] - eigvals[j]
             if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
                 f_quotient, g_quotient = qfi_quotient2(eigvals[i], eigvals[j], eigvecs[i], eigvecs[j], dA)
+                #f_quotient, g_quotient = qfi_quotient3(eigvals[i], eigvals[j], lambda_grads[:, [i, j]])
                 f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigvecs[i], eigvecs[j])
                 running_sum += f_quotient * f_modulus
                 if grad.size > 0:
@@ -116,6 +119,7 @@ def get_matrix_grads_naive(rho, dA, eigvals, eigvecs, tol):
 
     dim = eigvecs.shape[0]
     psi_grads = np.zeros((dim, dim), dtype="cdouble")
+    lambda_grads = np.zeros(dim)
 
     # force Hermitianness:
     dA = (dA + dA.conj().T) / 2.0
@@ -138,19 +142,25 @@ def get_matrix_grads_naive(rho, dA, eigvals, eigvecs, tol):
             # Two cases - either the eigenvalue has multiplicity one or it doesn't.
             if len(group_set) > 1:
                 lhs = rho - eigvals[group_set[-1]] * np.eye(dim)
-                Lambda_prime = eigvecs[group_set].conj() @ dA @ eigvecs[group_set].T
-                rhs = -dA @ eigvecs[group_set].T + eigvecs[group_set].T @ Lambda_prime
+                lhs = np.hstack((lhs, -eigvecs[group_set].T))
+                lhs_row2 = np.hstack((-eigvecs[group_set].conj(), np.zeros((len(group_set), len(group_set)))))
+                lhs = np.vstack((lhs, lhs_row2))
+                #Lambda_prime = eigvecs[group_set].conj() @ dA @ eigvecs[group_set].T
+                rhs = -dA @ eigvecs[group_set].T# + eigvecs[group_set].T @ Lambda_prime
+                rhs = np.vstack((rhs, np.zeros((len(group_set), len(group_set)))))
                 sol = np.linalg.solve(lhs, rhs)
-                psi_grads[group_set] = sol.T
-
+                psi_grads[group_set] = sol[:dim, :].T
+                Lambda_prime = sol[dim:, :]
+                lambda_grads[group_set] = np.real(np.diag(Lambda_prime))
             else: # The eigenvalue has multiplicity one and we can do the more obvious thing:
                 M = np.hstack((rho - eigvals[ind1] * np.eye(dim), -np.expand_dims(eigvecs[ind1].T, 1)))
                 M = np.vstack((M, np.expand_dims(np.hstack((eigvecs[ind1].conj(), 0)), 0)))
                 rhs = np.vstack((np.expand_dims(-dA @ eigvecs[ind1].T, 1), 0))
                 sol = np.linalg.solve(M, rhs)
                 psi_grads[ind1] = np.squeeze(sol[:dim])
+                lambda_grads[ind1] = np.real(sol[dim])
 
-    return psi_grads
+    return psi_grads, lambda_grads
 
 
 def qfi_quotient(lambda_i, lambda_j, psi_i, psi_j, dA):
@@ -191,6 +201,24 @@ def qfi_quotient2(lambda_i, lambda_j, psi_i, psi_j, dA):
     for k in range(dim):
         dk_lambda_i = psi_i.conj() @ dA[k] @ psi_i.T
         dk_lambda_j = psi_j.conj() @ dA[k] @ psi_j.T
+
+        g[k] = np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2))
+
+    return f, g
+
+def qfi_quotient3(lambda_i, lambda_j, lambda_grads):
+
+    dim = np.shape(lambda_grads)[0]
+
+    diff = lambda_i - lambda_j
+    sum = lambda_i + lambda_j
+
+    f = diff ** 2 / sum
+
+    g = np.zeros(dim)
+    for k in range(dim):
+        dk_lambda_i = lambda_grads[k, 0]
+        dk_lambda_j = lambda_grads[k, 1]
 
         g[k] = np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2))
 
