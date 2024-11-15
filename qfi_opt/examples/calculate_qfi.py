@@ -180,7 +180,7 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
     for ind1 in range(dim):
         if current_ind == ind1:
             for ind2 in range(ind1 + 1, dim):
-                if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol):
+                if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol, rtol=tol):
                     break  # the for loop over ind2
             # we just broke the for loop, so:
             current_ind = ind2
@@ -197,14 +197,14 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
                 eigvalsH, eigvecsH = np.linalg.eigh(H)
                 rotated_eigvecs = eigvecs[group_set].T @ eigvecsH
                 lhs = rho - eigvals[group_set[-1]] * np.eye(dim)
-                lhs = np.hstack((lhs, -rotated_eigvecs.T))
-                lhs_row2 = np.hstack((-rotated_eigvecs.conj(), np.zeros((len(group_set), len(group_set)))))
+                lhs = np.hstack((lhs, -rotated_eigvecs))
+                lhs_row2 = np.hstack((-rotated_eigvecs.T.conj(), np.zeros((len(group_set), len(group_set)))))
                 lhs = np.vstack((lhs, lhs_row2))
-                rhs = -dA @ rotated_eigvecs.T
+                rhs = -dA @ rotated_eigvecs
                 rhs = np.vstack((rhs, np.zeros((len(group_set), len(group_set)))))
                 sol = np.linalg.solve(lhs, rhs)
                 psi_grads[group_set] = sol[:dim, :].T
-                Lambda_prime = sol[dim:, :] # this should approximately equal H by design (assuming all linalg is good!)
+                Lambda_prime = sol[dim:, :] # this should, in infinite precision, be equal to H. 
                 lambda_grads[group_set] = np.real(np.diag(Lambda_prime))
 
                 # key: let the routine that called this subroutine know we rotated the eigvecs
