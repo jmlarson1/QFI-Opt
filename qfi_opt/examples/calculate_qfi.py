@@ -48,15 +48,15 @@ def compute_QFI(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, param
         grad[:] = np.zeros(num_params)
         psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
         lambda_grads = np.zeros((num_params, num_vals))
-        eigenvector_bases = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
+        #eigenvector_bases = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
 
         for k in range(num_params):
             # compute gradients of each eigenvalue
-            #psi_grad_k, lambda_grad_k = get_matrix_grads_naive(rho, dA[k], eigvals, eigvecs, tol)
-            psi_grad_k, lambda_grad_k, basis_k = get_matrix_grads_rotate(rho, dA[k], eigvals, eigvecs, tol)
+            psi_grad_k, lambda_grad_k = get_matrix_grads_hail_mary(rho, dA[k], eigvals, eigvecs, tol)
+            #psi_grad_k, lambda_grad_k, basis_k = get_matrix_grads_rotate(rho, dA[k], eigvals, eigvecs, tol)
             psi_grads[k] = psi_grad_k
             lambda_grads[k] = lambda_grad_k
-            eigenvector_bases[k] = basis_k
+            #eigenvector_bases[k] = basis_k
 
     # NOW COMPUTE
     for i in range(num_vals):
@@ -66,7 +66,8 @@ def compute_QFI(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, param
             if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
                 #f_quotient, g_quotient = qfi_quotient2(eigvals[i], eigvals[j], eigvecs[i], eigvecs[j], dA)
                 f_quotient, g_quotient = qfi_quotient3(eigvals[i], eigvals[j], lambda_grads[:, [i, j]])
-                f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigenvector_bases)
+                f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigvecs[i], eigvecs[j])
+                #f_modulus, g_modulus = qfi_modulus2(G, psi_grads, i, j, eigenvector_bases)
                 running_sum += f_quotient * f_modulus
                 if grad.size > 0:
                     grad[:] += f_quotient * g_modulus + f_modulus * g_quotient
@@ -162,6 +163,46 @@ def get_matrix_grads_naive(rho, dA, eigvals, eigvecs, tol):
                 sol = np.linalg.solve(M, rhs)
                 psi_grads[ind1] = np.squeeze(sol[:dim])
                 lambda_grads[ind1] = np.real(sol[dim])
+
+    return psi_grads, lambda_grads
+
+
+def get_matrix_grads_hail_mary(rho, dA, eigvals, eigvecs, tol):
+
+    dim = eigvecs.shape[0]
+    psi_grads = np.zeros((dim, dim), dtype="cdouble")
+    lambda_grads = np.zeros(dim)
+
+    # force Hermitianness:
+    dA = (dA + dA.conj().T) / 2.0
+
+    # group the sorted eigvals by tolerance, intended to help stability of eigenvector derivatives:
+    current_ind = 0
+    for ind1 in range(dim):
+        if current_ind == ind1:
+            for ind2 in range(ind1 + 1, dim):
+                if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol, rtol=tol):
+                    break  # the for loop over ind2
+            # we just broke the for loop, so:
+            current_ind = ind2
+
+            group_set = np.arange(ind1, ind2)
+
+            if group_set.size == 0:
+                group_set = [ind2]
+
+            # Two cases - either the eigenvalue has multiplicity one or it doesn't.
+            # If the eigenvalue has multiplicity, we're going to perturb the matrix to avoid instabilities
+            for j in range(1, len(group_set)):
+                # rank one perturbation
+                rho += j * tol * eigvecs[group_set[j]].conj() @ eigvecs[group_set[j]].T
+            for j in group_set: # The eigenvalue has multiplicity one and we can do the more obvious thing:
+                M = np.hstack((rho - eigvals[j] * np.eye(dim), -np.expand_dims(eigvecs[j].T, 1)))
+                M = np.vstack((M, np.expand_dims(np.hstack((eigvecs[j].conj(), 0)), 0)))
+                rhs = np.vstack((np.expand_dims(-dA @ eigvecs[j].T, 1), 0))
+                sol = np.linalg.solve(M, rhs)
+                psi_grads[j] = np.squeeze(sol[:dim])
+                lambda_grads[j] = np.real(sol[dim])
 
     return psi_grads, lambda_grads
 
@@ -282,7 +323,25 @@ def qfi_quotient3(lambda_i, lambda_j, lambda_grads):
     return f, g
 
 
-def qfi_modulus(G, psi_grads, i, j, eigenvectors):
+def qfi_modulus(G, psi_grads, i, j, psi_i, psi_j):
+
+    dim = np.shape(psi_grads)[0]
+    g = np.zeros(dim)
+
+    ip = psi_i.conj() @ G @ psi_j.T
+
+    f = np.absolute(ip) ** 2
+
+    for k in range(dim):
+        d_xk_psi_i = psi_grads[k, i]
+        d_xk_psi_j = psi_grads[k, j]
+        der_product = d_xk_psi_i.conj() @ G @ psi_j.T + psi_i.conj() @ G @ d_xk_psi_j.T
+        g[k] = 2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product)
+
+    return f, g
+
+
+def qfi_modulus2(G, psi_grads, i, j, eigenvectors):
 
     dim = np.shape(psi_grads)[0]
     g = np.zeros(dim)
