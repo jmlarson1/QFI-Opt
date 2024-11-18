@@ -215,6 +215,10 @@ def get_matrix_grads_hail_mary(rho, dA, eigvals, eigvecs, tol):
 
 def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
 
+    scaling_factor = 1.0 / np.maximum(1e-4, np.amin(eigvals))
+    rho = scaling_factor * np.copy(rho)
+    eigvals = scaling_factor * np.copy(eigvals)
+    eigvecs = scaling_factor * np.copy(eigvecs)
     dim = eigvecs.shape[0]
     psi_grads = np.zeros((dim, dim), dtype="cdouble")
     lambda_grads = np.zeros(dim)
@@ -251,7 +255,7 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
                 rhs = np.vstack((rhs, np.zeros((len(group_set), len(group_set)))))
                 sol = np.linalg.solve(lhs, rhs)
                 psi_grads[group_set] = sol[:dim, :].T
-                Lambda_prime = sol[dim:, :] # this should, in infinite precision, be equal to H. 
+                Lambda_prime = sol[dim:, :] 
                 lambda_grads[group_set] = np.real(np.diag(Lambda_prime))
 
                 # key: let the routine that called this subroutine know we rotated the eigvecs
@@ -264,7 +268,7 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
                 psi_grads[ind1] = np.squeeze(sol[:dim])
                 lambda_grads[ind1] = np.real(sol[dim])
 
-    return psi_grads, lambda_grads, eigvecs
+    return psi_grads / scaling_factor, lambda_grads / scaling_factor, eigvecs / scaling_factor
 
 
 def qfi_quotient(lambda_i, lambda_j, psi_i, psi_j, dA):

@@ -56,18 +56,19 @@ def LBFGSB(func, x0, l, u, m=10, tol=1e-5, max_iters=20, display=True, xhistory=
             if f_new > f + alpha * c1 * dphi0:  # Failed to find decrease
                 alpha_hi = alpha
                 print("Line search continues. Insufficient decrease found. f0 = ", f, 'fnew = ', f_new)
-            elif dphiplus < c2 * dphi0:
-                alpha_lo = alpha
-                print("Line search continues. Weak Wolfe condition not satisfied. f0 = ", f, 'fnew = ', f_new)
+            #elif dphiplus < c2 * dphi0:
+                # testing something, remove this break eventually:
+                #alpha_lo = alpha
+                #print("Line search continues. Weak Wolfe condition not satisfied. f0 = ", f, 'fnew = ', f_new)
             else:
                 x = xtrial
                 f, g = f_new, g_new
                 break
 
             if alpha_hi < np.inf:
-                alpha = (alpha_hi + alpha_lo) / 2
+                alpha = (alpha_hi + alpha_lo) / 10
             else:
-                alpha = 2 * alpha_lo
+                alpha = 10 * alpha_lo
 
         if alpha <= 1e-8 or np.abs(f_new - f_old) <= 1e-12:
             print('Stopping because line search failed - gradient error or nonsmoothness likely to blame.')
@@ -78,9 +79,14 @@ def LBFGSB(func, x0, l, u, m=10, tol=1e-5, max_iters=20, display=True, xhistory=
         s = x - x_old
         curv = np.dot(s.T, y)  # Keep sign of curvature
         if curv < np.finfo(float).eps:
-            ipdb.set_trace()
+            # with weak Wolfe, this shouldn't be entered.
             print('Warning: negative curvature detected, skipping L-BFGS update')
             k += 1
+        
+            # Print useful information
+            if display:
+                opt = get_optimality(x, g, l, u)
+                print(f'{k:3d} {f:16.8f} {opt:16.8f}')
 
             continue
 
