@@ -467,6 +467,17 @@ def get_jacobian_func(simulate_func: Callable) -> Callable:
 
     return get_jacobian_manually
 
+def get_hessian_func(simulate_func: Callable) -> Callable:
+    """Convert a simulation method into a function that returns its Hessian."""
+
+    def get_hessian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+        _simulate_func = lambda params: simulate_func(params, *args, **kwargs)
+        _get_hessian = jax.jacfwd(jax.jacfwd(_simulate_func, argnums=0, holomorphic=True), holomorphic=True)
+        return _get_hessian(np.array(params, dtype=COMPLEX_TYPE))
+
+    return get_hessian
+
+
 
 def print_jacobian(jacobian: np.ndarray, precision: int = 3, linewidth: int = 200) -> None:
     np.set_printoptions(precision=precision, suppress=True, linewidth=linewidth)
@@ -475,6 +486,12 @@ def print_jacobian(jacobian: np.ndarray, precision: int = 3, linewidth: int = 20
         print(f"d(final_state/d(params[{pp}]):")
         print(jacobian[:, :, pp])
 
+def print_hessian(hessian: np.ndarray, precision: int = 3, linewidth: int = 200) -> None:
+    np.set_printoptions(precision=precision, suppress=True, linewidth=linewidth)
+    params = hessian.shape[2]
+    for pp in range(params):
+        print(f"d^2(final_state)/(d(params[{pp}])d(params[{pp}])):")
+        print(hessian[:, :, pp, pp])
 
 if __name__ == "__main__":
     # parse arguments
@@ -486,12 +503,19 @@ if __name__ == "__main__":
     parser.add_argument("--dissipation", type=float, default=0.0)
     parser.add_argument("--params", type=float, nargs="+", default=np.array([0.5, 0.5, 0.5, 0]))
     parser.add_argument("--jacobian", action="store_true", default=False)
+    parser.add_argument("--hessian", action="store_true", default=False)
     args = parser.parse_args(sys.argv[1:])
 
     if args.jacobian:
         get_jacobian = get_jacobian_func(simulate_OAT)
         jacobian = get_jacobian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
         print_jacobian(jacobian)
+
+    if args.hessian:
+        print("Get HESSIAN")
+        get_hessian = get_hessian_func(simulate_OAT)
+        hessian = get_hessian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
+        print_hessian(hessian)
 
     # simulate the OAT protocol
     final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
