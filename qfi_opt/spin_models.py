@@ -477,7 +477,16 @@ def get_hessian_func(simulate_func: Callable) -> Callable:
 
     return get_hessian
 
+def get_hessian_diag_func(simulate_func: Callable) -> Callable:
+    """Convert a simulation method into a function that returns its Hessian's diagonal (last two axis form the diagonal)."""
 
+    def get_hessian(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+
+        _simulate_func = lambda params: simulate_func(params, *args, **kwargs)
+        _get_hessian = jax.jacfwd(jax.jacfwd(_simulate_func, argnums=0, holomorphic=True), holomorphic=True)#
+        return np.diagonal(_get_hessian(np.array(params, dtype=COMPLEX_TYPE)), axis1=2, axis2=3)
+
+    return get_hessian
 
 def print_jacobian(jacobian: np.ndarray, precision: int = 3, linewidth: int = 200) -> None:
     np.set_printoptions(precision=precision, suppress=True, linewidth=linewidth)
@@ -492,6 +501,13 @@ def print_hessian(hessian: np.ndarray, precision: int = 3, linewidth: int = 200)
     for pp in range(params):
         print(f"d^2(final_state)/(d(params[{pp}])d(params[{pp}])):")
         print(hessian[:, :, pp, pp])
+
+def print_hessian_diag(hessian: np.ndarray, precision: int = 3, linewidth: int = 200) -> None:
+    np.set_printoptions(precision=precision, suppress=True, linewidth=linewidth)
+    params = hessian.shape[2]
+    for pp in range(params):
+        print(f"d^2(final_state)/(d(params[{pp}])d(params[{pp}])):")
+        print(hessian[:, :, pp])
 
 if __name__ == "__main__":
     # parse arguments
@@ -512,10 +528,9 @@ if __name__ == "__main__":
         print_jacobian(jacobian)
 
     if args.hessian:
-        print("Get HESSIAN")
-        get_hessian = get_hessian_func(simulate_OAT)
+        get_hessian = get_hessian_diag_func(simulate_OAT)
         hessian = get_hessian(args.params, args.num_qubits, dissipation_rates=args.dissipation)
-        print_hessian(hessian)
+        print_hessian_diag(hessian)
 
     # simulate the OAT protocol
     final_state = simulate_OAT(args.params, args.num_qubits, dissipation_rates=args.dissipation)
