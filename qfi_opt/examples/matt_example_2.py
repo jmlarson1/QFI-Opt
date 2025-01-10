@@ -43,6 +43,22 @@ def LBFGSB_wrapper(x, obj, obj_params, get_jacobian):
     #approx_grad = np.expand_dims(approx_grad, 0).T
     return -1.0 * qfi, -1.0 * new_grad #approx_grad
 
+
+def LBFGSB_wrapper2(x, obj, obj_params, get_jacobian, get_hessian):
+
+    x = np.squeeze(x.T)
+    dim = len(x)
+    qfi_grad = np.zeros(dim)
+
+    rho = obj(params=x, num_qubits=obj_params['N'], dissipation_rates=obj_params['dissipation'], coupling_exponent=obj_params['coupling_exponent'])
+
+    vals, vecs = calc_qfi.compute_eigendecomposition(rho)
+    qfi, new_grad = calc_qfi.compute_QFI2(rho, vals, vecs, x, obj_params=obj_params, grad=qfi_grad, get_jacobian=get_jacobian, get_hessian=get_hessian)
+
+    new_grad = np.expand_dims(new_grad, 0).T
+
+    return -1.0 * qfi, -1.0 * new_grad #approx_grad
+
 # N is number of spins, the examples we have use N = 4 or N = 5
 #
 # model should be a string argument.
@@ -78,16 +94,19 @@ random.seed(3)
 np.random.seed(3)
 # set up initial vector, parameter bounds
 #x0, bounds = 0.5 * np.random.rand(3 + 2 * layers), [(0.0, 1.0) for _ in range(3 + 2 * layers)]
-x0, bounds = 0.5 * np.random.rand(3 + 2 * layers), [(-np.Inf, np.Inf) for _ in range(3 + 2 * layers)]
+x0, bounds = 0.5 * np.random.rand(3 + 2 * layers), [(-np.inf, np.inf) for _ in range(3 + 2 * layers)]
 
 num_params = 3 + 2 * layers
 
 get_jacobian = sm.get_jacobian_func(obj)
 
+get_hessian = sm.get_hessian_diag_func(obj)
 
-func = lambda x: LBFGSB_wrapper(x, obj, obj_params, get_jacobian)
-lower_bounds = np.expand_dims(-np.Inf * np.ones(num_params), 0).T
-upper_bounds = np.expand_dims(np.Inf * np.ones(num_params), 0).T
+#func = lambda x: LBFGSB_wrapper(x, obj, obj_params, get_jacobian)
+func = lambda x: LBFGSB_wrapper2(x, obj, obj_params, get_jacobian, get_hessian)
+
+lower_bounds = np.expand_dims(-np.inf * np.ones(num_params), 0).T
+upper_bounds = np.expand_dims(np.inf * np.ones(num_params), 0).T
 x0 = np.expand_dims(x0, 0).T
 x, xhist, exitflag = LBFGSB(func, x0, lower_bounds, upper_bounds, m=10, tol=1e-5, max_iters=50, display=True, xhistory=False)
 print(exitflag)
