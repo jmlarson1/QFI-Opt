@@ -131,11 +131,18 @@ def compute_QFI2(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, para
             denom = eigvals[i] + eigvals[j]
             diff = eigvals[i] - eigvals[j]
             if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff**2 / denom, 0, atol=tol, rtol=tol):
-                f_quotient, g_quotient = qfi_quotient(eigvals[i], eigvals[j], lambda_grads[:, [i, j]])
+                # can i possibly help the scaling here to avoid numerical blowups?
+                # idea: try to get the sum (denom) to be approximately 1 so the division by denom(**2) doesn't hurt too bad.
+                scaling_factor = 1.0 #denom
+                eigvals_i = eigvals[i] / scaling_factor
+                eigvals_j = eigvals[j] / scaling_factor
+                lambda_grads_ij = lambda_grads[:, [i, j]] / scaling_factor
+                f_quotient, g_quotient = qfi_quotient(eigvals_i, eigvals_j, lambda_grads_ij)
                 f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigenvector_bases)
-                running_sum += f_quotient * f_modulus
+                # scale back (multiply f_quotient and g_quotient by an extra scaling_factor)
+                running_sum += f_quotient * scaling_factor * f_modulus
                 if grad.size > 0:
-                    grad[:] += f_quotient * g_modulus + f_modulus * g_quotient
+                    grad[:] += scaling_factor * (f_quotient * g_modulus + f_modulus * g_quotient)
 
     if grad.size > 0:
         return 4 * running_sum, 4 * grad
@@ -220,6 +227,8 @@ def get_matrix_grads_hessian(rho, dA, d2A, eigvals, eigvecs, tol):
                 eigvals_sub, eigvecs_sub = compute_eigendecomposition(M1)
                 eigvals_sub = np.real(eigvals_sub)
                 lambda_grads[group_set] = eigvals_sub
+                if check_close_entries(eigvals_sub, tol):
+                    print("Eek, even the derivative eigenvalues are numerically close. group_set: ", group_set, "lambda_grads: ", eigvals_sub)
                 rotated_eigvecs = eigvecs[group_set].T @ eigvecs_sub.T
                 V = np.linalg.solve(rho - eigvals[ind1] * np.eye(dim),
                                     -1.0 * dA @ eigvecs[group_set].T + rotated_eigvecs @ np.diag(eigvals_sub) @ eigvecs_sub.conj())
