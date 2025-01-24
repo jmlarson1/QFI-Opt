@@ -1,7 +1,7 @@
 import numpy as np
-import qfi_opt.spin_models as sm
 from scipy.optimize import minimize as mini
 from scipy.integrate import solve_ivp as ivp
+import qfi_opt.spin_models as sm
 
 PAULI_Z = np.array([[1, 0], [0, -1]])
 PAULI_X = np.array([[0, 1], [1, 0]])
@@ -146,6 +146,42 @@ def compute_collective_basis_CFI_for_uniform_qubit_rotations(rho: np.ndarray,
     return np.max(fishers) / num_qubits ** 2, varphi[np.argmax(fishers)]
 
 
+def compute_collective_basis_CFI_for_uniform_qubit_rotations_Ffun(params, sim_params):
+
+    num_params = len(params)
+    x = params[:num_params - 1]
+    theta = params[num_params - 1] # theta is one dimensional for this CFI type.
+
+    num_qubits = sim_params['N']
+    model = sim_params['model']
+    coupling_exponent = sim_params['coupling_exponent']
+    dissipation_rates = sim_params['dissipation_rates']
+    dphi = sim_params['dphi'] # dphi = 1e-5
+
+    simulation_obj = getattr(sm, f'simulate_{model}_chain')
+
+    rho = simulation_obj(params=x, num_qubits=num_qubits, dissipation_rates=dissipation_rates,
+                         coupling_exponent=coupling_exponent)
+
+    assert not np.all(np.isnan(rho.real)), 'density matrix format invalid'
+
+    Sx, Sy, Sz = sm.collective_spin_ops(num_qubits=num_qubits)
+
+    def Svarphi(varphi: float) -> np.ndarray:
+        return np.cos(varphi) * Sx + np.sin(varphi) * Sy
+
+    Svarphi_ = Svarphi(theta)
+    rho_varphi = state_integrator(rho, Svarphi_, np.pi / 2)
+    rho_pert = state_integrator(rho, Sz, dphi)
+    rho_varphi_pert = state_integrator(rho_pert, Svarphi_, np.pi / 2)
+
+    unpert_dist = distribution(rho_varphi, num_qubits)
+    pert_dist = distribution(rho_varphi_pert, num_qubits)
+
+    # note: h needs to be multiplied by 1.0 / ((num_qubits * dphi) ** 2)
+    return np.concatenate((unpert_dist, pert_dist))
+
+
 def compute_bitstring_basis_CFI_for_uniform_qubit_rotations(rho: np.ndarray,
                    num_qubits: int,
                    varphi_partition: int = 31) -> [float, float]:
@@ -261,6 +297,9 @@ def compute_bitstring_basis_CFI_for_single_qubit_rotations(rho: np.ndarray,
     # NOTE: CFI IS NORMALIZED TO HEISENBERG LIMIT
     # return CFI and optimal single-qubit rotation axes
     return -opt_cfi/num_qubits**2, opt_x
+
+
+
 
 
 
