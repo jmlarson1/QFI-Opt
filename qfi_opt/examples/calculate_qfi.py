@@ -120,7 +120,8 @@ def compute_QFI2(rho: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray, para
 
         for k in range(num_params):
             # compute gradients of each eigenvalue
-            psi_grad_k, lambda_grad_k, basis_k = get_matrix_grads_hessian(rho, dA[k], d2A[k], eigvals, eigvecs, tol)
+            # I am only passing k as the last argument right now for the sake of debugging which partials are screwy.
+            psi_grad_k, lambda_grad_k, basis_k = get_matrix_grads_hessian(rho, dA[k], d2A[k], eigvals, eigvecs, tol, k)
             psi_grads[k] = psi_grad_k
             lambda_grads[k] = lambda_grad_k
             eigenvector_bases[k] = basis_k
@@ -201,7 +202,7 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
     return psi_grads, lambda_grads, eigvecs
 
 
-def get_matrix_grads_hessian(rho, dA, d2A, eigvals, eigvecs, tol):
+def get_matrix_grads_hessian(rho, dA, d2A, eigvals, eigvecs, tol, k):
 
     dim = eigvecs.shape[0]
     psi_grads = np.zeros((dim, dim), dtype="cdouble")
@@ -228,7 +229,7 @@ def get_matrix_grads_hessian(rho, dA, d2A, eigvals, eigvecs, tol):
                 eigvals_sub = np.real(eigvals_sub)
                 lambda_grads[group_set] = eigvals_sub
                 if check_close_entries(eigvals_sub, tol):
-                    print("Eek, even the derivative eigenvalues are numerically close. group_set: ", group_set, "lambda_grads: ", eigvals_sub)
+                    print("Derivative eigenvalues are numerically close. group_set: ", group_set, "lambda_grads: ", eigvals_sub, "partial: ", k)
                 rotated_eigvecs = eigvecs[group_set].T @ eigvecs_sub.T
                 V = np.linalg.solve(rho - eigvals[ind1] * np.eye(dim),
                                     -1.0 * dA @ eigvecs[group_set].T + rotated_eigvecs @ np.diag(eigvals_sub) @ eigvecs_sub.conj())
