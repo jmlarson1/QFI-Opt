@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import minimize as mini
 from scipy.integrate import solve_ivp as ivp
 import qfi_opt.spin_models as sm
+import ipdb
 
 PAULI_Z = np.array([[1, 0], [0, -1]])
 PAULI_X = np.array([[0, 1], [1, 0]])
@@ -156,7 +157,7 @@ def compute_collective_basis_CFI_for_uniform_qubit_rotations_Ffun(params, sim_pa
     model = sim_params['model']
     coupling_exponent = sim_params['coupling_exponent']
     dissipation_rates = sim_params['dissipation_rates']
-    dphi = sim_params['dphi'] # dphi = 1e-5
+    dphi = sim_params['dphi']
 
     simulation_obj = getattr(sm, f'simulate_{model}_chain')
 
@@ -179,7 +180,16 @@ def compute_collective_basis_CFI_for_uniform_qubit_rotations_Ffun(params, sim_pa
     pert_dist = distribution(rho_varphi_pert, num_qubits)
 
     # note: h needs to be multiplied by 1.0 / ((num_qubits * dphi) ** 2)
-    return np.concatenate((unpert_dist, pert_dist))
+
+    distribution_support = len(unpert_dist)
+    Fvec = np.zeros(2 * distribution_support)
+    ctr = 0
+    for key in unpert_dist:
+        Fvec[ctr] = unpert_dist[key]
+        Fvec[distribution_support + ctr] = pert_dist[key]
+        ctr += 1
+
+    return Fvec
 
 
 def compute_bitstring_basis_CFI_for_uniform_qubit_rotations(rho: np.ndarray,
