@@ -265,6 +265,53 @@ def compute_collective_basis_CFI_for_single_qubit_rotations(rho: np.ndarray,
     # return CFI and optimal single-qubit rotation axes
     return -opt_cfi/num_qubits**2, opt_x
 
+def compute_collective_basis_CFI_for_single_qubit_rotations_Ffun(params, sim_params):
+
+
+    num_qubits = sim_params['N']
+    model = sim_params['model']
+    coupling_exponent = sim_params['coupling_exponent']
+    dissipation_rates = sim_params['dissipation_rates']
+    dphi = sim_params['dphi']
+
+    num_params = len(params)
+    x = params[:num_params - num_qubits]
+    theta = params[num_params - num_qubits:]  # theta has dimension num_qubits for this CFI type.
+
+    simulation_obj = getattr(sm, f'simulate_{model}_chain')
+
+    rho = simulation_obj(params=x, num_qubits=num_qubits, dissipation_rates=dissipation_rates,
+                         coupling_exponent=coupling_exponent)
+
+    assert not np.all(np.isnan(rho.real)), 'density matrix format invalid'
+
+    Sx, Sy, Sz = sm.collective_spin_ops(num_qubits=num_qubits)
+
+    # rotate all qubits uniformly by small value dphi about z
+    rotate_qubit = state_integrator(rho, Sz, dphi)
+
+    # rotate all qubits about the equator arbitrarily
+    for qubit_idx in range(num_qubits):
+        rotator = construct_qubit_equator_rotator(num_qubits, qubit_idx, float(theta[qubit_idx]))
+        rotate_qubit = state_integrator(rotate_qubit, rotator, np.pi / 2)
+        rho = state_integrator(rho, rotator, np.pi / 2)
+
+    # compute the cfi with respect to the arbitrarily rotated density matrix
+    rotated_rho_dist = distribution(rotate_qubit, num_qubits)
+    init_rho_dist = distribution(rho, num_qubits)
+
+    # note: h needs to be multiplied by 1.0 / ((num_qubits * dphi) ** 2)
+
+    distribution_support = len(init_rho_dist)
+    Fvec = np.zeros(2 * distribution_support)
+    ctr = 0
+    for key in init_rho_dist:
+        Fvec[ctr] = init_rho_dist[key]
+        Fvec[distribution_support + ctr] = rotated_rho_dist[key]
+        ctr += 1
+
+    return Fvec
+
 
 def compute_bitstring_basis_CFI_for_single_qubit_rotations(rho: np.ndarray,
                                                      num_qubits: int) -> list:
