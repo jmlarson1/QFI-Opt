@@ -1,6 +1,19 @@
-import numpy as np
-from scipy.linalg import expm
-from numpy import linalg as LA
+import os
+USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
+
+if USE_DIFFRAX:
+    import diffrax
+    import jax
+    import jax.numpy as np
+    from jax.scipy.linalg import expm
+    from jax.numpy import linalg as LA
+    jax.config.update("jax_enable_x64", True)
+    COMPLEX_TYPE = np.complex128
+
+else:
+    import numpy as np  # type: ignore[no-redef]
+    from scipy.linalg import expm
+    from numpy import linalg as LA
 
 ###################################
 ## Dicke basis, ordered as |0,0>, |1,-1>,|1,0>... |J-1,J-1>,|J,-J>,...|J,J>
@@ -18,7 +31,10 @@ def Init_rho(Jmax): #Jmax=N/2
     for i in range (0,Jmax+1):
         result.append(np.zeros(((2*i+1),(2*i+1)), dtype=np.complex128))
     #set the |J,J>=1, all other zero
-    result[Jmax][2*Jmax][2*Jmax]=1
+    if USE_DIFFRAX == False:
+        result[Jmax][2*Jmax][2*Jmax]=1
+    else:
+        result[Jmax] = result[Jmax].at[2*Jmax,2*Jmax].set(1)
     return result
 
 
@@ -30,7 +46,10 @@ def MatSz(Jmax):
         for i in range (0,2*mj+1):
             for j in range (0,2*mj+1):
                 if(i==j):
-                    result[mj][i][j]=i-mj
+                    if USE_DIFFRAX == False:
+                        result[mj][i][j]=i-mj
+                    else:
+                        result[mj] = result[mj].at[i,j].set(i-mj)
     return result
 
 
@@ -41,9 +60,15 @@ def MatSy(Jmax):
         for i in range (0,2*mj+1):
             for j in range (0,2*mj+1):
                 if(i==j+1):
-                    result[mj][i][j]=-0.5*1j*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj))
+                    if USE_DIFFRAX == False:
+                        result[mj][i][j]=-0.5*1j*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj))
+                    else:
+                        result[mj] = result[mj].at[i,j].set(-0.5*1j*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj)))
                 elif(i==j-1):
-                    result[mj][i][j]=0.5*1j*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj))
+                    if USE_DIFFRAX == False:
+                        result[mj][i][j]=0.5*1j*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj))
+                    else:
+                        result[mj] = result[mj].at[i,j].set(0.5*1j*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj)))
     return result
 
 
@@ -54,9 +79,15 @@ def MatSx(Jmax):
         for i in range (0,2*mj+1):
             for j in range (0,2*mj+1):
                 if(i==j+1):
-                    result[mj][i][j]=0.5*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj))
+                    if USE_DIFFRAX == False:
+                        result[mj][i][j]=0.5*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj))
+                    else:
+                        result[mj] = result[mj].at[i,j].set(0.5*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj)))
                 elif(i==j-1):
-                    result[mj][i][j]=0.5*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj))
+                    if USE_DIFFRAX == False:
+                        result[mj][i][j]=0.5*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj))
+                    else:
+                        result[mj] = result[mj].at[i,j].set(0.5*np.sqrt(mj*(mj+1)-(j-mj)*(i-mj)))
     return result
 
 
@@ -114,7 +145,10 @@ def recoverrhomat2(rho0, N, Nstep):
             result[time].append(np.zeros((2*i+1,2*i+1),dtype=np.complex128))
             for mj1 in range(0,2*i+1):
                 for mj2 in range(0,2*i+1):
-                    result[time][i][mj1][mj2]=rho0[count][time]
+                    if USE_DIFFRAX == False:
+                        result[time][i][mj1][mj2]=rho0[count][time]
+                    else:
+                        result[time][i] = result[time][i].at[mj1,mj2].set(rho0[count][time])
                     # if (mj1!=mj2):
                     #     result[time][i][mj2][mj1]=np.conj(rho0[count][time])
                     count+=1
@@ -330,7 +364,10 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
         if params[pp] > 0:
             state_f = flatrhomat(state, Jmax)
             sol = matrix.Perm_solver(state_f, params[pp] * np.pi, Dmat, Dmatloc, Hmat, Hmatloc, dimension, Nsteps)
-            state = recoverrhomat2(sol.y, Jmax, Nsteps)[-1]
+            if USE_DIFFRAX == False:
+                state = recoverrhomat2(sol.y, Jmax, Nsteps)[-1]
+            else:
+                state = recoverrhomat2(sol, Jmax, Nsteps)[-1]
             # out_state = ent1[-1]
 
         state = UnitaryGate(state, Sx, -params[pp + 1] * np.pi, Jmax)
@@ -339,3 +376,68 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
     state = UnitaryGate(state, Sy, -params[-1] * np.pi, Jmax)
 
     return state
+
+#def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dissipation_rates:tuple|float=0.0, dissipation_format:str='XYZ'):
+#def simulate_OAT(
+#    params: Sequence[float] | np.ndarray,
+#    num_qubits: int,
+#    *,
+#    dissipation_rates: float | tuple[float, float, float] = 0.0,
+#    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
+#)
+def get_jacobian_func(simulate_func):
+    """Convert a simulation method into a function that returns its Jacobian."""
+
+    if USE_DIFFRAX:
+        print("USE_DIFFRAX and FORWARD_MODE")
+        # forward-mode automatic differentiation
+
+        def get_jacobian(params, *args: object, **kwargs: object) -> np.ndarray:
+            _simulate_func = lambda params: simulate_func(params, *args, **kwargs)
+            _get_jacobian = jax.jacfwd(_simulate_func, argnums=0, holomorphic=True)
+            return _get_jacobian(np.array(params, dtype=COMPLEX_TYPE))
+
+        return get_jacobian
+
+    #def get_jacobian_manually(params: Sequence[float], *args: object, **kwargs: object) -> np.ndarray:
+    def get_jacobian_manually(params, *args: object, **kwargs: object) -> np.ndarray:
+        step_sizes = kwargs.get("step_sizes", 1e-10)
+        if isinstance(step_sizes, float):
+            param_step_sizes = [step_sizes] * len(params)
+        assert len(param_step_sizes) == len(params)
+
+        result_at_params = simulate_func(params, *args, **kwargs)
+        shifted_results1 = [ ] 
+        shifted_results2 = [ ] 
+        shifted_results = [ shifted_results1, shifted_results2] 
+        print(result_at_params[0].shape, result_at_params[1].shape )
+        for idx, step_size in enumerate(param_step_sizes):
+            new_params = list(params)
+            new_params[idx] += step_size
+            result_at_params_with_step = simulate_func(new_params, *args, **kwargs)
+            #print("len(result_at_params_with_step)", len(result_at_params_with_step))
+            for i in range(len(result_at_params_with_step)):
+                shifted_results[i].append((result_at_params_with_step[i] - result_at_params[i])/ step_size)
+            #shifted_results.append(res)
+        print(shifted_results[1])
+        #return shifted_results
+        #return np.stack(shifted_results, axis=-1)
+        print("result_at_params[0].shape, params.shape", (params.shape + result_at_params[0].shape))
+        return [np.array(shifted_results[0]).reshape((params.shape + result_at_params[0].shape )), 
+                np.array(shifted_results[1]).reshape((params.shape + result_at_params[1].shape)) ]
+
+    return get_jacobian_manually
+
+def print_jacobian(jacobian: np.ndarray, precision: int = 3, linewidth: int = 200) -> None:
+    np.set_printoptions(precision=precision, suppress=True, linewidth=linewidth)
+    params = jacobian.shape[2]
+    for pp in range(params):
+        print(f"d(final_state/d(params[{pp}]):")
+        print(jacobian[:, :, pp])
+
+def print_jacobian_manual(jacobian: np.ndarray, precision: int = 3, linewidth: int = 200) -> None:
+    np.set_printoptions(precision=precision, suppress=True, linewidth=linewidth)
+    params = jacobian.shape[0]
+    for pp in range(params):
+        print(f"d(final_state/d(params[{pp}]):")
+        print(jacobian[pp, :, :])

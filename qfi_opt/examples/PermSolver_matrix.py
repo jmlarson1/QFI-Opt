@@ -1,5 +1,19 @@
-import numpy as np
-from scipy.integrate import solve_ivp
+import os
+USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
+
+if USE_DIFFRAX:
+    import diffrax
+    import jax
+    import jax.numpy as np
+    from jax.scipy.linalg import expm
+    from jax.numpy import linalg as LA
+    jax.config.update("jax_enable_x64", True)
+    COMPLEX_TYPE = np.complex128
+
+else:
+    import numpy as np
+    from scipy.integrate import solve_ivp
+
 ###################################
 ## Define functions for building the matrix of Hamiltonian and dissipation
 ###################################
@@ -541,18 +555,60 @@ def LMGMat2(chi, Omega, N): #-chi/(2N)*Sz^2-Omega*S_x
 
 
 def Perm_solver(rho0, tmax, Dmat, Dmatloc,Hmat, Hmatloc, dimension, Ntime):
-    atol=1e-10
-    rtol=1e-10
-    #method = DEFAULT_INTEGRATION_METHOD
-    teval=np.linspace(0, tmax, Ntime+1, endpoint=True)
     def func(t, rho, Dmat, Dmatloc,Hmat,Hmatloc, dimension):
-        drhodt=np.zeros(dimension, dtype=np.complex128)
+        #drhodt=np.zeros(dimension, dtype=np.complex128)
+        drhodt=[]
         for i in range(0,dimension):
+            drhodt.append(0+0j)
             for j in range(0,len(Dmat[i])):
                 drhodt[i]+=rho[Dmatloc[i][j]]*Dmat[i][j]
+                """
+                if USE_DIFFRAX == False:
+                    drhodt[i]+=rho[Dmatloc[i][j]]*Dmat[i][j]
+                else:
+                    drhodt = drhodt.at[i].add(rho[Dmatloc[i][j]]*Dmat[i][j])
+                """
             for j in range(0,len(Hmat[i])):
                 drhodt[i]+=rho[Hmatloc[i][j]]*Hmat[i][j]
+                """
+                if USE_DIFFRAX == False:
+                    drhodt[i]+=rho[Hmatloc[i][j]]*Hmat[i][j]
+                else:
+                    drhodt = drhodt.at[i].add(rho[Hmatloc[i][j]]*Hmat[i][j])
+                """
+        #print("drhodt.shape", drhodt.shape)
         return drhodt
-    sol = solve_ivp(func, [0,tmax], rho0,  args=(Dmat, Dmatloc,Hmat, Hmatloc, dimension),t_eval=teval,rtol=rtol,
-        atol=atol)#,method=method)
-    return sol
+
+    if USE_DIFFRAX == False:
+        atol=1e-10
+        rtol=1e-10
+        #method = DEFAULT_INTEGRATION_METHOD
+        teval=np.linspace(0, tmax, Ntime+1, endpoint=True)
+        sol = solve_ivp(func, [0,tmax], rho0,  args=(Dmat, Dmatloc,Hmat, Hmatloc, dimension),t_eval=teval,rtol=rtol,
+            atol=atol)#,method=method)
+        return sol
+    else:
+
+        def _func(t, rho, args):
+            return func(t, rho, args[0], args[1], args[2], args[3], args[4])
+            """
+            drhodt=np.zeros(dimension, dtype=np.complex128)
+            for i in range(0,dimension):
+                for j in range(0,len(Dmat[i])):
+                    drhodt[i]+=rho[Dmatloc[i][j]]*Dmat[i][j]
+                for j in range(0,len(Hmat[i])):
+                    drhodt[i]+=rho[Hmatloc[i][j]]*Hmat[i][j]
+            return drhodt
+            """
+        # set initial time step size
+        diffrax_kwargs = {}
+        diffrax_kwargs["dt0"] = tmax.real/Ntime
+
+        term = diffrax.ODETerm(_func)
+        solver = diffrax.Tsit5()  # try also diffrax.Dopri8()
+        solver_args = dict(t0=0.0, t1=tmax.real, y0=rho0, args=(Dmat, Dmatloc,Hmat, Hmatloc, dimension))
+        #if FORWARD_MODE:
+        diffrax_kwargs["max_steps"] = diffrax_kwargs.get("max_steps", None)
+        solver_args |= dict(adjoint=diffrax.DirectAdjoint())
+        solution = diffrax.diffeqsolve(term, solver, **solver_args, **diffrax_kwargs)
+        return solution.ys #[-1]
