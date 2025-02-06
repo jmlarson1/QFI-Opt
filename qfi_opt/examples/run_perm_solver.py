@@ -55,7 +55,10 @@ else:
                                      Hamiltonian_set=Hmat_set,
                                      dissipation_rates=dissipation / np.pi)
       for i in range(len(jacobian)):
-            methods.print_jacobian_manual(jacobian[i])
+            if USE_DIFFRAX == False:
+                  methods.print_jacobian_manual(jacobian[i])
+            else:
+                  methods.print_jacobian(jacobian[i])
 
 
 
