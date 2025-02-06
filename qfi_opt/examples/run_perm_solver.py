@@ -34,11 +34,10 @@ exec(f"Hmat_set = matrix.{model}Mat(1.0, Jmax)")
 # params
 if USE_DIFFRAX == False:
       x0 = (np.array([1/2 for _ in range(2)] + [1/2 if _ % 2 else 1 for _ in range(2 * layers)] + [1])
-            #* np.random.rand(3 + 2 * layers))
-            * np.full(3 + 2 * layers, 0.77, dtype=np.float64))
+            * np.random.rand(3 + 2 * layers))
 else:
       x0 = (np.array([1/2 for _ in range(2)] + [1/2 if _ % 2 else 1 for _ in range(2 * layers)] + [1])
-            * np.full(3 + 2 * layers, 0.77, dtype=np.float64))     
+            * np.random.rand(3 + 2 * layers))
 
 # simulate
 if calcjacobian == 0:
