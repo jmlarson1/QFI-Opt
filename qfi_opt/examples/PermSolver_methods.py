@@ -483,16 +483,22 @@ def compute_QFI(rho: np.ndarray, params: np.ndarray, jacobian: np.ndarray, obj_p
 
         if grad.size > 0:
             dA = jacobian[jm]
-            #dA = np.transpose(dA, (2, 0, 1))
-            # for any blocks that may be 1D, they will contribute nothing to QFI.
-            if np.shape(dA)[1] == 1:
-                continue
+            if USE_DIFFRAX:
+                if np.shape(dA)[0] == 1:
+                    # for any blocks that may be 1D, they will contribute nothing to QFI.
+                    continue
+                dA = np.transpose(dA, (2, 0, 1))
+            else:
+                # for any blocks that may be 1D, they will contribute nothing to QFI.
+                if np.shape(dA)[1] == 1:
+                    continue
             psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
             lambda_grads = np.zeros((num_params, num_vals))
             eigenvector_bases = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
 
             for k in range(num_params):
                 # compute gradients of each eigenvalue
+                ipdb.set_trace()
                 psi_grad_k, lambda_grad_k, basis_k = get_matrix_grads_rotate(rho[jm], dA[k], eigvals, eigvecs, tol)
                 psi_grads[k] = psi_grad_k
                 lambda_grads[k] = lambda_grad_k
@@ -575,6 +581,7 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
             else: # The eigenvalue has multiplicity one and we can do the more obvious thing:
                 M = np.hstack((rho - eigvals[ind1] * np.eye(dim), -np.expand_dims(eigvecs[ind1].T, 1)))
                 M = np.vstack((M, np.expand_dims(np.hstack((eigvecs[ind1].conj(), 0)), 0)))
+                ipdb.set_trace()
                 rhs = np.vstack((np.expand_dims(-dA @ eigvecs[ind1].T, 1), 0))
                 sol = np.linalg.solve(M, rhs)
                 psi_grads[ind1] = np.squeeze(sol[:dim])
