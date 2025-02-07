@@ -1,4 +1,5 @@
 import os
+import ipdb
 
 USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
 
@@ -408,10 +409,11 @@ def get_jacobian_func(simulate_func):
         assert len(param_step_sizes) == len(params)
 
         result_at_params = simulate_func(params, *args, **kwargs)
-        shifted_results1 = [ ] 
-        shifted_results2 = [ ] 
-        shifted_results = [ shifted_results1, shifted_results2] 
-        print(result_at_params[0].shape, result_at_params[1].shape )
+        shifted_results = [[] for i in range(len(result_at_params))]
+        #shifted_results1 = [ ]
+        #shifted_results2 = [ ]
+        #shifted_results = [ shifted_results1, shifted_results2]
+        #print(result_at_params[0].shape, result_at_params[1].shape )
         for idx, step_size in enumerate(param_step_sizes):
             new_params = list(params)
             new_params[idx] += step_size
@@ -420,12 +422,13 @@ def get_jacobian_func(simulate_func):
             for i in range(len(result_at_params_with_step)):
                 shifted_results[i].append((result_at_params_with_step[i] - result_at_params[i])/ step_size)
             #shifted_results.append(res)
-        print(shifted_results[1])
+        #print(shifted_results[1])
         #return shifted_results
         #return np.stack(shifted_results, axis=-1)
-        print("result_at_params[0].shape, params.shape", (params.shape + result_at_params[0].shape))
-        return [np.array(shifted_results[0]).reshape((params.shape + result_at_params[0].shape )), 
-                np.array(shifted_results[1]).reshape((params.shape + result_at_params[1].shape)) ]
+        #print("result_at_params[0].shape, params.shape", (params.shape + result_at_params[0].shape))
+        #return [np.array(shifted_results[0]).reshape((params.shape + result_at_params[0].shape )),
+        #        np.array(shifted_results[1]).reshape((params.shape + result_at_params[1].shape)) ]
+        return [np.array(shifted_results[res]).reshape((params.shape + result_at_params[res].shape)) for res in range(len(result_at_params))]
 
     return get_jacobian_manually
 
