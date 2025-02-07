@@ -480,9 +480,9 @@ def compute_QFI(rho: np.ndarray, params: np.ndarray, jacobian: np.ndarray, obj_p
 
         if grad.size > 0:
             dA = jacobian[jm]
-            dA = np.transpose(dA, (2, 0, 1))
+            #dA = np.transpose(dA, (2, 0, 1))
             # for any blocks that may be 1D, they will contribute nothing to QFI.
-            if np.shape(dA)[2] == 1: #[1] == 1:
+            if np.shape(dA)[1] == 1:
                 continue
             psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
             lambda_grads = np.zeros((num_params, num_vals))
