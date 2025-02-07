@@ -498,11 +498,13 @@ def compute_QFI(rho: np.ndarray, params: np.ndarray, jacobian: np.ndarray, obj_p
 
             for k in range(num_params):
                 # compute gradients of each eigenvalue
-                ipdb.set_trace()
                 psi_grad_k, lambda_grad_k, basis_k = get_matrix_grads_rotate(rho[jm], dA[k], eigvals, eigvecs, tol)
-                psi_grads[k] = psi_grad_k
-                lambda_grads[k] = lambda_grad_k
-                eigenvector_bases[k] = basis_k
+                #psi_grads[k] = psi_grad_k
+                psi_grads = psi_grads.at[k].set(psi_grad_k)
+                #lambda_grads[k] = lambda_grad_k
+                lambda_grads = lambda_grads.at[k].set(lambda_grad_k)
+                eigenvector_bases = eigenvector_bases.at[k].set(basis_k)
+                #eigenvector_bases[k] = basis_k
 
         # NOW COMPUTE
         for i in range(num_vals):
@@ -581,11 +583,12 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
             else: # The eigenvalue has multiplicity one and we can do the more obvious thing:
                 M = np.hstack((rho - eigvals[ind1] * np.eye(dim), -np.expand_dims(eigvecs[ind1].T, 1)))
                 M = np.vstack((M, np.expand_dims(np.hstack((eigvecs[ind1].conj(), 0)), 0)))
-                ipdb.set_trace()
                 rhs = np.vstack((np.expand_dims(-dA @ eigvecs[ind1].T, 1), 0))
                 sol = np.linalg.solve(M, rhs)
-                psi_grads[ind1] = np.squeeze(sol[:dim])
-                lambda_grads[ind1] = np.real(sol[dim])
+                #psi_grads[ind1] = np.squeeze(sol[:dim])
+                psi_grads = psi_grads.at[ind1].set(np.squeeze(sol[:dim]))
+                #lambda_grads[ind1] = np.real(sol[dim])
+                lambda_grads = lambda_grads.at[ind1].set(np.squeeze(np.real(sol[dim])))
 
     return psi_grads, lambda_grads, eigvecs
 
@@ -607,7 +610,8 @@ def qfi_quotient(lambda_i, lambda_j, lambda_grads):
         dk_lambda_i = lambda_grads[k, 0]
         dk_lambda_j = lambda_grads[k, 1]
 
-        g[k] = np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2))
+        #g[k] = np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2))
+        g = g.at[k].set(np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2)))
 
     return f, g
 
@@ -633,6 +637,7 @@ def qfi_modulus(G, psi_grads, i, j, eigenvectors):
         psi_i = eigenvectors[k, i]
         psi_j = eigenvectors[k, j]
         der_product = d_xk_psi_i.conj() @ G @ psi_j.T + psi_i.conj() @ G @ d_xk_psi_j.T
-        g[k] = 2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product)
+        #g[k] = 2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product)
+        g = g.at[k].set(2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product))
 
     return f, g
