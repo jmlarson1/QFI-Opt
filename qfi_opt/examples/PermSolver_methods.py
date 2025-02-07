@@ -1,6 +1,6 @@
 import os
 
-USE_DIFFRAX = False #bool(os.getenv("USE_DIFFRAX"))
+USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
 
 if USE_DIFFRAX:
     import diffrax
@@ -480,9 +480,9 @@ def compute_QFI(rho: np.ndarray, params: np.ndarray, jacobian: np.ndarray, obj_p
 
         if grad.size > 0:
             dA = jacobian[jm]
-            #dA = np.transpose(dA, (2, 0, 1))
+            dA = np.transpose(dA, (2, 0, 1))
             # for any blocks that may be 1D, they will contribute nothing to QFI.
-            if np.shape(dA)[1] == 1:
+            if np.shape(dA)[2] == 1: #[1] == 1:
                 continue
             psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
             lambda_grads = np.zeros((num_params, num_vals))
@@ -501,13 +501,19 @@ def compute_QFI(rho: np.ndarray, params: np.ndarray, jacobian: np.ndarray, obj_p
                 denom = eigvals[i] + eigvals[j]
                 diff = eigvals[i] - eigvals[j]
                 if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
-                    f_quotient, g_quotient = qfi_quotient(eigvals[i], eigvals[j], lambda_grads[:, [i, j]])
-                    f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigenvector_bases)
+                    if grad.size > 0:
+                        f_quotient, g_quotient = qfi_quotient(eigvals[i], eigvals[j], lambda_grads[:, [i, j]])
+                        f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigenvector_bases)
+                    else:
+                        eigenvector_bases = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
+                        eigenvector_bases[0] = eigvecs
+                        f_quotient = qfi_quotient(eigvals[i], eigvals[j], np.array([]))
+                        f_modulus = qfi_modulus(G, np.array([]), i, j, eigenvector_bases)
                     running_sum += f_quotient * f_modulus
                     if grad.size > 0:
                         grad[:] += f_quotient * g_modulus + f_modulus * g_quotient
 
-    const = (2 / (obj_params['N']**2))
+    const = (4 / (obj_params['N']**2))
     if grad.size > 0:
         return const * running_sum, const * grad
     else:
@@ -583,6 +589,9 @@ def qfi_quotient(lambda_i, lambda_j, lambda_grads):
 
     f = diff ** 2 / sum
 
+    if lambda_grads.size == 0:
+        return f
+
     g = np.zeros(dim)
     for k in range(dim):
         dk_lambda_i = lambda_grads[k, 0]
@@ -604,6 +613,9 @@ def qfi_modulus(G, psi_grads, i, j, eigenvectors):
     ip = psi_i.conj() @ G @ psi_j.T
 
     f = np.absolute(ip) ** 2
+
+    if psi_grads.size == 0:
+        return f
 
     for k in range(dim):
         d_xk_psi_i = psi_grads[k, i]
