@@ -1,5 +1,6 @@
 import os
-USE_DIFFRAX = bool(os.getenv("USE_DIFFRAX"))
+
+USE_DIFFRAX = False #bool(os.getenv("USE_DIFFRAX"))
 
 if USE_DIFFRAX:
     import diffrax
@@ -389,7 +390,7 @@ def get_jacobian_func(simulate_func):
     """Convert a simulation method into a function that returns its Jacobian."""
 
     if USE_DIFFRAX:
-        print("USE_DIFFRAX and FORWARD_MODE")
+        #print("USE_DIFFRAX and FORWARD_MODE")
         # forward-mode automatic differentiation
 
         def get_jacobian(params, *args: object, **kwargs: object) -> np.ndarray:
@@ -441,3 +442,175 @@ def print_jacobian_manual(jacobian: np.ndarray, precision: int = 3, linewidth: i
     for pp in range(params):
         print(f"d(final_state/d(params[{pp}]):")
         print(jacobian[pp, :, :])
+
+def compute_eigendecomposition(rho: np.ndarray):
+    # Compute eigendecomposition for rho
+    eigvals, eigvecs = np.linalg.eigh(rho)
+    eigvecs = eigvecs.T  # make the k-th eigenvector eigvecs[k, :] = eigvecs[k]
+    # consistent sorting:
+    eigvals = np.real(eigvals)
+    sort_inds = np.argsort(eigvals)
+    eigvals = eigvals[sort_inds]
+    eigvecs = eigvecs[sort_inds]
+    return eigvals, eigvecs
+
+
+def compute_QFI(rho: np.ndarray, params: np.ndarray, jacobian: np.ndarray, obj_params, tol: float = 1e-8, etol_scale: float = 10, grad=np.empty(0)):
+
+    Jmax = len(rho)
+    num_params = len(params)
+
+    # Initialize QFI and grad
+    running_sum = 0
+    if grad.size > 0:
+        grad[:] = np.zeros(num_params)
+
+    for jm in range(Jmax):
+        eigvals, eigvecs = compute_eigendecomposition(rho[jm])
+        # Note: The eigenvectors must be rows of eigvecs
+        num_vals = len(eigvals)
+
+        G = obj_params["G"][jm]
+
+        # There should never be negative eigenvalues, so their magnitude gives an
+        # empirical estimate of the numerical accuracy of the eigendecomposition.
+        # We discard any QFI terms denominators within an order of magnitude of
+        # this value.
+        tol = max(tol, -etol_scale * np.min(eigvals))
+
+        if grad.size > 0:
+            dA = jacobian[jm]
+            #dA = np.transpose(dA, (2, 0, 1))
+            # for any blocks that may be 1D, they will contribute nothing to QFI.
+            if np.shape(dA)[1] == 1:
+                continue
+            psi_grads = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
+            lambda_grads = np.zeros((num_params, num_vals))
+            eigenvector_bases = np.zeros((num_params, num_vals, num_vals), dtype="cdouble")
+
+            for k in range(num_params):
+                # compute gradients of each eigenvalue
+                psi_grad_k, lambda_grad_k, basis_k = get_matrix_grads_rotate(rho[jm], dA[k], eigvals, eigvecs, tol)
+                psi_grads[k] = psi_grad_k
+                lambda_grads[k] = lambda_grad_k
+                eigenvector_bases[k] = basis_k
+
+        # NOW COMPUTE
+        for i in range(num_vals):
+            for j in range(i + 1, num_vals):
+                denom = eigvals[i] + eigvals[j]
+                diff = eigvals[i] - eigvals[j]
+                if not np.isclose(denom, 0, atol=tol, rtol=tol) and not np.isclose(diff, 0, atol=tol, rtol=tol):
+                    f_quotient, g_quotient = qfi_quotient(eigvals[i], eigvals[j], lambda_grads[:, [i, j]])
+                    f_modulus, g_modulus = qfi_modulus(G, psi_grads, i, j, eigenvector_bases)
+                    running_sum += f_quotient * f_modulus
+                    if grad.size > 0:
+                        grad[:] += f_quotient * g_modulus + f_modulus * g_quotient
+
+    const = (2 / (obj_params['N']**2))
+    if grad.size > 0:
+        return const * running_sum, const * grad
+    else:
+        return const * running_sum, []
+
+
+def check_close_entries(arr, tol):
+    for i in range(len(arr)):
+        for j in range(i + 1, len(arr)):
+            diff = arr[j] - arr[i]
+            if np.isclose(diff, 0, atol=tol, rtol=tol):
+                return True
+    return False
+
+
+def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
+
+    dim = eigvecs.shape[0]
+    psi_grads = np.zeros((dim, dim), dtype="cdouble")
+    lambda_grads = np.zeros(dim)
+
+    # group the sorted eigvals by tolerance, intended to help stability of eigenvector derivatives:
+    current_ind = 0
+    for ind1 in range(dim):
+        if current_ind == ind1:
+            for ind2 in range(ind1 + 1, dim):
+                if not np.isclose(eigvals[ind2], eigvals[ind1], atol=tol, rtol=tol):
+                    break  # the for loop over ind2
+            # we just broke the for loop, so:
+            current_ind = ind2
+
+            group_set = np.arange(ind1, ind2)
+
+            if group_set.size == 0:
+                group_set = [ind2]
+
+            # Two cases - either the eigenvalue has multiplicity one or it doesn't.
+            if len(group_set) > 1:
+                Lambda_prime = eigvecs[group_set].conj() @ dA @ eigvecs[group_set].T
+                H = Lambda_prime @ Lambda_prime
+                eigvalsH, eigvecsH = np.linalg.eigh(H)
+                rotated_eigvecs = eigvecs[group_set].T @ eigvecsH
+                lhs = rho - eigvals[group_set[-1]] * np.eye(dim)
+                lhs = np.hstack((lhs, -rotated_eigvecs))
+                lhs_row2 = np.hstack((-rotated_eigvecs.T.conj(), np.zeros((len(group_set), len(group_set)))))
+                lhs = np.vstack((lhs, lhs_row2))
+                rhs = -dA @ rotated_eigvecs
+                rhs = np.vstack((rhs, np.zeros((len(group_set), len(group_set)))))
+                sol = np.linalg.solve(lhs, rhs)
+                psi_grads[group_set] = sol[:dim, :].T
+                Lambda_prime = sol[dim:, :]
+                lambda_grads[group_set] = np.real(np.diag(Lambda_prime))
+
+                # key: let the routine that called this subroutine know we rotated the eigvecs
+                eigvecs[group_set] = rotated_eigvecs.T
+            else: # The eigenvalue has multiplicity one and we can do the more obvious thing:
+                M = np.hstack((rho - eigvals[ind1] * np.eye(dim), -np.expand_dims(eigvecs[ind1].T, 1)))
+                M = np.vstack((M, np.expand_dims(np.hstack((eigvecs[ind1].conj(), 0)), 0)))
+                rhs = np.vstack((np.expand_dims(-dA @ eigvecs[ind1].T, 1), 0))
+                sol = np.linalg.solve(M, rhs)
+                psi_grads[ind1] = np.squeeze(sol[:dim])
+                lambda_grads[ind1] = np.real(sol[dim])
+
+    return psi_grads, lambda_grads, eigvecs
+
+
+def qfi_quotient(lambda_i, lambda_j, lambda_grads):
+
+    dim = np.shape(lambda_grads)[0]
+
+    diff = lambda_i - lambda_j
+    sum = lambda_i + lambda_j
+
+    f = diff ** 2 / sum
+
+    g = np.zeros(dim)
+    for k in range(dim):
+        dk_lambda_i = lambda_grads[k, 0]
+        dk_lambda_j = lambda_grads[k, 1]
+
+        g[k] = np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2))
+
+    return f, g
+
+
+def qfi_modulus(G, psi_grads, i, j, eigenvectors):
+
+    dim = np.shape(psi_grads)[0]
+    g = np.zeros(dim)
+
+    # WLOG:
+    psi_i = eigenvectors[0, i]
+    psi_j = eigenvectors[0, j]
+    ip = psi_i.conj() @ G @ psi_j.T
+
+    f = np.absolute(ip) ** 2
+
+    for k in range(dim):
+        d_xk_psi_i = psi_grads[k, i]
+        d_xk_psi_j = psi_grads[k, j]
+        psi_i = eigenvectors[k, i]
+        psi_j = eigenvectors[k, j]
+        der_product = d_xk_psi_i.conj() @ G @ psi_j.T + psi_i.conj() @ G @ d_xk_psi_j.T
+        g[k] = 2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product)
+
+    return f, g
