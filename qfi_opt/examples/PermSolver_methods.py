@@ -499,12 +499,19 @@ def compute_QFI(rho: np.ndarray, params: np.ndarray, jacobian: np.ndarray, obj_p
             for k in range(num_params):
                 # compute gradients of each eigenvalue
                 psi_grad_k, lambda_grad_k, basis_k = get_matrix_grads_rotate(rho[jm], dA[k], eigvals, eigvecs, tol)
-                #psi_grads[k] = psi_grad_k
-                psi_grads = psi_grads.at[k].set(psi_grad_k)
-                #lambda_grads[k] = lambda_grad_k
-                lambda_grads = lambda_grads.at[k].set(lambda_grad_k)
-                eigenvector_bases = eigenvector_bases.at[k].set(basis_k)
-                #eigenvector_bases[k] = basis_k
+                if not USE_DIFFRAX:
+                    psi_grads[k] = psi_grad_k
+                else:
+                    psi_grads = psi_grads.at[k].set(psi_grad_k)
+                if not USE_DIFFRAX:
+                    lambda_grads[k] = lambda_grad_k
+                else:
+                    lambda_grads = lambda_grads.at[k].set(lambda_grad_k)
+                if not USE_DIFFRAX:
+                    eigenvector_bases[k] = basis_k
+                else:
+                    eigenvector_bases = eigenvector_bases.at[k].set(basis_k)
+
 
         # NOW COMPUTE
         for i in range(num_vals):
@@ -574,21 +581,34 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
                 rhs = -dA @ rotated_eigvecs
                 rhs = np.vstack((rhs, np.zeros((len(group_set), len(group_set)))))
                 sol = np.linalg.solve(lhs, rhs)
-                psi_grads[group_set] = sol[:dim, :].T
+                if not USE_DIFFRAX:
+                    psi_grads[group_set] = sol[:dim, :].T
+                else:
+                    psi_grads = psi_grads.at[group_set].set(np.squeeze(sol[:dim, :].T))
                 Lambda_prime = sol[dim:, :]
-                lambda_grads[group_set] = np.real(np.diag(Lambda_prime))
+                if not USE_DIFFRAX:
+                    lambda_grads[group_set] = np.real(np.diag(Lambda_prime))
+                else:
+                    lambda_grads = lambda_grads.at[group_set].set(np.squeeze(np.real(np.diag(Lambda_prime))))
 
                 # key: let the routine that called this subroutine know we rotated the eigvecs
-                eigvecs[group_set] = rotated_eigvecs.T
+                if not USE_DIFFRAX:
+                    eigvecs[group_set] = rotated_eigvecs.T
+                else:
+                    eigvecs = eigvecs.at[group_set].set(np.squeeze(rotated_eigvecs.T))
             else: # The eigenvalue has multiplicity one and we can do the more obvious thing:
                 M = np.hstack((rho - eigvals[ind1] * np.eye(dim), -np.expand_dims(eigvecs[ind1].T, 1)))
                 M = np.vstack((M, np.expand_dims(np.hstack((eigvecs[ind1].conj(), 0)), 0)))
                 rhs = np.vstack((np.expand_dims(-dA @ eigvecs[ind1].T, 1), 0))
                 sol = np.linalg.solve(M, rhs)
-                #psi_grads[ind1] = np.squeeze(sol[:dim])
-                psi_grads = psi_grads.at[ind1].set(np.squeeze(sol[:dim]))
-                #lambda_grads[ind1] = np.real(sol[dim])
-                lambda_grads = lambda_grads.at[ind1].set(np.squeeze(np.real(sol[dim])))
+                if not USE_DIFFRAX:
+                    psi_grads[ind1] = np.squeeze(sol[:dim])
+                else:
+                    psi_grads = psi_grads.at[ind1].set(np.squeeze(sol[:dim]))
+                if not USE_DIFFRAX:
+                    lambda_grads[ind1] = np.real(sol[dim])
+                else:
+                    lambda_grads = lambda_grads.at[ind1].set(np.squeeze(np.real(sol[dim])))
 
     return psi_grads, lambda_grads, eigvecs
 
@@ -610,8 +630,10 @@ def qfi_quotient(lambda_i, lambda_j, lambda_grads):
         dk_lambda_i = lambda_grads[k, 0]
         dk_lambda_j = lambda_grads[k, 1]
 
-        #g[k] = np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2))
-        g = g.at[k].set(np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2)))
+        if not USE_DIFFRAX:
+            g[k] = np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2))
+        else:
+            g = g.at[k].set(np.real((2 * diff * sum * (dk_lambda_i - dk_lambda_j) - (dk_lambda_i + dk_lambda_j) * diff ** 2) / (sum ** 2)))
 
     return f, g
 
@@ -637,7 +659,9 @@ def qfi_modulus(G, psi_grads, i, j, eigenvectors):
         psi_i = eigenvectors[k, i]
         psi_j = eigenvectors[k, j]
         der_product = d_xk_psi_i.conj() @ G @ psi_j.T + psi_i.conj() @ G @ d_xk_psi_j.T
-        #g[k] = 2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product)
-        g = g.at[k].set(2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product))
+        if not USE_DIFFRAX:
+            g[k] = 2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product)
+        else:
+            g = g.at[k].set(2 * np.real(ip) * np.real(der_product) + 2 * np.imag(ip) * np.imag(der_product))
 
     return f, g
