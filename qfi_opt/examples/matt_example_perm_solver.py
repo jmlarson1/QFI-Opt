@@ -36,8 +36,8 @@ layers = int(sys.argv[4])
 
 obj_params = {'G': psm.MatSz(N//2), 'N': N, 'dissipation': dissipation, 'layers': layers, 'Hmat_set': Hmat_set}
 
-random.seed(3)
-np.random.seed(3)
+random.seed(888)
+np.random.seed(888)
 # set up initial vector, parameter bounds
 #x0 = (np.array([1/2 for _ in range(2)] + [1/2 if _ % 2 else 1 for _ in range(2 * obj_params['layers'])] + [1])
 #      * np.random.rand(3 + 2 * obj_params['layers']))

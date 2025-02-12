@@ -48,6 +48,11 @@ if calcjacobian == 0:
       # calculate qfi
       qfi = methods.calc_QFI(rho, Jmax, G) / N**2
       print(f'params = {x0}', f'qfi = {qfi}', sep='\n')
+
+      # compute qfi
+      obj_params = {'G': G, 'N': N}
+      qfi = methods.compute_QFI(rho, x0, [], obj_params)
+      print(f'params = {x0}', f'qfi = {qfi}', sep='\n')
 else:
       get_jacobian = methods.get_jacobian_func(methods.simulate_layers)
       jacobian = get_jacobian(params=x0,

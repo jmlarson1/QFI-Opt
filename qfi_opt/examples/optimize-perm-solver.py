@@ -4,6 +4,7 @@ np.random.seed(int((time.time() * 10 ** 8) % 10** 8))
 from scipy.optimize import minimize as mini
 import PermSolver_methods as methods
 import PermSolver_matrix as matrix
+import random
 
 def min_funct(x0:np.ndarray, obj_params:dict, Hmat_set:list):
 
@@ -18,11 +19,11 @@ def min_funct(x0:np.ndarray, obj_params:dict, Hmat_set:list):
 
 
 # set optimization parameters
-method = "L-BFGS-B" # 'Nelder-Mead'
+method = 'Nelder-Mead' #"L-BFGS-B" # 'Nelder-Mead'
 obj_params = {}
 obj_params['N'] = 8
-model = np.random.choice(['OAT', 'TAT'])
-obj_params['dissipation'] = float(np.random.choice(np.logspace(-2, 1.5, 7)))
+model = 'TAT' #np.random.choice(['OAT', 'TAT'])
+obj_params['dissipation'] = 0.01  #float(np.random.choice(np.logspace(-2, 1.5, 7)))
 obj_params['layers'] = 2
 obj_params['G'] = methods.MatSz(obj_params['N']//2)
 exec(f"Hmat_set = matrix.{model}Mat(1.0, obj_params['N']//2)")
@@ -30,7 +31,12 @@ exec(f"Hmat_set = matrix.{model}Mat(1.0, obj_params['N']//2)")
 x0 = (np.array([1/2 for _ in range(2)] + [1/2 if _ % 2 else 1 for _ in range(2 * obj_params['layers'])] + [1])
       * np.random.rand(3 + 2 * obj_params['layers']))
 bnds = [(0, 1/2) for _ in range(2)] + [(0,1/2) if _ % 2 == 0 else (0, 1) for _ in range(2 * obj_params['layers'])] + [(0, 1)]
+# unbounded case:
+bnds = [(-np.inf, np.inf) for _ in range(3 + 2 * obj_params['layers'])]
 
+random.seed(888)
+np.random.seed(888)
+x0 = np.random.rand(3 + 2 * obj_params['layers'])
 
 # optimize qfi
 time_stamp = time.time()
