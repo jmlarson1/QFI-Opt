@@ -127,10 +127,10 @@ def recoverrhomat(rho0, N):
     for i in range(0,N+1):
         result.append(np.zeros((2*i+1,2*i+1),dtype=np.complex128))
         for mj1 in range(0,2*i+1):
-            for mj2 in range(0,2*i+1):
+            for mj2 in range(mj1,2*i+1):
                 result[i][mj1][mj2]=rho0[count]
-                # if (mj1!=mj2):
-                #     result[i][mj2][mj1]=np.conj(rho0[count])
+                if (mj1!=mj2):
+                    result[i][mj2][mj1]=np.conj(rho0[count])
                 count+=1
     return result
 
