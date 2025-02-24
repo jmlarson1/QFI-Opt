@@ -36,9 +36,10 @@ if USE_DIFFRAX == False:
       x0 = (np.array([1/2 for _ in range(2)] + [1/2 if _ % 2 else 1 for _ in range(2 * layers)] + [1])
             * np.random.rand(3 + 2 * layers))
 else:
+      from jax import random
+      key = random.PRNGKey(18237)
       x0 = (np.array([1/2 for _ in range(2)] + [1/2 if _ % 2 else 1 for _ in range(2 * layers)] + [1])
-            * np.random.rand(3 + 2 * layers))
-
+          * random.normal(key, shape=(3 + 2 * layers,)))
 # simulate
 if calcjacobian == 0:
       rho = methods.simulate_layers(params=x0,
