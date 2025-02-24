@@ -277,6 +277,7 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
     # set all spins down
     rho_init = UnitaryGate(Init_rho(Jmax), Sx, np.pi, Jmax)
 
+    dissipation_rates = dissipation_rates / np.pi
     if dissipation_format == "XYZ":
         if type(dissipation_rates) == float or type(dissipation_rates) == np.float64:
             Dmat, Dmatloc, Dmat2, Dmatloc2, dimension = matrix.XYZ_DisMat(dissipation_rates, dissipation_rates, dissipation_rates, Jmax)
