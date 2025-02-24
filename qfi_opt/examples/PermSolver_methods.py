@@ -262,63 +262,6 @@ def calc_QFI(rho, Jmax, optrSz, tol=1e-10)->float:
 
 
 import PermSolver_matrix as matrix
-def simulate(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dissipation_rates:tuple|float=0.0, dissipation_format:str='XYZ'):
-    assert dissipation_format in ['XYZ', 'PMZ'], "dissipation format distinct from preset formats"
-    Jmax = num_qubits//2
-    Nsteps = 101
-    Sx, Sy, Sz, Sx2, Sy2, Sz2 = operator_moments(Jmax)
-    Hmat, Hmatloc, dimension = Hamiltonian_set[0], Hamiltonian_set[1], Hamiltonian_set[2]
-
-    # start all spins down
-    rho_init = UnitaryGate(Init_rho(Jmax), Sx, np.pi, Jmax)
-
-    if dissipation_format == "XYZ":
-        if type(dissipation_rates) == float or type(dissipation_rates) == np.float64:
-            Dmat, Dmatloc, dimension = matrix.isotropic_DisMat(dissipation_rates, dissipation_rates, dissipation_rates, Jmax)
-        else:
-            Dmat, Dmatloc, dimension = matrix.isotropic_DisMat(dissipation_rates[0], dissipation_rates[1], dissipation_rates[2],
-                                                               Jmax)
-    else:
-        if type(dissipation_rates) == float or type(dissipation_rates) == np.float64:
-            Dmat, Dmatloc, dimension = matrix.DisMat(dissipation_rates, dissipation_rates, dissipation_rates,
-                                                     0, 0, 0, Jmax)
-        else:
-            Dmat, Dmatloc, dimension = matrix.DisMat(dissipation_rates[0], dissipation_rates[1], dissipation_rates[2],
-                                                     0, 0, 0, Jmax)
-
-    # set up initial rotation axis -> params[1]
-    axis_factor = 1
-    cos_component = np.cos(axis_factor * np.pi * params[1])
-    sin_component = np.sin(axis_factor * np.pi * params[1])
-    Sphi1 = []
-    for jj in range(Jmax + 1):
-        Sphi1.append(Sx[jj] * cos_component + Sy[jj] * sin_component)
-
-    # rotate state for angle params[0] * pi about axis set by params[1] * pi
-    rot1 = UnitaryGate(rho_init, Sphi1, -params[0] * np.pi, Jmax)
-
-
-    # Entangle!
-    # if entangling time is not zero, entangle
-    if params[2] != 0:
-        rho1_f = flatrhomat(rot1, Jmax)
-        sol = matrix.Perm_solver(rho1_f, params[2] * np.pi, Dmat, Dmatloc, Hmat, Hmatloc, dimension, Nsteps)
-        ent1 = recoverrhomat2(sol.y, Jmax, Nsteps)
-        out_state = ent1[-1]
-
-
-    else:
-        out_state = rot1
-
-    # set up final rotation axis -> params[4]
-    cos_component = np.cos(axis_factor * np.pi * params[4])
-    sin_component = np.sin(axis_factor * np.pi * params[4])
-    Sphi2 = []
-    for jj in range(Jmax + 1):
-        Sphi2.append(Sx[jj] * cos_component + Sy[jj] * sin_component)
-
-    # rotate state for angle params[3] * pi about axis set by params[4] * pi
-    return UnitaryGate(out_state, Sphi2, params[3] * np.pi, Jmax)
 
 
 def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dissipation_rates:tuple|float=0.0, dissipation_format:str='XYZ'):
@@ -329,23 +272,23 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
     Jmax = num_qubits//2
     Nsteps = 11
     Sx, Sy, Sz = operator_moments(Jmax, return_first_moments_only=True)
-    Hmat, Hmatloc, dimension = Hamiltonian_set[0], Hamiltonian_set[1], Hamiltonian_set[2]
+    Hmat, Hmatloc, Hmat2, Hmatloc2, dimension = Hamiltonian_set
 
     # set all spins down
     rho_init = UnitaryGate(Init_rho(Jmax), Sx, np.pi, Jmax)
 
     if dissipation_format == "XYZ":
         if type(dissipation_rates) == float or type(dissipation_rates) == np.float64:
-            Dmat, Dmatloc, dimension = matrix.isotropic_DisMat(dissipation_rates, dissipation_rates, dissipation_rates, Jmax)
+            Dmat, Dmatloc, Dmat2, Dmatloc2, dimension = matrix.XYZ_DisMat(dissipation_rates, dissipation_rates, dissipation_rates, Jmax)
         else:
-            Dmat, Dmatloc, dimension = matrix.isotropic_DisMat(dissipation_rates[0], dissipation_rates[1], dissipation_rates[2],
+            Dmat, Dmatloc, Dmat2, Dmatloc2, dimension = matrix.XYZ_DisMat(dissipation_rates[0], dissipation_rates[1], dissipation_rates[2],
                                                                Jmax)
     else:
         if type(dissipation_rates) == float or type(dissipation_rates) == np.float64:
-            Dmat, Dmatloc, dimension = matrix.DisMat(dissipation_rates, dissipation_rates, dissipation_rates,
+            Dmat, Dmatloc, Dmat2, Dmatloc2, dimension = matrix.PMZ_DisMat(dissipation_rates, dissipation_rates, dissipation_rates,
                                                      0, 0, 0, Jmax)
         else:
-            Dmat, Dmatloc, dimension = matrix.DisMat(dissipation_rates[0], dissipation_rates[1], dissipation_rates[2],
+            Dmat, Dmatloc, Dmat2, Dmatloc2, dimension = matrix.PMZ_DisMat(dissipation_rates[0], dissipation_rates[1], dissipation_rates[2],
                                                      0, 0, 0, Jmax)
 
     # set up initial rotation axis -> params[1]
@@ -365,7 +308,7 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
         # if entangling time is not zero, entangle
         if params[pp] > 0:
             state_f = flatrhomat(state, Jmax)
-            sol = matrix.Perm_solver(state_f, params[pp] * np.pi, Dmat, Dmatloc, Hmat, Hmatloc, dimension, Nsteps)
+            sol = matrix.Perm_solver(state_f, params[pp] * np.pi, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension, Nsteps)
             if USE_DIFFRAX == False:
                 state = recoverrhomat2(sol.y, Jmax, Nsteps)[-1]
             else:
