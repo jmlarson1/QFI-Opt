@@ -146,13 +146,16 @@ def recoverrhomat2(rho0, N, Nstep):
         for i in range(0,N+1):
             result[time].append(np.zeros((2*i+1,2*i+1),dtype=np.complex128))
             for mj1 in range(0,2*i+1):
-                for mj2 in range(0,2*i+1):
+                for mj2 in range(mj1,2*i+1):
                     if USE_DIFFRAX == False:
                         result[time][i][mj1][mj2]=rho0[count][time]
+                        if (mj1!=mj2):
+                            result[time][i][mj2][mj1]=np.conj(rho0[count][time])
                     else:
                         result[time][i] = result[time][i].at[mj1,mj2].set(rho0[count][time])
-                    # if (mj1!=mj2):
-                    #     result[time][i][mj2][mj1]=np.conj(rho0[count][time])
+                        if mj1!=mj2:
+                            result[time][i] = result[time][i].at[mj1, mj2].set(np.conj(rho0[count][time]))
+                    
                     count+=1
     return result
 
