@@ -554,8 +554,20 @@ def LMGMat2(chi, Omega, N): #-chi/(2N)*Sz^2-Omega*S_x
     return resultmat,resultmatloc,dimension
 
 
-def Perm_solver(rho0, tmax, Dmat, Dmatloc,Hmat, Hmatloc, dimension, Ntime):
-    def func(t, rho, Dmat, Dmatloc,Hmat,Hmatloc, dimension):
+def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension, Ntime):
+    def func(t, rho, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension):
+        drhodt=np.zeros(dimension, dtype=np.complex128)
+        for i in range(0,dimension):
+            for j in range(0,len(Dmat[i])):
+                drhodt[i]+=rho[Dmatloc[i][j]]*Dmat[i][j]
+            for j in range(0,len(Dmat2[i])):
+                drhodt[i]+=np.conj(rho[Dmatloc2[i][j]])*Dmat2[i][j]
+            for j in range(0,len(Hmat[i])):
+                drhodt[i]+=rho[Hmatloc[i][j]]*Hmat[i][j]
+            for j in range(0,len(Hmat2[i])):
+                drhodt[i]+=np.conj(rho[Hmatloc2[i][j]])*Hmat2[i][j]
+        return drhodt
+        '''
         #drhodt=np.zeros(dimension, dtype=np.complex128)
         drhodt=[]
         for i in range(0,dimension):
@@ -578,13 +590,14 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc,Hmat, Hmatloc, dimension, Ntime):
                 """
         #print("drhodt.shape", drhodt.shape)
         return drhodt
+        '''
 
     if USE_DIFFRAX == False:
         atol=1e-10
         rtol=1e-10
         #method = DEFAULT_INTEGRATION_METHOD
         teval=np.linspace(0, tmax, Ntime+1, endpoint=True)
-        sol = solve_ivp(func, [0,tmax], rho0,  args=(Dmat, Dmatloc,Hmat, Hmatloc, dimension),t_eval=teval,rtol=rtol,
+        sol = solve_ivp(func, [0,tmax], rho0,  args=(Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension),t_eval=teval,rtol=rtol,
             atol=atol)#,method=method)
         return sol
     else:
