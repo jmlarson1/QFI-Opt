@@ -24,7 +24,7 @@ else:
 
  
 # dephasing with spontaneous emission/absorption
-def dephasing_DisMat(gamma_p, gamma_m, gamma_z, gamma_pall, gamma_mall, gamma_zall, N):
+def PMZ_DisMat(gamma_p, gamma_m, gamma_z, gamma_pall, gamma_mall, gamma_zall, N):
     # table for j, mj
     tablej = []
     tablemj1 = []
@@ -171,7 +171,7 @@ def dephasing_DisMat(gamma_p, gamma_m, gamma_z, gamma_pall, gamma_mall, gamma_za
 
 
 # dephasing along all axes
-def axes_DisMat(gamma_x, gamma_y, gamma_z, N):
+def XYZ_DisMat(gamma_x, gamma_y, gamma_z, N):
     #table for j, mj
     tablej=[]
     tablemj1=[]
