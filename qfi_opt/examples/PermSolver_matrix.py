@@ -686,7 +686,7 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
     else:
 
         def _func(t, rho, args):
-            return func(t, rho, args[0], args[1], args[2], args[3], args[4])
+            return func(t, rho, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9])
             """
             drhodt=np.zeros(dimension, dtype=np.complex128)
             for i in range(0,dimension):
