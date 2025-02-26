@@ -147,7 +147,7 @@ def compute_collective_basis_CFI_for_uniform_qubit_rotations(rho: np.ndarray,
     return np.max(fishers) / num_qubits ** 2, varphi[np.argmax(fishers)]
 
 
-def compute_collective_basis_CFI_for_uniform_qubit_rotations_Ffun(params, sim_params):
+def compute_collective_basis_CFI_for_uniform_qubit_rotations_Ffun(params, sim_params, just_return_rho=False, just_theta=False, rho=np.nan):
 
     num_params = len(params)
     x = params[:num_params - 1]
@@ -159,12 +159,18 @@ def compute_collective_basis_CFI_for_uniform_qubit_rotations_Ffun(params, sim_pa
     dissipation_rates = sim_params['dissipation_rates']
     dphi = sim_params['dphi']
 
-    simulation_obj = getattr(sm, f'simulate_{model}_chain')
+    if not just_theta:
+        #  we need to compute rho.
+        simulation_obj = getattr(sm, f'simulate_{model}_chain')
 
-    rho = simulation_obj(params=x, num_qubits=num_qubits, dissipation_rates=dissipation_rates,
+        rho = simulation_obj(params=x, num_qubits=num_qubits, dissipation_rates=dissipation_rates,
                          coupling_exponent=coupling_exponent)
 
     assert not np.all(np.isnan(rho.real)), 'density matrix format invalid'
+
+    if just_return_rho:
+        #  return early, this is all we wanted.
+        return rho
 
     Sx, Sy, Sz = sm.collective_spin_ops(num_qubits=num_qubits)
 
@@ -223,7 +229,52 @@ def compute_bitstring_basis_CFI_for_uniform_qubit_rotations(rho: np.ndarray,
     # return CFI and optimal rotation axes
     return np.max(fishers) / num_qubits ** 2, varphi[np.argmax(fishers)]
 
+def compute_bitstring_basis_CFI_for_uniform_qubit_rotations_Ffun(params, sim_params, just_return_rho=False, just_theta=False, rho=np.nan):
+    num_params = len(params)
+    x = params[:num_params - 1]
+    theta = params[num_params - 1]  # theta is one dimensional for this CFI type.
 
+    num_qubits = sim_params['N']
+    model = sim_params['model']
+    coupling_exponent = sim_params['coupling_exponent']
+    dissipation_rates = sim_params['dissipation_rates']
+    dphi = sim_params['dphi']
+
+    if not just_theta:
+        #  we need to compute rho.
+        simulation_obj = getattr(sm, f'simulate_{model}_chain')
+
+        rho = simulation_obj(params=x, num_qubits=num_qubits, dissipation_rates=dissipation_rates,
+                             coupling_exponent=coupling_exponent)
+
+    assert not np.all(np.isnan(rho.real)), 'density matrix format invalid'
+
+    if just_return_rho:
+        #  return early, this is all we wanted.
+        return rho
+
+    Sx, Sy, Sz = sm.collective_spin_ops(num_qubits=num_qubits)
+
+    def Svarphi(varphi: float) -> np.ndarray:
+        return np.cos(varphi) * Sx + np.sin(varphi) * Sy
+
+    Svarphi_ = Svarphi(theta)
+    rho_varphi = state_integrator(rho, Svarphi_, np.pi / 2)
+    rho_pert = state_integrator(rho, Sz, dphi)
+    rho_varphi_pert = state_integrator(rho_pert, Svarphi_, np.pi / 2)
+
+    unpert_dist = np.real(np.diagonal(rho_varphi))
+    pert_dist = np.real(np.diagonal(rho_varphi_pert))
+
+    # note: h needs to be multiplied by 1.0 / ((num_qubits * dphi) ** 2)
+
+    distribution_support = len(unpert_dist)
+    Fvec = np.zeros(2 * distribution_support)
+    for key in range(distribution_support):
+        Fvec[key] = unpert_dist[key]
+        Fvec[distribution_support + key] = pert_dist[key]
+
+    return Fvec
 
 # we instead optimize to find the best rotation axes for all single-qubit rotations
 def compute_collective_basis_CFI_for_single_qubit_rotations(rho: np.ndarray,
@@ -265,8 +316,8 @@ def compute_collective_basis_CFI_for_single_qubit_rotations(rho: np.ndarray,
     # return CFI and optimal single-qubit rotation axes
     return -opt_cfi/num_qubits**2, opt_x
 
-def compute_collective_basis_CFI_for_single_qubit_rotations_Ffun(params, sim_params):
 
+def compute_collective_basis_CFI_for_single_qubit_rotations_Ffun(params, sim_params, just_return_rho=False, just_theta=False, rho=np.nan):
 
     num_qubits = sim_params['N']
     model = sim_params['model']
@@ -278,12 +329,19 @@ def compute_collective_basis_CFI_for_single_qubit_rotations_Ffun(params, sim_par
     x = params[:num_params - num_qubits]
     theta = params[num_params - num_qubits:]  # theta has dimension num_qubits for this CFI type.
 
-    simulation_obj = getattr(sm, f'simulate_{model}_chain')
+    if not just_theta:
+        #  we need to compute rho.
+        simulation_obj = getattr(sm, f'simulate_{model}_chain')
 
-    rho = simulation_obj(params=x, num_qubits=num_qubits, dissipation_rates=dissipation_rates,
+        rho = simulation_obj(params=x, num_qubits=num_qubits, dissipation_rates=dissipation_rates,
                          coupling_exponent=coupling_exponent)
 
+    #  by the default, this will also make sure that a rho was actually provided if just_theta=True
     assert not np.all(np.isnan(rho.real)), 'density matrix format invalid'
+
+    if just_return_rho:
+        #  return early, this is all we wanted.
+        return rho
 
     Sx, Sy, Sz = sm.collective_spin_ops(num_qubits=num_qubits)
 
@@ -356,7 +414,56 @@ def compute_bitstring_basis_CFI_for_single_qubit_rotations(rho: np.ndarray,
     return -opt_cfi/num_qubits**2, opt_x
 
 
+def compute_bitstring_basis_CFI_for_single_qubit_rotations_Ffun(params, sim_params, just_return_rho=False, just_theta=False, rho=np.nan):
 
+    num_qubits = sim_params['N']
+    model = sim_params['model']
+    coupling_exponent = sim_params['coupling_exponent']
+    dissipation_rates = sim_params['dissipation_rates']
+    dphi = sim_params['dphi']
+
+    num_params = len(params)
+    x = params[:num_params - num_qubits]
+    theta = params[num_params - num_qubits:]  # theta has dimension num_qubits for this CFI type.
+
+    if not just_theta:
+        #  we need to compute rho.
+        simulation_obj = getattr(sm, f'simulate_{model}_chain')
+
+        rho = simulation_obj(params=x, num_qubits=num_qubits, dissipation_rates=dissipation_rates,
+                         coupling_exponent=coupling_exponent)
+
+    #  by the default, this will also make sure that a rho was actually provided if just_theta=True
+    assert not np.all(np.isnan(rho.real)), 'density matrix format invalid'
+
+    if just_return_rho:
+        #  return early, this is all we wanted.
+        return rho
+
+    Sx, Sy, Sz = sm.collective_spin_ops(num_qubits=num_qubits)
+
+    # rotate all qubits uniformly by small value dphi about z
+    rotate_qubit = state_integrator(rho, Sz, dphi)
+
+    # rotate all qubits about the equator arbitrarily
+    for qubit_idx in range(num_qubits):
+        rotator = construct_qubit_equator_rotator(num_qubits, qubit_idx, float(theta[qubit_idx]))
+        rotate_qubit = state_integrator(rotate_qubit, rotator, np.pi / 2)
+        rho = state_integrator(rho, rotator, np.pi / 2)
+
+    # compute the cfi with respect to the arbitrarily rotated density matrix
+    pert_dist = np.real(np.diagonal(rotate_qubit))
+    init_dist = np.real(np.diagonal(rho))
+
+    # note: h needs to be multiplied by 1.0 / ((num_qubits * dphi) ** 2)
+
+    distribution_support = len(init_dist)
+    Fvec = np.zeros(2 * distribution_support)
+    for key in range(distribution_support):
+        Fvec[key] = init_dist[key]
+        Fvec[distribution_support + key] = pert_dist[key]
+
+    return Fvec
 
 
 
