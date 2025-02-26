@@ -702,7 +702,7 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
 
         term = diffrax.ODETerm(_func)
         solver = diffrax.Tsit5()  # try also diffrax.Dopri8()
-        solver_args = dict(t0=0.0, t1=tmax.real, y0=rho0, args=(Dmat, Dmatloc,Hmat, Hmatloc, dimension))
+        solver_args = dict(t0=0.0, t1=tmax.real, y0=rho0, args=(Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension))
         #if FORWARD_MODE:
         diffrax_kwargs["max_steps"] = diffrax_kwargs.get("max_steps", None)
         solver_args |= dict(adjoint=diffrax.DirectAdjoint())
