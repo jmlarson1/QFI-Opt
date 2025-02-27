@@ -642,13 +642,27 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
         drhodt=np.zeros(dimension, dtype=np.complex128)
         for i in range(0,dimension):
             for j in range(0,len(Dmat[i])):
-                drhodt[i]+=rho[Dmatloc[i][j]]*Dmat[i][j]
+                if USE_DIFFRAX == False:
+                    drhodt[i]+=rho[Dmatloc[i][j]]*Dmat[i][j]
+                else:
+                    drhodt[i]+=drhodt.at[i].add(rho[Dmatloc[i][j]]*Dmat[i][j])
+            
             for j in range(0,len(Dmat2[i])):
-                drhodt[i]+=np.conj(rho[Dmatloc2[i][j]])*Dmat2[i][j]
+                if USE_DIFFRAX == False:
+                    drhodt[i]+=np.conj(rho[Dmatloc2[i][j]])*Dmat2[i][j]
+                else:
+                    drhodt[i]+=drhodt.at[i].add(np.conj(rho[Dmatloc2[i][j]])*Dmat2[i][j])
+                    
             for j in range(0,len(Hmat[i])):
-                drhodt[i]+=rho[Hmatloc[i][j]]*Hmat[i][j]
+                if USE_DIFFRAX == False:
+                    drhodt[i]+=rho[Hmatloc[i][j]]*Hmat[i][j]
+                else:
+                    drhodt[i]+=drhodt.at[i].add(rho[Hmatloc[i][j]]*Hmat[i][j])
             for j in range(0,len(Hmat2[i])):
-                drhodt[i]+=np.conj(rho[Hmatloc2[i][j]])*Hmat2[i][j]
+                if USE_DIFFRAX == False:
+                    drhodt[i]+=np.conj(rho[Hmatloc2[i][j]])*Hmat2[i][j]
+                else:
+                    drhodt[i]+=drhodt.at[i].add(np.conj(rho[Hmatloc2[i][j]])*Hmat2[i][j])
         return drhodt
         '''
         #drhodt=np.zeros(dimension, dtype=np.complex128)
