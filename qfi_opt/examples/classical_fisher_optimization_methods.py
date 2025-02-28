@@ -2,8 +2,9 @@ import ibcdfo.pounders as pdrs
 import numpy as np
 from declare_hfun_and_combine_model_with_jax_CFI import hfun, combinemodels_jax, hfun_d
 from bayes_opt import BayesianOptimization
+import ipdb
 
-def run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0=0.125, nf_max=500, g_tol=1e-4):
+def run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0=0.125, Prior=None, nf_max=500, g_tol=1e-4):
 
     n = len(initial_point)
 
@@ -32,6 +33,7 @@ def run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0=0.125
 
     Pars = [np.sqrt(n), 10.0, 0.001, 0.001] # the second number is forcing us to pick points closer to TR.
     Model = {"np_max": int((n + 1) * (n + 2) / 2), "Par": Pars}
+    #Model = {"np_max": 2*n + 1, "Par": Pars}
 
     def wrapped_Ffun(x):
         return Ffun(x, sim_params)
@@ -42,12 +44,12 @@ def run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0=0.125
     Upp = np.array([entry[1] for entry in bounds])
 
     [X, F, hF, flag, xkin] = pdrs.pounders(wrapped_Ffun, initial_point, n, nf_max, g_tol, delta_0, m, Low, Upp,
-                                           Options=Opts, Model=Model)
+                                           Options=Opts, Model=Model, Prior=Prior)
 
     return X, F, hF, flag, xkin
 
 
-def run_bayes_opt(x_opt, num_thetas, bounds, rho, N, dphi, random_seed=888):
+def run_bayes_opt(x_opt, cfi_value, num_thetas, bounds, rho, N, dphi, random_seed=888, nf_max=64):
     # This function is intended only to attempt global maximization over theta.
     # The high-level idea of why I'm providing it is to sanity check a solution to make sure that the max over theta in
     # the definition of CFI is not, in fact, only a local maximum (meaning the CFI definition is wrong).
@@ -72,15 +74,22 @@ def run_bayes_opt(x_opt, num_thetas, bounds, rho, N, dphi, random_seed=888):
         f=bayes_wrapped_hFfun_fixed_x,
         pbounds=pbounds,
         random_state=random_seed,
-        verbose=1
+        verbose=1,
     )
 
+    # let the optimizer know we have one good guess already as a lower bound
+    initial_point = {}
+    for t in range(num_thetas):
+        initial_point['theta[' + str(t) + ']'] = x_opt[n - num_thetas + t]
+    optimizer.register(initial_point, cfi_value)
+
+    # now actually do the maximization:
     optimizer.maximize(
         init_points=num_thetas, # intuition: Latin hypercube sampling
-        n_iter=np.maximum(2 ** num_thetas, 64)  # intuition: let an acquisition function at least explore the corners.
+        n_iter=np.maximum(2 ** num_thetas, nf_max),  # intuition: let an acquisition function at least explore the corners.
     )
 
-    cfi_value = -1.0 * optimizer.max['target']
+    cfi_value = optimizer.max['target']
     theta_star = np.zeros(num_thetas)
     for t in range(num_thetas):
         theta_star[t] = optimizer.max['params']['theta[' + str(t) + ']']
@@ -92,8 +101,9 @@ if __name__ == "__main__":
     N = 4
     model = 'XX'
     coupling_exponent = 0.0
-    dissipation_rates = 0.1
+    dissipation_rates = 0.01
     layers = 1
+    dphi = 1e-5  # involved in CFI computation, unsure how much this should be exposed as a parameter.
     cfi_type = 4
 
     if cfi_type == 1:
@@ -113,34 +123,54 @@ if __name__ == "__main__":
         num_thetas = N
         bounds = [(0, 1 / 2), (0, 1 / 2)] + [(0, 1 / 2) if _ % 2 == 0 else (0, 1) for _ in range(2 * layers)] + [(0, 1)] + num_thetas * [(0, np.pi)]
 
-    # involved in CFI computation, unsure how much this should be exposed.
-    dphi = 1e-5
-
     # create dictionary from simulation parameters
     sim_params = {'N': N, 'model': model, 'coupling_exponent': coupling_exponent, 'dissipation_rates': dissipation_rates, 'dphi': dphi}
 
     initial_point = np.array(2 * [1/4] + [1/4 if _ % 2 == 0 else 1/2 for _ in range(2 * layers)] + [1/2] + num_thetas * [0])
+    n = len(initial_point)
     rho = Ffun(initial_point, sim_params, just_return_rho=True)
-    m = len(Ffun(initial_point, sim_params, just_theta=True, rho=rho))
+    initial_Fvec = Ffun(initial_point, sim_params, just_theta=True, rho=rho)
+    cfi_value = -1.0 * hfun(initial_Fvec)
+
+    # three more parameters for pounders:
+    m = len(initial_Fvec)
     delta_0 = 0.125
+    Prior = None
 
-    print("First testing pounders to find a stationary point of the composite objective function.")
-    X, F, hF, flag, xkin = run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0, nf_max=500, g_tol=1e-4)
+    # Can we identify a (near-)optimal starting theta given the fixed x?
+    cfi, theta_star = run_bayes_opt(initial_point, cfi_value, num_thetas, bounds, rho, N, dphi)
+    initial_point[n-num_thetas:] = theta_star
 
-    print("Optimal CFI is ", -1.0 * hF[xkin])
-    x_opt = X[xkin]
+    # Now we're going to iterate between (short) runs of pounders and attempts at global optimization until it looks
+    # like the value of cfi has converged.
+    num_iters = n # this is an upper bound on how long we're willing to let this loop run.
+    ftol = 1e-6 # this tolerance determines if we're making enough improvement between iterations.
+    nf_max = 10*n # this provides a lower bound, for BOTH pounders and Bayesian optimization, on function evaluations per optimizer call
 
-    print("Now probing the value of theta by Bayesian optimization to ensure that it's actually a global maximum.")
-    rho = Ffun(x_opt, sim_params, just_return_rho=True)
-    cfi, theta_star = run_bayes_opt(x_opt, num_thetas, bounds, rho, N, dphi)
-    print("Optimal CFI after attempting to improve theta is: ", -1.0 * cfi)
+    for iter in range(num_iters):
+        # do a pounders run
+        print("Running pounders to find a stationary point of the composite objective function.")
+        X, F, hF, flag, xkin = run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0, Prior=Prior, nf_max=nf_max, g_tol=1e-4)
 
-    print("If the post-Bayes values of optimal CFI is significantly better than the pre-Bayes value, then pounders")
-    print("unfortunately found a local maximum. You would ideally overwrite the last num_thetas entries of x_opt")
-    print("with theta_star and restart pounders. Also, note that it's wholly possible that, for the fixed x variables,")
-    print("theta is globally optimal. This simple test doesn't rule out this possibility. This is why restarts (or an ")
-    print("attempt at global optimization in x, as well) are necessary to convince yourself that you have THE solution")
+        cfi_after_pounders = -1.0 * hF[xkin]
+        print("Current estimate of optimal CFI: ", cfi_after_pounders)
+        x_opt = X[xkin]
 
+        # do a Bayesian optimization run, fixing x, and maximizing over theta
+        print("Now probing the value of theta by Bayesian optimization to see if it's actually approximating a global maximum.")
+        rho = Ffun(x_opt, sim_params, just_return_rho=True)
+        cfi_after_bo, theta_star = run_bayes_opt(x_opt, cfi_after_pounders, num_thetas, bounds, rho, N, dphi, nf_max=nf_max)
 
-
-
+        initial_point = x_opt
+        if cfi_after_bo > cfi_after_pounders:
+            x_opt[n-num_thetas:] = theta_star
+            cfi = cfi_after_bo
+            Prior = None
+        else:
+            if cfi_after_pounders < cfi + ftol:
+                break # not enough improvement, we're "converged"
+            else:
+                cfi = cfi_after_pounders # we're going to continue
+                Prior = {"X_init": X, "F_init": F, "xk_in": xkin, "nfs": len(F)}
+        print("Current estimate of optimal value of CFI: ", cfi)
+    print("Final estimate of optimal value of CFI: ", cfi)
