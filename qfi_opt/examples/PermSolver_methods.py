@@ -118,7 +118,7 @@ def flatrhomat(rho0, N):
         for j in range(0,2*i+1):
             for k in range(j,2*i+1):
                 result.append(rho0[i][j][k])
-    return result
+    return np.array(result)
 
 
 def recoverrhomat(rho0, N):
