@@ -500,6 +500,9 @@ def get_matrix_grads_rotate(rho, dA, eigvals, eigvecs, tol):
     psi_grads = np.zeros((dim, dim), dtype="cdouble")
     lambda_grads = np.zeros(dim)
 
+    if np.linalg.matrix_rank(rho) < dim:
+        return psi_grads, lambda_grads, eigvecs # skip this term of the matrix
+
     # group the sorted eigvals by tolerance, intended to help stability of eigenvector derivatives:
     current_ind = 0
     for ind1 in range(dim):
