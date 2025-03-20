@@ -32,18 +32,64 @@ def run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0=0.125
     }
 
     Pars = [np.sqrt(n), 10.0, 0.001, 0.001] # the second number is forcing us to pick points closer to TR.
-    Model = {"np_max": int((n + 1) * (n + 2) / 2), "Par": Pars}
-    #Model = {"np_max": 2*n + 1, "Par": Pars}
+    #Model = {"np_max": int((n + 1) * (n + 2) / 2), "Par": Pars}
+    Model = {"np_max": 2*n + 1, "Par": Pars}
 
     def wrapped_Ffun(x):
         return Ffun(x, sim_params)
 
     # don't actually bound the pounders run (function is periodic in all variables)
-    bounds = [(-np.inf, np.inf) for _ in range(2 * layers + 3 + num_thetas)]
+    bounds = [(-np.inf, np.inf) for _ in range(n)]
     Low = np.array([entry[0] for entry in bounds])
     Upp = np.array([entry[1] for entry in bounds])
 
     [X, F, hF, flag, xkin] = pdrs.pounders(wrapped_Ffun, initial_point, n, nf_max, g_tol, delta_0, m, Low, Upp,
+                                           Options=Opts, Model=Model, Prior=Prior)
+
+    return X, F, hF, flag, xkin
+
+def run_pounders_x_only(initial_point, num_thetas, Ffun, hfun, hfun_d, sim_params, m, delta_0=0.125, Prior=None, nf_max=500, g_tol=1e-4):
+
+    n = len(initial_point)
+    initial_x = initial_point[:n-num_thetas]
+    fixed_theta = initial_point[n-num_thetas:]
+
+    # need to scale hfun and hfun_d:
+    N = sim_params['N']
+    dphi = sim_params['dphi']
+
+    def scaled_hfun(y):
+        return hfun(y) / ((N * dphi) ** 2)
+
+    def scaled_hfun_d(y, yd):
+        resd = hfun_d(y, yd)
+        resd = np.array(resd)
+        for ctr in range(len(resd)):
+            resd[ctr] = resd[ctr] / ((N * dphi) ** 2)
+        return resd
+
+    Opts = {
+        "hfun": scaled_hfun,  # using structure
+        "combinemodels": combinemodels_jax, # not actually used, just pulling from outer scope
+        "hfun_d": scaled_hfun_d,  # using structure
+        "printf": 1,  # for debugging.
+        "spsolver": 4,
+        "delta_min": 1e-8
+    }
+
+    Pars = [np.sqrt(n), 10.0, 0.001, 0.001] # the second number is forcing us to pick points closer to TR.
+    Model = {"np_max": int((n + 1) * (n + 2) / 2), "Par": Pars}
+    #Model = {"np_max": 2*n + 1, "Par": Pars}
+
+    def wrapped_Ffun(x):
+        return Ffun(np.concatenate((x, fixed_theta)), sim_params)
+
+    # don't actually bound the pounders run (function is periodic in all variables)
+    bounds = [(-np.inf, np.inf) for _ in range(n - num_thetas)]
+    Low = np.array([entry[0] for entry in bounds])
+    Upp = np.array([entry[1] for entry in bounds])
+
+    [X, F, hF, flag, xkin] = pdrs.pounders(wrapped_Ffun, initial_x, n-num_thetas, nf_max, g_tol, delta_0, m, Low, Upp,
                                            Options=Opts, Model=Model, Prior=Prior)
 
     return X, F, hF, flag, xkin
@@ -86,7 +132,7 @@ def run_bayes_opt(x_opt, cfi_value, num_thetas, bounds, rho, N, dphi, random_see
     # now actually do the maximization:
     optimizer.maximize(
         init_points=num_thetas, # intuition: Latin hypercube sampling
-        n_iter=np.maximum(2 ** num_thetas, nf_max),  # intuition: let an acquisition function at least explore the corners.
+        n_iter=nf_max#np.maximum(2 ** num_thetas, nf_max),  # intuition: let an acquisition function at least explore the corners.
     )
 
     cfi_value = optimizer.max['target']
@@ -98,13 +144,13 @@ def run_bayes_opt(x_opt, cfi_value, num_thetas, bounds, rho, N, dphi, random_see
 
 if __name__ == "__main__":
     ##  Define the problem. This could be passed in a number of ways
-    N = 4
+    N = 6
     model = 'XX'
     coupling_exponent = 0.0
-    dissipation_rates = 0.01
+    dissipation_rates = 1.0
     layers = 1
     dphi = 1e-5  # involved in CFI computation, unsure how much this should be exposed as a parameter.
-    cfi_type = 4
+    cfi_type = 3
 
     if cfi_type == 1:
         from qfi_opt.examples.classical_fisher import compute_collective_basis_CFI_for_uniform_qubit_rotations_Ffun as Ffun
@@ -143,18 +189,24 @@ if __name__ == "__main__":
 
     # Now we're going to iterate between (short) runs of pounders and attempts at global optimization until it looks
     # like the value of cfi has converged.
-    num_iters = n # this is an upper bound on how long we're willing to let this loop run.
+    num_iters = 2*n # this is an upper bound on how long we're willing to let this loop run.
     ftol = 1e-6 # this tolerance determines if we're making enough improvement between iterations.
     nf_max = 10*n # this provides a lower bound, for BOTH pounders and Bayesian optimization, on function evaluations per optimizer call
+    pounders_x_only = False
 
     for iter in range(num_iters):
         # do a pounders run
         print("Running pounders to find a stationary point of the composite objective function.")
-        X, F, hF, flag, xkin = run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0, Prior=Prior, nf_max=nf_max, g_tol=1e-4)
-
+        if pounders_x_only:
+            X, F, hF, flag, xkin = run_pounders_x_only(initial_point, num_thetas, Ffun, hfun, hfun_d, sim_params, m, delta_0, Prior=Prior,
+                                                nf_max=nf_max, g_tol=1e-4)
+            x_opt = np.concatenate((X[xkin], initial_point[n-num_thetas:]))
+        else:
+            X, F, hF, flag, xkin = run_pounders(initial_point, Ffun, hfun, hfun_d, sim_params, m, delta_0, Prior=Prior, nf_max=nf_max, g_tol=1e-4)
+            x_opt = X[xkin]
         cfi_after_pounders = -1.0 * hF[xkin]
         print("Current estimate of optimal CFI: ", cfi_after_pounders)
-        x_opt = X[xkin]
+
 
         # do a Bayesian optimization run, fixing x, and maximizing over theta
         print("Now probing the value of theta by Bayesian optimization to see if it's actually approximating a global maximum.")
