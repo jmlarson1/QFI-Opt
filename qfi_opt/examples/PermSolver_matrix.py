@@ -696,7 +696,7 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
         teval=np.linspace(0, tmax, 40, endpoint=True)
         sol = solve_ivp(func, [0,tmax], rho0,  args=(Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension),t_eval=teval,rtol=rtol,
             atol=atol)#,method=method)
-        return sol
+        return np.expand_dims(np.squeeze(sol.y[:,-1]), axis=1)
     else:
 
         def _func(t, rho, args):
@@ -720,4 +720,4 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
         diffrax_kwargs["max_steps"] = diffrax_kwargs.get("max_steps", None)
         solver_args |= dict(adjoint=diffrax.DirectAdjoint())
         solution = diffrax.diffeqsolve(term, solver, **solver_args, **diffrax_kwargs)
-        return solution.ys #[-1]
+        return np.expand_dims(np.squeeze(solution.ys), axis=1)
