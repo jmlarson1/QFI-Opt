@@ -266,14 +266,13 @@ def calc_QFI(rho, Jmax, optrSz, tol=1e-10)->float:
 
 import PermSolver_matrix as matrix
 
-
 def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dissipation_rates:tuple|float=0.0, dissipation_format:str='XYZ'):
     assert dissipation_format in ['XYZ', 'PMZ'], "dissipation format distinct from preset formats"
     if len(params) < 5 or not len(params) % 2:
         raise ValueError(f"The number of parameters should be an odd number >=5, not {len(params)}.")
 
     Jmax = num_qubits//2
-    Nsteps = 11
+    Nsteps = 0
     Sx, Sy, Sz = operator_moments(Jmax, return_first_moments_only=True)
     Hmat, Hmatloc, Hmat2, Hmatloc2, dimension = Hamiltonian_set
 
@@ -313,12 +312,8 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
         if params[pp] > 0:
             state_f = flatrhomat(state, Jmax)
             sol = matrix.Perm_solver(state_f, params[pp] * np.pi, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension, Nsteps)
-            if USE_DIFFRAX == False:
-                state = recoverrhomat2(sol.y, Jmax, Nsteps)[-1]
-            else:
-                state = recoverrhomat2(sol, Jmax, Nsteps)[-1]
+            state = recoverrhomat2(sol, Jmax, Nsteps)[-1]
             # out_state = ent1[-1]
-
         state = UnitaryGate(state, Sx, -params[pp + 1] * np.pi, Jmax)
 
     # final rotation about Y
