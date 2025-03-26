@@ -693,7 +693,7 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
         atol=1e-10
         rtol=1e-10
         #method = DEFAULT_INTEGRATION_METHOD
-        teval=np.linspace(0, tmax, Ntime+1, endpoint=True)
+        teval=np.linspace(0, tmax, 40, endpoint=True)
         sol = solve_ivp(func, [0,tmax], rho0,  args=(Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension),t_eval=teval,rtol=rtol,
             atol=atol)#,method=method)
         return sol
@@ -712,8 +712,7 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
             """
         # set initial time step size
         diffrax_kwargs = {}
-        diffrax_kwargs["dt0"] = tmax.real/Ntime
-
+        diffrax_kwargs["dt0"] = tmax.real/(40)
         term = diffrax.ODETerm(_func)
         solver = diffrax.Tsit5()  # try also diffrax.Dopri8()
         solver_args = dict(t0=0.0, t1=tmax.real, y0=rho0, args=(Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension))
