@@ -154,7 +154,7 @@ def recoverrhomat2(rho0, N, Nstep):
                     else:
                         result[time][i] = result[time][i].at[mj1,mj2].set(rho0[count][time])
                         if mj1!=mj2:
-                            result[time][i] = result[time][i].at[mj1, mj2].set(np.conj(rho0[count][time]))
+                            result[time][i] = result[time][i].at[mj2, mj1].set(np.conj(rho0[count][time]))
                     
                     count+=1
     return result
