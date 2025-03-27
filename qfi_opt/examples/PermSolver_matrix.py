@@ -688,19 +688,19 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
         #print("drhodt.shape", drhodt.shape)
         return drhodt
         '''
-
+    t_eval_pts = 40
     if USE_DIFFRAX == False:
         atol=1e-10
         rtol=1e-10
         #method = DEFAULT_INTEGRATION_METHOD
-        teval=np.linspace(0, tmax, 40, endpoint=True)
+        teval=np.linspace(0, tmax, t_eval_pts, endpoint=True)
         sol = solve_ivp(func, [0,tmax], rho0,  args=(Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension),t_eval=teval,rtol=rtol,
             atol=atol)#,method=method)
         return np.expand_dims(np.squeeze(sol.y[:,-1]), axis=1)
     else:
 
         def _func(t, rho, args):
-            return func(t, rho, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+            return func(t, rho, *args)
             """
             drhodt=np.zeros(dimension, dtype=np.complex128)
             for i in range(0,dimension):
@@ -712,7 +712,7 @@ def Perm_solver(rho0, tmax, Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2
             """
         # set initial time step size
         diffrax_kwargs = {}
-        diffrax_kwargs["dt0"] = tmax.real/(40)
+        diffrax_kwargs["dt0"] = tmax.real/(t_eval_pts)
         term = diffrax.ODETerm(_func)
         solver = diffrax.Tsit5()  # try also diffrax.Dopri8()
         solver_args = dict(t0=0.0, t1=tmax.real, y0=rho0, args=(Dmat, Dmatloc, Dmat2, Dmatloc2, Hmat, Hmatloc, Hmat2, Hmatloc2, dimension))
