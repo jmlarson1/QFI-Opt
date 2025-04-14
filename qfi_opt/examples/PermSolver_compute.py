@@ -461,9 +461,9 @@ def husimi(rho:list, num_qubits:int, resolution_pts:int=101)->None:
         for Jth_sector in range(Jmax + 1):
             coherentState = np.zeros((2 * Jth_sector + 1, 1), dtype='complex128')
             for k in range(2 * Jth_sector + 1):
-                coherentState[k, 0] = (np.exp(1j * phi) * np.tan(theta / 2)) ** k * np.sqrt(binom(2 * Jth_sector, k))
+                coherentState[k, 0] = (np.exp(1j * phi) * np.sin(theta / 2)) ** k * np.cos(theta / 2) ** (2 * Jth_sector - k) * np.sqrt(binom(2 * Jth_sector, k))
 
-            full_state.append(coherentState * np.cos(theta / 2) ** (2 * Jth_sector))
+            full_state.append(coherentState)
 
         return full_state
 
