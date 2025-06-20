@@ -303,7 +303,7 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
         Sphi1.append(Sx[jj] * cos_component + Sy[jj] * sin_component)
 
     # rotate state for angle params[0] * pi about axis set by params[1] * pi
-    state = UnitaryGate(rho_init, Sphi1, -params[0] * np.pi, Jmax)
+    state = UnitaryGate(rho_init, Sphi1, params[0] * np.pi, Jmax)
 
     # Entangle-rotate
     for pp in range(2, len(params) - 1, 2):
@@ -314,10 +314,10 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
             sol = matrix.Perm_solver(state_f, params[pp] * np.pi, *dissipation_matrix_set[:-1], *Hamiltonian_set, Nsteps)
             state = recoverrhomat2(sol, Jmax, Nsteps)[-1]
             # out_state = ent1[-1]
-        state = UnitaryGate(state, Sx, -params[pp + 1] * np.pi, Jmax)
+        state = UnitaryGate(state, Sx, params[pp + 1] * np.pi, Jmax)
 
     # final rotation about Y
-    state = UnitaryGate(state, Sy, -params[-1] * np.pi, Jmax)
+    state = UnitaryGate(state, Sy, params[-1] * np.pi, Jmax)
 
     return state
 
