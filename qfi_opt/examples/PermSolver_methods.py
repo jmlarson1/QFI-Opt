@@ -321,14 +321,6 @@ def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dis
 
     return state
 
-#def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dissipation_rates:tuple|float=0.0, dissipation_format:str='XYZ'):
-#def simulate_OAT(
-#    params: Sequence[float] | np.ndarray,
-#    num_qubits: int,
-#    *,
-#    dissipation_rates: float | tuple[float, float, float] = 0.0,
-#    dissipation_format: str = DEFAULT_DISSIPATION_FORMAT,
-#)
 def get_jacobian_func(simulate_func):
     """Convert a simulation method into a function that returns its Jacobian."""
 
