@@ -101,7 +101,8 @@ def operator_moments(Jmax:float, return_first_moments_only:bool=False)->list:
 
 
 def unitary(rho,rotmat,theta):
-    result=expm(1j*rotmat*theta)@rho@expm(-1j*rotmat*theta)
+    U = expm(-1j*rotmat*theta)
+    result=U @ rho @ U.T.conj()
     return result
 
 
