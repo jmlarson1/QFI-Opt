@@ -267,7 +267,7 @@ def calc_QFI(rho, Jmax, optrSz, tol=1e-10)->float:
 
 import PermSolver_matrix as matrix
 
-def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dissipation_rates:tuple|float=0.0, dissipation_format:str='XYZ'):
+def simulate_layers(params:np.ndarray, num_qubits:int, Hamiltonian_set:list, dissipation_rates:list[float] | tuple[float] | float=0.0, dissipation_format:str='XYZ'):
     assert dissipation_format in ['XYZ', 'PMZ'], "dissipation format distinct from preset formats"
     if len(params) < 5 or not len(params) % 2:
         raise ValueError(f"The number of parameters should be an odd number >=5, not {len(params)}.")
