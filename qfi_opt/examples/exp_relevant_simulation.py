@@ -27,8 +27,8 @@ import sys, os
 
 import qfi_opt.spin_models as sm
 from qfi_opt.examples import calculate_qfi as calc_qfi
-import PermSolver_methods as methods
-import PermSolver_matrix as matrix
+from qfi_opt.examples import PermSolver_methods as methods
+from qfi_opt.examples import PermSolver_matrix as matrix
 
 import functools as ftools
 import warnings
