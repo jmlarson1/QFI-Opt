@@ -32,6 +32,7 @@ from qfi_opt.examples import PermSolver_matrix as matrix
 
 import functools as ftools
 import warnings
+import numpy as np
 
 """ 
 # raw inputs are all strings
@@ -43,11 +44,19 @@ model = sys.argv[2]
 coupling_exponent = float(sys.argv[3])
 dissipation_rates = sys.argv[4]
 dissipation_rates = float(dissipation_rates) if sys.argv[4].count(',') == 0 else tuple(float(rate) for rate in dissipation_rates.split(','))
-params = [float(param) for param in sys.argv[5].split(',')]
+layers = int(sys.argv[5])
+
+#params = [float(param) for param in sys.argv[5].split(',')]
 
 assert model in ['ising', 'local_TAT', 'XX'], f'Passed model "{model}" not in expected models: "ising", "local_TAT", "XX"'
 assert coupling_exponent >= 0, f'Coupling exponent {coupling_exponent} is unphysical.'
+
+params = (np.array([1/2 for _ in range(2)] + [1/2 if _ % 2 else 1 for _ in range(2 * layers)] + [1])
+      * np.random.rand(3 + 2 * layers))
+
 assert len(params) >= 5 and (len(params) - 3) % 2 == 0, f'Unexpected param length {len(params)}. Should follow 3 + 2 * l where l is the number of layers.'
+
+
 
 if (model == 'XX' and coupling_exponent == 0):
     warnings.warn("When coupling_exponent = 0, 'XX' and 'ising' are identical up to a phase (a factor of -1) which may affect the geometry of "
@@ -85,13 +94,14 @@ else:
     # jacobian
     # TODO: need to pass coupling_exponent?
     get_jacobian = sm.get_jacobian_func(sim_obj)
-    jacobian = ftools.partial(get_jacobian,
-                                  num_qubits=num_qubits,
-                                  dissipation_rates=dissipation_rates,
-                                  coupling_exponent=coupling_exponent)
+    #jacobian = ftools.partial(get_jacobian,
+    #                              num_qubits=num_qubits,
+    #                              dissipation_rates=dissipation_rates,
+    #                              coupling_exponent=coupling_exponent)
+    grad = np.zeros(len(params))
 
     # compute QFI
     vals, vecs = calc_qfi.compute_eigendecomposition(rho)
     obj_params["G"] = sm.collective_op(sm.PAULI_Z, num_qubits) / 2
-    sm_qfi, grad = calc_qfi.compute_QFI(eigvals=vals, eigvecs=vecs, params=params, obj_params=obj_params, jacobian=jacobian)
+    sm_qfi, grad = calc_qfi.compute_QFI(rho=rho, eigvals=vals, eigvecs=vecs, params=params, obj_params=obj_params, get_jacobian=get_jacobian, grad=grad)
     print(f'spin_models: \nQFI: {sm_qfi/num_qubits**2} \nparams: {[float(f"{_:.3f}") for _ in params]}')
